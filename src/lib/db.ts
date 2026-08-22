@@ -1,0 +1,112 @@
+import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
+
+import type { Deck, Difficulty } from './types';
+
+const DB_NAME = 'studypack.db';
+const SCHEMA_VERSION = 1;
+
+let instance: SQLiteDatabase | null = null;
+
+export function getDb(): SQLiteDatabase {
+  if (!instance) {
+    instance = openDatabaseSync(DB_NAME);
+  }
+  return instance;
+}
+
+/** Runs versioned migrations. Must complete before any screen renders. */
+export async function initDb(): Promise<void> {
+  const db = getDb();
+  await db.execAsync('PRAGMA journal_mode = WAL');
+  await db.execAsync('PRAGMA foreign_keys = ON');
+
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const version = row?.user_version ?? 0;
+
+  if (version < 1) {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS decks (
+          id TEXT PRIMARY KEY,
+          category_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          difficulty TEXT NOT NULL,
+          question_count INTEGER NOT NULL,
+          downloaded_at INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS questions (
+          id TEXT PRIMARY KEY,
+          deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+          position INTEGER NOT NULL,
+          prompt TEXT NOT NULL,
+          correct_answer TEXT NOT NULL,
+          answers_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_questions_deck ON questions(deck_id, position);
+        CREATE TABLE IF NOT EXISTS attempts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          deck_id TEXT NOT NULL,
+          score INTEGER NOT NULL,
+          total INTEGER NOT NULL,
+          duration_ms INTEGER NOT NULL,
+          completed_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_attempts_completed ON attempts(completed_at);
+      `);
+    });
+  }
+
+  await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
+interface DeckRow {
+  id: string;
+  category_id: number;
+  name: string;
+  difficulty: string;
+  question_count: number;
+  downloaded_at: number | null;
+}
+
+function toDeck(row: DeckRow): Deck {
+  return {
+    id: row.id,
+    categoryId: row.category_id,
+    name: row.name,
+    difficulty: row.difficulty as Difficulty,
+    questionCount: row.question_count,
+    downloadedAt: row.downloaded_at,
+  };
+}
+
+export async function listDecks(): Promise<Deck[]> {
+  const rows = await getDb().getAllAsync<DeckRow>(
+    `SELECT * FROM decks
+     ORDER BY name, CASE difficulty WHEN 'easy' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END`
+  );
+  return rows.map(toDeck);
+}
+
+/**
+ * Refreshes the browsable catalog. Never touches downloaded_at or questions,
+ * so a catalog refresh can't corrupt an existing download.
+ */
+export async function upsertCatalog(decks: Omit<Deck, 'downloadedAt'>[]): Promise<void> {
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    for (const deck of decks) {
+      await db.runAsync(
+        `INSERT INTO decks (id, category_id, name, difficulty, question_count)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           question_count = excluded.question_count`,
+        deck.id,
+        deck.categoryId,
+        deck.name,
+        deck.difficulty,
+        deck.questionCount
+      );
+    }
+  });
+}
