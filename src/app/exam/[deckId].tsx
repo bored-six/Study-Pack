@@ -1,6 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
@@ -20,7 +30,7 @@ const ORDER: ExamFormat[] = [
   'enumeration',
 ];
 
-function Stepper({
+function FormatRow({
   format,
   count,
   max,
@@ -32,6 +42,17 @@ function Stepper({
   onChange: (next: number) => void;
 }) {
   const disabled = max === 0;
+  const [draft, setDraft] = useState(String(count));
+
+  // Keep the field in step when Max or another control changes the number.
+  useEffect(() => {
+    setDraft(String(count));
+  }, [count]);
+
+  const commit = () => {
+    const parsed = parseInt(draft.replace(/[^0-9]/g, ''), 10);
+    onChange(Number.isNaN(parsed) ? 0 : parsed);
+  };
 
   return (
     <View style={[styles.row, disabled && styles.rowOff]}>
@@ -47,21 +68,24 @@ function Stepper({
       {disabled ? (
         <Text style={styles.none}>—</Text>
       ) : (
-        <View style={styles.stepper}>
+        <View style={styles.control}>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            onBlur={commit}
+            onSubmitEditing={commit}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            selectTextOnFocus
+            maxLength={3}
+            style={[styles.countInput, count > 0 && styles.countInputOn]}
+          />
           <Pressable
-            onPress={() => onChange(count - 1)}
+            onPress={() => onChange(max)}
             hitSlop={6}
-            style={({ pressed }) => [styles.step, pressed && styles.pressed]}>
-            <Text style={styles.stepText}>−</Text>
+            style={({ pressed }) => [styles.maxBtn, pressed && styles.pressed]}>
+            <Text style={styles.maxText}>Max {max}</Text>
           </Pressable>
-          <Text style={styles.count}>{count}</Text>
-          <Pressable
-            onPress={() => onChange(count + 1)}
-            hitSlop={6}
-            style={({ pressed }) => [styles.step, pressed && styles.pressed]}>
-            <Text style={styles.stepText}>+</Text>
-          </Pressable>
-          <Text style={styles.max}>of {max}</Text>
         </View>
       )}
     </View>
@@ -98,6 +122,9 @@ export default function ExamSetupScreen() {
   }
 
   const picked = total();
+  // Roughly half a minute per question — enough to set expectations.
+  const minutes = Math.round(picked * 0.5);
+  const longExam = picked > 40;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
@@ -121,7 +148,7 @@ export default function ExamSetupScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
         {ORDER.map((format) => (
-          <Stepper
+          <FormatRow
             key={format}
             format={format}
             count={counts[format]}
@@ -133,16 +160,20 @@ export default function ExamSetupScreen() {
         <View style={styles.note}>
           <Icon name="bulb" size={16} color={colors.gold} strokeWidth={2.2} />
           <Text style={styles.noteText}>
-            Question types are mixed together and the order is shuffled, so it won't run in
-            blocks.
+            A question can show up in more than one format — the same fact as multiple choice
+            and again as true or false. Types are mixed and the order shuffled.
           </Text>
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <Text style={styles.total}>
-          {picked} question{picked === 1 ? '' : 's'} selected
+          {picked} question{picked === 1 ? '' : 's'}
+          {minutes > 0 ? ` · about ${minutes} min` : ''}
         </Text>
+        {longExam ? (
+          <Text style={styles.longNote}>That’s a big sitting — you can always do less.</Text>
+        ) : null}
         <ChunkyButton
           label={picked === 0 ? 'Pick at least one' : 'Start exam'}
           icon="play"
@@ -240,37 +271,46 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     marginTop: 1,
   },
-  stepper: {
+  control: {
     alignItems: 'center',
-    gap: 2,
+    gap: 5,
   },
-  step: {
-    width: 30,
-    height: 30,
-    borderRadius: 11,
-    backgroundColor: colors.accentWash,
+  countInput: {
+    width: 56,
     borderWidth: 1.5,
     borderColor: colors.edge,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepText: {
-    fontFamily: font.heading,
-    fontSize: 17,
-    lineHeight: 21,
-    color: colors.accentDeep,
-  },
-  count: {
+    borderRadius: 12,
+    backgroundColor: colors.surface2,
+    paddingVertical: 8,
+    textAlign: 'center',
     fontFamily: font.hero,
     fontSize: 19,
-    lineHeight: 24,
-    color: colors.text,
+    color: colors.textFaint,
     fontVariant: ['tabular-nums'],
   },
-  max: {
+  countInputOn: {
+    backgroundColor: colors.accentWash,
+    borderColor: colors.ink,
+    color: colors.text,
+  },
+  maxBtn: {
+    backgroundColor: colors.accentWash,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  maxText: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 10.5,
+    color: colors.accentDeep,
+    fontVariant: ['tabular-nums'],
+  },
+  longNote: {
     fontFamily: font.bodySemibold,
-    fontSize: 10,
-    color: colors.textFaint,
+    fontSize: 11.5,
+    color: colors.gold,
+    textAlign: 'center',
+    marginTop: -4,
   },
   none: {
     fontFamily: font.heading,

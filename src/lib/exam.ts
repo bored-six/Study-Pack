@@ -295,12 +295,16 @@ function buildEnumeration(question: Question): EnumerationItem {
   };
 }
 
+/** Terms per matching grid: fewer than three is trivial, more than five is a wall. */
+const MATCHING_MIN = 3;
+const MATCHING_MAX = 5;
+
 /** Matching groups several definition questions into one exercise. */
 export function buildMatching(questions: Question[], rand: () => number): MatchingItem | null {
   const usable = questions.filter((q) => q.kind === 'definition' && q.sourceLine);
-  if (usable.length < 3) return null;
+  if (usable.length < MATCHING_MIN) return null;
 
-  const chosen = shuffleWith(usable, rand).slice(0, Math.min(5, usable.length));
+  const chosen = shuffleWith(usable, rand).slice(0, Math.min(MATCHING_MAX, usable.length));
   const terms = chosen.map((q) => q.correctAnswer);
   const meanings = chosen.map((q) => meaningOf(q));
   const order = shuffleWith(
@@ -347,14 +351,25 @@ export function availability(questions: Question[]): Record<ExamFormat, number> 
   for (const question of questions) {
     for (const format of supportedFormats(question)) counts[format]++;
   }
-  // Matching bundles up to five terms into a single exercise.
-  counts.matching = counts.matching >= 3 ? Math.floor(counts.matching / 3) : 0;
+  // Matching bundles up to five terms per grid and needs at least three, so
+  // count the grids you can actually fill rather than dividing.
+  let spare = counts.matching;
+  let grids = 0;
+  while (spare >= MATCHING_MIN) {
+    spare -= Math.min(MATCHING_MAX, spare);
+    grids++;
+  }
+  counts.matching = grids;
   return counts;
 }
 
 /**
- * Builds the exam. Each question is used at most once, formats are
- * interleaved rather than grouped, and the order is shuffled.
+ * Builds the exam.
+ *
+ * A question may be used once *per format*, never twice in the same one. That
+ * is deliberate: testing the same fact as multiple choice and again as
+ * true/false is reinforcement, and it's what lets a 21-question deck produce a
+ * 40-question exam. Formats are interleaved and the order shuffled.
  */
 export function buildExam(
   questions: Question[],
@@ -363,28 +378,32 @@ export function buildExam(
 ): ExamItem[] {
   const rand = seed(seedText + questions.length);
   const pool = shuffleWith(questions, rand);
-  const used = new Set<string>();
   const items: ExamItem[] = [];
 
-  // Matching first: it consumes several questions at once.
+  // Matching first: one exercise consumes several questions at once, and no
+  // question should appear in two different matching grids.
+  const usedInMatching = new Set<string>();
   for (const request of requests.filter((r) => r.format === 'matching')) {
     for (let n = 0; n < request.count; n++) {
-      const available = pool.filter((q) => !used.has(q.id));
+      const available = pool.filter((q) => !usedInMatching.has(q.id));
       const item = buildMatching(available, rand);
       if (!item) break;
       item.terms.forEach((term) => {
         const match = available.find((q) => q.correctAnswer === term);
-        if (match) used.add(match.id);
+        if (match) usedInMatching.add(match.id);
       });
       items.push(item);
     }
   }
 
   for (const request of requests.filter((r) => r.format !== 'matching')) {
+    // Fresh per format, so the same fact can be revisited a different way.
+    const usedInFormat = new Set<string>();
     let made = 0;
+
     for (const question of pool) {
       if (made >= request.count) break;
-      if (used.has(question.id)) continue;
+      if (usedInFormat.has(question.id)) continue;
       if (!supportedFormats(question).includes(request.format)) continue;
 
       let item: ExamItem | null = null;
@@ -408,7 +427,7 @@ export function buildExam(
       }
 
       if (!item) continue;
-      used.add(question.id);
+      usedInFormat.add(question.id);
       items.push(item);
       made++;
     }

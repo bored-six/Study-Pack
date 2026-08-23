@@ -103,9 +103,21 @@ describe('availability', () => {
     expect(availability([DEFINITION(), CLOZE()]).matching).toBe(0);
   });
 
-  it('bundles definitions into matching exercises', () => {
-    const decks = [DEFINITION(), DEFINITION(), DEFINITION(), DEFINITION(), DEFINITION(), DEFINITION()];
-    expect(availability(decks).matching).toBe(2);
+  it('counts only the matching grids it can actually fill', () => {
+    const defs = (n: number) => Array.from({ length: n }, DEFINITION);
+    // Three fills one grid exactly.
+    expect(availability(defs(3)).matching).toBe(1);
+    // Seven fills one grid of five and leaves two — not enough for a second.
+    expect(availability(defs(7)).matching).toBe(1);
+    // Ten fills two full grids.
+    expect(availability(defs(10)).matching).toBe(2);
+  });
+
+  it('promises no more matching grids than buildExam can produce', () => {
+    const deck = Array.from({ length: 7 }, DEFINITION);
+    const promised = availability(deck).matching;
+    const built = buildExam(deck, [{ format: 'matching', count: promised }], 'match-seed');
+    expect(built.filter((i) => i.format === 'matching')).toHaveLength(promised);
   });
 });
 
@@ -118,17 +130,38 @@ describe('buildExam', () => {
     expect(items.every((i) => i.format === 'multiple_choice')).toBe(true);
   });
 
-  it('never uses the same question twice in one exam', () => {
+  it('never repeats a question within one format', () => {
+    const items = buildExam(DECK, [{ format: 'multiple_choice', count: 6 }], 'seed-b');
+    const ids = items.map((i) => i.questionId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('lets a question be revisited in a different format', () => {
     const items = buildExam(
       DECK,
       [
-        { format: 'multiple_choice', count: 3 },
-        { format: 'true_false', count: 3 },
+        { format: 'multiple_choice', count: 6 },
+        { format: 'true_false', count: 6 },
       ],
-      'seed-b'
+      'seed-b2'
     );
-    const ids = items.map((i) => i.questionId);
-    expect(new Set(ids).size).toBe(ids.length);
+    // Both formats draw from the same six questions, so we get twelve items.
+    expect(items).toHaveLength(12);
+    expect(new Set(items.map((i) => i.id)).size).toBe(12);
+  });
+
+  it('fills each format independently rather than racing for a shared pool', () => {
+    // The bug this replaces: matching ate the deck and left nothing for the rest.
+    const items = buildExam(
+      DECK,
+      [
+        { format: 'matching', count: 1 },
+        { format: 'multiple_choice', count: 6 },
+      ],
+      'seed-b3'
+    );
+    expect(items.filter((i) => i.format === 'multiple_choice')).toHaveLength(6);
+    expect(items.filter((i) => i.format === 'matching')).toHaveLength(1);
   });
 
   it('mixes the formats rather than running them in blocks', () => {
