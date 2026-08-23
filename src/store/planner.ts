@@ -3,9 +3,11 @@ import { create } from 'zustand';
 import {
   createSchedule,
   deleteSchedule,
+  disableSchedules,
   listSchedules,
   readSetting,
   setScheduleEnabled,
+  setScheduleStart,
   writeSetting,
   type NewSchedule,
 } from '@/lib/db';
@@ -21,8 +23,11 @@ import {
   bucketIntoSessions,
   DEFAULT_LEADS,
   expandOccurrences,
+  isSpent,
+  nextOccurrenceFrom,
   planReminders,
   SESSION_WINDOW_MIN,
+  spentScheduleIds,
   type PlannedReminder,
   type Session,
 } from '@/lib/schedule';
@@ -67,8 +72,9 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     ]);
 
     const leads = parseLeads(savedLeads) ?? [...DEFAULT_LEADS];
-    set({ schedules, leads, capability, status: 'ready' });
-    await reArm(schedules, leads, set);
+    const live = await retireSpent(schedules);
+    set({ schedules: live, leads, capability, status: 'ready' });
+    await reArm(live, leads, set);
   },
 
   add: async (schedule) => {
@@ -79,6 +85,12 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
   },
 
   toggle: async (id, enabled) => {
+    // Switching a spent one-off back on has to give it a future date,
+    // or the sweep would flick it straight off again.
+    const current = get().schedules.find((s) => s.id === id);
+    if (enabled && current && isSpent(current)) {
+      await setScheduleStart(id, nextOccurrenceFrom(current.timeOfDay));
+    }
     await setScheduleEnabled(id, enabled);
     const schedules = await listSchedules();
     set({ schedules });
@@ -119,6 +131,27 @@ export const usePlannerStore = create<PlannerState>((set, get) => ({
     await cancelSession(sessionAt);
   },
 }));
+
+/**
+ * A quiz planned for one specific moment is done once that moment passes —
+ * it can never fire again, so switch it off instead of leaving a dead plan
+ * looking armed. Runs on every refresh, which is every time the Planner or
+ * Home screen comes into focus.
+ */
+async function retireSpent(schedules: readonly Schedule[]): Promise<Schedule[]> {
+  const spent = spentScheduleIds(schedules);
+  if (spent.length === 0) return [...schedules];
+
+  const ids = new Set(spent);
+  try {
+    await disableSchedules(spent);
+  } catch (e) {
+    // The plan is still shown either way; it just stays on until next time.
+    console.warn('Could not retire spent plans', e);
+    return [...schedules];
+  }
+  return schedules.map((s) => (ids.has(s.id) ? { ...s, enabled: false } : s));
+}
 
 function parseLeads(raw: string | null): number[] | null {
   if (!raw) return null;

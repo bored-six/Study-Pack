@@ -1,9 +1,13 @@
 import {
   bucketIntoSessions,
   expandOccurrences,
+  isSpent,
   joinDeckNames,
+  nextOccurrenceFrom,
+  occurrenceAt,
   planReminders,
   reminderCopy,
+  spentScheduleIds,
   type Occurrence,
 } from '../schedule';
 import type { Schedule } from '../types';
@@ -192,5 +196,41 @@ describe('copy', () => {
     const plan = planReminders([schedule({ id: 1, deckName: 'Biology' })], { now: at(24, 12) });
     expect(reminderCopy(plan[0]).title).toBe('1 quiz in 10 min');
     expect(reminderCopy(plan[1]).title).toBe('Time to study');
+  });
+});
+
+describe('spent one-offs', () => {
+  it('is spent once the moment it was planned for has gone by', () => {
+    const once = schedule({ id: 1, deckName: 'Biology' });
+    expect(occurrenceAt(once)).toBe(at(24, 19));
+    expect(isSpent(once, at(24, 18, 59))).toBe(false);
+    expect(isSpent(once, at(24, 19))).toBe(true);
+    expect(isSpent(once, at(25, 8))).toBe(true);
+  });
+
+  it('never calls a repeat spent', () => {
+    for (const repeat of ['daily', 'weekdays', 'weekly'] as const) {
+      const plan = schedule({ id: 1, deckName: 'Biology', repeat });
+      expect(isSpent(plan, at(30, 12))).toBe(false);
+    }
+  });
+
+  it('only reports one-offs that are still switched on', () => {
+    const plans = [
+      schedule({ id: 1, deckName: 'Biology' }),
+      schedule({ id: 2, deckName: 'Chem', enabled: false }),
+      schedule({ id: 3, deckName: 'Maths', repeat: 'daily' }),
+      schedule({ id: 4, deckName: 'History', startDate: at(28, 0) }),
+    ];
+    expect(spentScheduleIds(plans, at(25, 9))).toEqual([1]);
+    expect(spentScheduleIds(plans, at(24, 12))).toEqual([]);
+  });
+
+  it('moves a re-enabled one-off to the next time that clock comes around', () => {
+    // Still ahead today.
+    expect(nextOccurrenceFrom(19 * 60, at(24, 12))).toBe(at(24, 19));
+    // Already gone by, so tomorrow.
+    expect(nextOccurrenceFrom(19 * 60, at(24, 19))).toBe(at(25, 19));
+    expect(nextOccurrenceFrom(8 * 60, at(24, 22))).toBe(at(25, 8));
   });
 });

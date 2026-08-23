@@ -93,6 +93,43 @@ function occursOn(repeat: Repeat, day: Date, start: Date): boolean {
   }
 }
 
+/** The single moment a plan's start day and time of day land on. */
+export function occurrenceAt(schedule: Pick<Schedule, 'startDate' | 'timeOfDay'>): number {
+  return atLocalTime(startOfLocalDay(schedule.startDate), schedule.timeOfDay);
+}
+
+/**
+ * A one-off plan is *spent* once its moment has gone by: it can never fire
+ * again, so leaving the switch on would be a lie. Repeats are never spent.
+ */
+export function isSpent(schedule: Schedule, now: number = Date.now()): boolean {
+  return schedule.repeat === 'once' && occurrenceAt(schedule) <= now;
+}
+
+/**
+ * Ids of enabled one-offs that have gone by. The planner switches these
+ * off for the student rather than leaving dead plans looking armed.
+ */
+export function spentScheduleIds(
+  schedules: readonly Schedule[],
+  now: number = Date.now()
+): number[] {
+  return schedules.filter((s) => s.enabled && isSpent(s, now)).map((s) => s.id);
+}
+
+/**
+ * The next time this time of day comes around — today if it is still
+ * ahead, otherwise tomorrow. Switching a spent one-off back on moves it
+ * here, so the switch means something instead of flicking straight off.
+ */
+export function nextOccurrenceFrom(timeOfDay: number, now: number = Date.now()): number {
+  const today = startOfLocalDay(now);
+  const at = atLocalTime(today, timeOfDay);
+  if (at > now) return at;
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  return atLocalTime(tomorrow, timeOfDay);
+}
+
 /** Expands schedules into concrete dated occurrences within the window. */
 export function expandOccurrences(
   schedules: readonly Schedule[],

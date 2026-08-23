@@ -20,6 +20,7 @@ import { listDecks } from '@/lib/db';
 import {
   AVAILABLE_LEADS,
   formatClock,
+  isSpent,
   joinDeckNames,
   LEAD_LABEL,
   SESSION_WINDOW_MIN,
@@ -200,6 +201,7 @@ export default function PlannerScreen() {
                   </Text>
                   <Text style={[styles.planMeta, !schedule.enabled && styles.dimmed]}>
                     {schedule.deckName} · {REPEAT_LABEL[schedule.repeat]}
+                    {isSpent(schedule, now) ? ' · done' : ''}
                   </Text>
                 </View>
                 <Switch

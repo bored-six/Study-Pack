@@ -510,6 +510,25 @@ export async function setScheduleEnabled(id: number, enabled: boolean): Promise<
   );
 }
 
+/** Switches several plans off at once — used to retire spent one-offs. */
+export async function disableSchedules(ids: readonly number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const holes = ids.map(() => '?').join(', ');
+  await getDb().runAsync(
+    `UPDATE schedules SET enabled = 0 WHERE id IN (${holes})`,
+    ...ids
+  );
+}
+
+/** Moves a plan to a new start day, keeping its time of day. */
+export async function setScheduleStart(id: number, startDate: number): Promise<void> {
+  await getDb().runAsync(
+    'UPDATE schedules SET start_date = ? WHERE id = ?',
+    startDate,
+    id
+  );
+}
+
 export async function deleteSchedule(id: number): Promise<void> {
   await getDb().runAsync('DELETE FROM schedules WHERE id = ?', id);
 }
