@@ -1,6 +1,6 @@
 import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 
-import type { Deck, Difficulty, Question } from './types';
+import type { Attempt, Deck, Difficulty, Question } from './types';
 
 const DB_NAME = 'studypack.db';
 const SCHEMA_VERSION = 1;
@@ -156,4 +156,46 @@ export async function removeDownload(deckId: string): Promise<void> {
     await db.runAsync('DELETE FROM questions WHERE deck_id = ?', deckId);
     await db.runAsync('UPDATE decks SET downloaded_at = NULL WHERE id = ?', deckId);
   });
+}
+
+export async function getDeckById(id: string): Promise<Deck | null> {
+  const row = await getDb().getFirstAsync<DeckRow>('SELECT * FROM decks WHERE id = ?', id);
+  return row ? toDeck(row) : null;
+}
+
+interface QuestionRow {
+  id: string;
+  deck_id: string;
+  position: number;
+  prompt: string;
+  correct_answer: string;
+  answers_json: string;
+}
+
+/** The quiz reads exclusively from here — it never touches the network. */
+export async function listQuestions(deckId: string): Promise<Question[]> {
+  const rows = await getDb().getAllAsync<QuestionRow>(
+    'SELECT * FROM questions WHERE deck_id = ? ORDER BY position',
+    deckId
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    deckId: row.deck_id,
+    position: row.position,
+    prompt: row.prompt,
+    correctAnswer: row.correct_answer,
+    answers: JSON.parse(row.answers_json) as string[],
+  }));
+}
+
+export async function saveAttempt(attempt: Omit<Attempt, 'id'>): Promise<void> {
+  await getDb().runAsync(
+    `INSERT INTO attempts (deck_id, score, total, duration_ms, completed_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    attempt.deckId,
+    attempt.score,
+    attempt.total,
+    attempt.durationMs,
+    attempt.completedAt
+  );
 }

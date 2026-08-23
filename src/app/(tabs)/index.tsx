@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -45,6 +46,10 @@ export default function DecksScreen() {
     },
     [downloadDeck]
   );
+
+  const handleStartQuiz = useCallback((deck: Deck) => {
+    router.push({ pathname: '/quiz/[deckId]', params: { deckId: deck.id } });
+  }, []);
 
   const handleRemove = useCallback(
     (deck: Deck) => {
@@ -100,6 +105,7 @@ export default function DecksScreen() {
             downloading={downloading[item.id] === true}
             onDownload={handleDownload}
             onRemove={handleRemove}
+            onStartQuiz={handleStartQuiz}
           />
         )}
         contentContainerStyle={styles.list}
