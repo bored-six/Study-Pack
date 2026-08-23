@@ -1,11 +1,14 @@
 import { Redirect, router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon, type IconName } from '@/components/Icon';
 import { RuledPaper, Tape } from '@/components/notebook';
 import { DIFFICULTY_LABEL } from '@/lib/types';
+import { AchievementModal } from '@/components/AchievementModal';
+import { useAchievementsStore } from '@/store/achievements';
 import { useMomentsStore } from '@/store/moments';
 import { useQuizStore } from '@/store/quiz';
 import { colors, font, outline, radius, shadow, textPop } from '@/theme/tokens';
@@ -21,6 +24,10 @@ export default function ResultsScreen() {
   const insets = useSafeAreaInsets();
   const { deck, questions, score, durationMs } = useQuizStore();
   const moment = useMomentsStore((s) => s.latest);
+  const pending = useAchievementsStore((s) => s.pending);
+  const clearPending = useAchievementsStore((s) => s.clearPending);
+  const [revealing, setRevealing] = useState(false);
+  const [revealIndex, setRevealIndex] = useState(0);
 
   // Only reachable by finishing a quiz; a cold deep link goes home.
   if (!deck || questions.length === 0) {
@@ -80,6 +87,20 @@ export default function ResultsScreen() {
         </View>
       ) : null}
 
+      {pending.length > 0 ? (
+        <Pressable
+          onPress={() => {
+            setRevealIndex(0);
+            setRevealing(true);
+          }}
+          style={({ pressed }) => [styles.achBanner, pressed && { opacity: 0.85 }]}>
+          <Icon name="star" size={18} color={colors.ink} fill={colors.gold} />
+          <Text style={styles.achBannerText}>
+            You got {pending.length === 1 ? 'an achievement' : `${pending.length} achievements`} — press to open
+          </Text>
+        </Pressable>
+      ) : null}
+
       <View style={styles.actions}>
         <ChunkyButton
           label="Try again"
@@ -91,6 +112,17 @@ export default function ResultsScreen() {
         />
         <ChunkyButton label="Done" size="lg" onPress={() => router.back()} />
       </View>
+
+      <AchievementModal
+        visible={revealing}
+        unlocks={pending}
+        index={revealIndex}
+        onNext={() => setRevealIndex((i) => i + 1)}
+        onClose={() => {
+          setRevealing(false);
+          clearPending();
+        }}
+      />
     </View>
   );
 }
@@ -203,6 +235,23 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.textDim,
     marginTop: 3,
+  },
+  achBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.goldWash,
+    ...outline,
+    borderRadius: radius.control,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+    marginTop: 12,
+  },
+  achBannerText: {
+    flex: 1,
+    fontFamily: font.heading,
+    fontSize: 14.5,
+    color: colors.text,
   },
   actions: {
     gap: 12,

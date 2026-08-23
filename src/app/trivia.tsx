@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -12,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { DeckCard } from '@/components/DeckCard';
 import { Icon } from '@/components/Icon';
 import { RuledPaper } from '@/components/notebook';
@@ -56,13 +56,16 @@ export default function TriviaScreen() {
     [visible]
   );
 
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
+  const [removing, setRemoving] = useState<Deck | null>(null);
+
   const handleDownload = useCallback(
     (deck: Deck) => {
       downloadDeck(deck).catch((e: unknown) => {
-        Alert.alert(
-          `Couldn't download ${deck.name}`,
-          e instanceof Error ? e.message : 'Something went wrong — try again.'
-        );
+        setNotice({
+          title: `Couldn't download ${deck.name}`,
+          message: e instanceof Error ? e.message : 'Something went wrong — try again.',
+        });
       });
     },
     [downloadDeck]
@@ -72,19 +75,7 @@ export default function TriviaScreen() {
     router.push({ pathname: '/quiz/[deckId]', params: { deckId: deck.id } });
   }, []);
 
-  const handleRemove = useCallback(
-    (deck: Deck) => {
-      Alert.alert('Remove download?', `${deck.name} will no longer work offline.`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => void removeDownload(deck.id),
-        },
-      ]);
-    },
-    [removeDownload]
-  );
+  const handleRemove = useCallback((deck: Deck) => setRemoving(deck), []);
 
   const header = (
     <View>
@@ -187,6 +178,27 @@ export default function TriviaScreen() {
             </View>
           ) : null
         }
+      />
+
+      <ConfirmModal
+        visible={notice != null}
+        title={notice?.title ?? ''}
+        message={notice?.message}
+        confirmLabel="Got it"
+        onCancel={() => setNotice(null)}
+      />
+      <ConfirmModal
+        visible={removing != null}
+        title="Remove download?"
+        message={removing ? `${removing.name} will no longer work offline.` : undefined}
+        confirmLabel="Remove"
+        destructive
+        onCancel={() => setRemoving(null)}
+        onConfirm={() => {
+          const id = removing?.id;
+          setRemoving(null);
+          if (id) void removeDownload(id);
+        }}
       />
     </View>
   );

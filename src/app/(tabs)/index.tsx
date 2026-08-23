@@ -1,12 +1,14 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/Icon';
+import { SubjectSheet } from '@/components/SubjectSheet';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import type { Deck } from '@/lib/types';
+import { customizeDeck } from '@/lib/db';
 import { colors, derpRadius, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
 import { formatClock, joinDeckNames } from '@/lib/schedule';
 import { usePlannerStore } from '@/store/planner';
@@ -53,16 +55,21 @@ export default function HomeScreen() {
     [decks]
   );
 
-  const handleDeleteNote = useCallback(
-    (deck: Deck) => {
-      Alert.alert('Delete these notes?', `"${deck.name}" and its questions will be removed.`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => void removeNoteDeck(deck.id),
-        },
-      ]);
+  const [editing, setEditing] = useState<Deck | null>(null);
+
+  const handleSaveLook = useCallback(
+    async (deckId: string, color: string | null, icon: string | null) => {
+      await customizeDeck(deckId, color, icon);
+      setEditing(null);
+      void refreshNotes();
+    },
+    [refreshNotes]
+  );
+
+  const handleDeleteSubject = useCallback(
+    (deckId: string) => {
+      setEditing(null);
+      void removeNoteDeck(deckId);
     },
     [removeNoteDeck]
   );
@@ -117,7 +124,7 @@ export default function HomeScreen() {
         </Pressable>
       ) : null}
 
-      <SectionHeading icon="book" label="MY NOTES" />
+      {noteDecks.length > 0 ? <SectionHeading icon="book" label="MY SUBJECTS" /> : null}
 
       {noteDecks.map((deck) => (
         <Pressable
@@ -126,10 +133,20 @@ export default function HomeScreen() {
             // Subjects open the exam builder; trivia keeps the plain quiz.
             router.push({ pathname: '/exam/[deckId]', params: { deckId: deck.id } })
           }
-          onLongPress={() => handleDeleteNote(deck)}
+          onLongPress={() => setEditing(deck)}
           style={({ pressed }) => [styles.noteDeckCard, pressed && styles.pressed]}>
-          <View style={styles.noteDeckBadge}>
-            <Icon name="book" size={24} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
+          <View
+            style={[
+              styles.noteDeckBadge,
+              deck.color ? { backgroundColor: deck.color } : null,
+            ]}>
+            <Icon
+              name={(deck.icon as IconName | null) ?? 'book'}
+              size={24}
+              color={colors.ink}
+              fill={colors.surface}
+              strokeWidth={1.9}
+            />
           </View>
           <View style={styles.cardText}>
             <Text style={styles.cardTitle} numberOfLines={1}>
@@ -139,9 +156,17 @@ export default function HomeScreen() {
               {deck.questionCount} question{deck.questionCount === 1 ? '' : 's'} · always offline
             </Text>
           </View>
+          <Pressable
+            hitSlop={10}
+            onPress={() => setEditing(deck)}
+            style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}>
+            <Icon name="pencil" size={16} color={colors.textFaint} strokeWidth={1.9} />
+          </Pressable>
           <Icon name="play" size={16} color={colors.accentDeep} />
         </Pressable>
       ))}
+
+      <SectionHeading icon="note" label="ADD NOTES" />
 
       <Pressable
         onPress={() => router.push('/notes/new')}
@@ -182,6 +207,14 @@ export default function HomeScreen() {
         <Icon name="play" size={16} color={colors.accentDeep} />
       </Pressable>
       </ScrollView>
+
+      <SubjectSheet
+        visible={editing != null}
+        subject={editing}
+        onClose={() => setEditing(null)}
+        onSave={(deckId, color, icon) => void handleSaveLook(deckId, color, icon)}
+        onDelete={handleDeleteSubject}
+      />
     </View>
   );
 }
@@ -380,6 +413,16 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     letterSpacing: 1.3,
     color: colors.gold,
+  },
+  editBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: colors.surface2,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pressed: {
     opacity: 0.8,

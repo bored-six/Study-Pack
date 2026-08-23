@@ -1,13 +1,16 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AchievementModal } from '@/components/AchievementModal';
 import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle } from '@/components/notebook';
 import { type AttemptWithDeck } from '@/lib/db';
 import { daysToNextTier, fireFor } from '@/lib/fire';
 import { masteryLabel, type SubjectMastery } from '@/lib/mastery';
+import { ACHIEVEMENTS, achievementById, type Unlock } from '@/lib/achievements';
+import { useAchievementsStore } from '@/store/achievements';
 import { useMomentsStore } from '@/store/moments';
 import { useProgressStore } from '@/store/progress';
 import { colors, font, radius, tabClearance } from '@/theme/tokens';
@@ -97,12 +100,16 @@ export default function ProgressScreen() {
     refresh,
   } = useProgressStore();
   const { log: moments, refresh: refreshMoments } = useMomentsStore();
+  const { unlocked, refresh: refreshAchievements } = useAchievementsStore();
+  const [viewing, setViewing] = useState<Unlock | null>(null);
+  const [lockedTapped, setLockedTapped] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       void refresh();
       void refreshMoments();
-    }, [refresh, refreshMoments])
+      void refreshAchievements();
+    }, [refresh, refreshMoments, refreshAchievements])
   );
 
   if (status !== 'ready') {
@@ -172,6 +179,35 @@ export default function ProgressScreen() {
               </View>
             ) : null}
 
+            <Text style={styles.section}>
+              ACHIEVEMENTS · {unlocked.length} OF {ACHIEVEMENTS.length} FOUND
+            </Text>
+            <View style={styles.achGrid}>
+              {unlocked.map((unlock) => {
+                const def = achievementById(unlock.id);
+                if (!def) return null;
+                return (
+                  <Pressable
+                    key={unlock.id}
+                    onPress={() => setViewing(unlock)}
+                    style={({ pressed }) => [styles.achTile, pressed && { opacity: 0.8 }]}>
+                    <Icon name={def.icon} size={22} color={colors.ink} fill={colors.goldWash} strokeWidth={1.9} />
+                    <Text style={styles.achTileText} numberOfLines={2}>
+                      {def.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              {ACHIEVEMENTS.filter((a) => !unlocked.some((u) => u.id === a.id)).map((a) => (
+                <Pressable
+                  key={a.id}
+                  onPress={() => setLockedTapped(true)}
+                  style={({ pressed }) => [styles.achTile, styles.achTileLocked, pressed && { opacity: 0.8 }]}>
+                  <Icon name="question" size={22} color={colors.textFaint} fill={colors.surface2} strokeWidth={1.9} />
+                </Pressable>
+              ))}
+            </View>
+
             {moments.length > 0 ? (
               <>
                 <Text style={styles.section}>MOMENTS</Text>
@@ -204,6 +240,18 @@ export default function ProgressScreen() {
           </>
         )}
       </ScrollView>
+
+      <AchievementModal
+        visible={viewing != null}
+        unlocks={viewing ? [viewing] : []}
+        onClose={() => setViewing(null)}
+      />
+      <AchievementModal
+        visible={lockedTapped}
+        unlocks={[]}
+        locked
+        onClose={() => setLockedTapped(false)}
+      />
     </View>
   );
 }
@@ -248,6 +296,35 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: colors.textFaint,
     marginTop: 4,
+  },
+  achGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 9,
+  },
+  achTile: {
+    width: 76,
+    minHeight: 68,
+    borderRadius: radius.control,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  achTileLocked: {
+    backgroundColor: colors.surface2,
+    borderStyle: 'dashed',
+  },
+  achTileText: {
+    fontFamily: font.bodyBold,
+    fontSize: 10,
+    lineHeight: 12.5,
+    color: colors.textDim,
+    textAlign: 'center',
   },
   moment: {
     flexDirection: 'row',

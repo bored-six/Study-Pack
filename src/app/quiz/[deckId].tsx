@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { RuledPaper } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
@@ -20,12 +21,9 @@ export default function QuizScreen() {
     if (deckId) void start(deckId);
   }, [deckId, start]);
 
-  const handleQuit = useCallback(() => {
-    Alert.alert('Quit quiz?', "This run won't be saved.", [
-      { text: 'Keep going', style: 'cancel' },
-      { text: 'Quit', style: 'destructive', onPress: () => router.back() },
-    ]);
-  }, []);
+  const [quitting, setQuitting] = useState(false);
+
+  const handleQuit = useCallback(() => setQuitting(true), []);
 
   const handleAdvance = useCallback(() => {
     void advance().then((result) => {
@@ -143,6 +141,20 @@ export default function QuizScreen() {
           })}
         </View>
       </ScrollView>
+
+      <ConfirmModal
+        visible={quitting}
+        title="Quit quiz?"
+        message="This run won't be saved."
+        confirmLabel="Quit"
+        cancelLabel="Keep going"
+        destructive
+        onCancel={() => setQuitting(false)}
+        onConfirm={() => {
+          setQuitting(false);
+          router.back();
+        }}
+      />
 
       <View style={{ paddingBottom: insets.bottom + 16 }}>
         {revealed ? (

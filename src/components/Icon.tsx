@@ -374,4 +374,17 @@ const glyphs = {
       fill={f}
     />
   ),
+  question: (f: string) => (
+    <>
+      <Circle cx={12} cy={12} r={8.5} fill={f} />
+      <Path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8v.3" />
+      <Path d="M12 16.6v.1" />
+    </>
+  ),
+  pencil: (f: string) => (
+    <>
+      <Path d="m14.5 5.5 4 4L8 20l-4.6.6L4 16z" fill={f} />
+      <Path d="m12.8 7.2 4 4" />
+    </>
+  ),
 } as const;

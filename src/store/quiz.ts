@@ -8,6 +8,7 @@ import {
   type AnswerInput,
 } from '@/lib/db';
 import { retireSessionForDeck } from '@/lib/notifications';
+import { useAchievementsStore } from '@/store/achievements';
 import { useMomentsStore } from '@/store/moments';
 import type { Deck, Question } from '@/lib/types';
 
@@ -121,6 +122,14 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         total: questions.length,
         completedAt,
         answers,
+      });
+
+      // And whether anything hidden was just found.
+      await useAchievementsStore.getState().checkAfterAttempt({
+        deckId: deck.id,
+        score,
+        total: questions.length,
+        completedAt,
       });
       // Stop any reminder still pending for the sitting this deck was
       // planned in — finishing early must not earn you a nag.

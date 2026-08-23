@@ -1,7 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { PlanQuizSheet, type PlanDraft } from '@/components/PlanQuizSheet';
 import { RuledPaper, Squiggle } from '@/components/notebook';
@@ -65,6 +65,9 @@ export default function PlannerScreen() {
 
   const [subjects, setSubjects] = useState<Deck[]>([]);
   const [planning, setPlanning] = useState(false);
+  const [clashDraft, setClashDraft] = useState<{ draft: PlanDraft; withName: string } | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
+  const [deleting, setDeleting] = useState<{ id: number; name: string } | null>(null);
   const [tuning, setTuning] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -87,6 +90,22 @@ export default function PlannerScreen() {
     [upcoming, now, schedules]
   );
 
+  const saveDraft = useCallback(
+    async (draft: PlanDraft) => {
+      await add(draft);
+      if (capability === 'denied') {
+        const result = await askPermission();
+        if (result === 'denied') {
+          setNotice({
+            title: 'Plan saved',
+            message: "It'll show up here, but we can't remind you until notifications are on.",
+          });
+        }
+      }
+    },
+    [add, askPermission, capability]
+  );
+
   const handleSave = useCallback(
     async (draft: PlanDraft) => {
       setPlanning(false);
@@ -95,46 +114,19 @@ export default function PlannerScreen() {
         (s) => s.enabled && Math.abs(s.timeOfDay - draft.timeOfDay) <= SESSION_WINDOW_MIN
       );
 
-      const save = async () => {
-        await add(draft);
-        if (capability === 'denied') {
-          const result = await askPermission();
-          if (result === 'denied') {
-            Alert.alert(
-              'Plan saved',
-              "It'll show up here, but we can't remind you until notifications are on."
-            );
-          }
-        }
-      };
-
       if (clash) {
-        Alert.alert(
-          'Same time slot',
-          `You already have ${clash.deckName} around ${clockFor(
-            draft.timeOfDay
-          )}. They'll run together as one session, with a single reminder.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Add it', onPress: () => void save() },
-          ]
-        );
+        setClashDraft({ draft, withName: clash.deckName });
         return;
       }
 
-      await save();
+      await saveDraft(draft);
     },
-    [add, askPermission, capability, schedules]
+    [saveDraft, schedules]
   );
 
   const handleDelete = useCallback(
-    (id: number, name: string) => {
-      Alert.alert('Delete this plan?', `${name} will stop reminding you.`, [
-        { text: 'Keep', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => void remove(id) },
-      ]);
-    },
-    [remove]
+    (id: number, name: string) => setDeleting({ id, name }),
+    []
   );
 
   const toggleLead = useCallback(
@@ -243,6 +235,46 @@ export default function PlannerScreen() {
           <Text style={styles.hint}>Hold a plan to delete it.</Text>
         ) : null}
       </ScrollView>
+
+      <ConfirmModal
+        visible={clashDraft != null}
+        title="Same time slot"
+        message={
+          clashDraft
+            ? `You already have ${clashDraft.withName} around ${clockFor(
+                clashDraft.draft.timeOfDay
+              )}. They'll run together as one session, with a single reminder.`
+            : undefined
+        }
+        confirmLabel="Add it"
+        onCancel={() => setClashDraft(null)}
+        onConfirm={() => {
+          const draft = clashDraft?.draft;
+          setClashDraft(null);
+          if (draft) void saveDraft(draft);
+        }}
+      />
+      <ConfirmModal
+        visible={notice != null}
+        title={notice?.title ?? ''}
+        message={notice?.message}
+        confirmLabel="Got it"
+        onCancel={() => setNotice(null)}
+      />
+      <ConfirmModal
+        visible={deleting != null}
+        title="Delete this plan?"
+        message={deleting ? `${deleting.name} will stop reminding you.` : undefined}
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        destructive
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => {
+          const id = deleting?.id;
+          setDeleting(null);
+          if (id != null) void remove(id);
+        }}
+      />
 
       <PlanQuizSheet
         visible={planning}

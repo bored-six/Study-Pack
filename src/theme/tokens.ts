@@ -47,6 +47,25 @@ export const candy = [
   { wash: '#EAE2FA', ink: '#6C51A8' }, // lilac
 ] as const;
 
+/** Washes a subject can wear, each with its matching deep ink. */
+export const subjectPalette = [
+  { wash: '#DDF3DC', ink: '#2C8A4A' }, // mint
+  { wash: '#FFE5D2', ink: '#BC5A2E' }, // peach
+  { wash: '#FCEBC0', ink: '#A0731A' }, // sun
+  { wash: '#DBEEFB', ink: '#2E6FA3' }, // sky
+  { wash: '#EAE2FA', ink: '#6C51A8' }, // lilac
+  { wash: '#F9DEE7', ink: '#B04A6E' }, // rose
+  { wash: '#E3EBD3', ink: '#5F7A34' }, // sage
+  { wash: '#EFE3CE', ink: '#8A6B3F' }, // sand
+  { wash: '#D9F0EA', ink: '#2F7D6D' }, // aqua
+  { wash: '#E0E4F5', ink: '#4A5AA8' }, // periwinkle
+] as const;
+
+/** The deep ink paired with a wash; falls back to plain ink. */
+export function subjectInkFor(wash: string | null): string {
+  return subjectPalette.find((p) => p.wash === wash)?.ink ?? colors.ink;
+}
+
 export const radius = {
   card: 22,
   control: 16,

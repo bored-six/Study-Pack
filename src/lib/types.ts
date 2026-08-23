@@ -23,6 +23,10 @@ export interface Deck {
   difficulty: Difficulty;
   questionCount: number;
   source: DeckSource;
+  /** Wash hex the student picked for this subject; null = default look. */
+  color: string | null;
+  /** Icon name the student picked for this subject; null = default. */
+  icon: string | null;
   /** Epoch ms when the deck's questions were saved locally; null = not downloaded. */
   downloadedAt: number | null;
 }

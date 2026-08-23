@@ -20,6 +20,8 @@ interface Props {
   variant?: Variant;
   size?: Size;
   disabled?: boolean;
+  /** Overrides the variant's label colour (e.g. coral for destructive). */
+  labelColor?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -34,9 +36,12 @@ export function ChunkyButton({
   variant = 'primary',
   size = 'md',
   disabled,
+  labelColor,
   style,
 }: Props) {
-  const contentColor = disabled ? colors.disabledText : labelStyles[variant].color;
+  const contentColor = disabled
+    ? colors.disabledText
+    : (labelColor ?? labelStyles[variant].color);
   return (
     <Pressable onPress={onPress} disabled={disabled} style={style}>
       {({ pressed }) => (
@@ -62,6 +67,7 @@ export function ChunkyButton({
                 styles.label,
                 labelSizes[size],
                 labelStyles[variant],
+                labelColor != null && { color: labelColor },
                 disabled && styles.labelDisabled,
               ]}>
               {label}
