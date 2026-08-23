@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -10,13 +11,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DeckCard } from '@/components/DeckCard';
-import { DIFFICULTIES, DIFFICULTY_LABEL, type Difficulty } from '@/lib/types';
+import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
 import { useDecksStore } from '@/store/decks';
 import { colors, font, radius } from '@/theme/tokens';
 
 export default function DecksScreen() {
   const insets = useSafeAreaInsets();
-  const { decks, status, error, fromCache, refresh } = useDecksStore();
+  const { decks, status, error, fromCache, refresh, downloading, downloadDeck, removeDownload } =
+    useDecksStore();
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
 
   useEffect(() => {
@@ -30,6 +32,32 @@ export default function DecksScreen() {
   const downloadedCount = useMemo(
     () => decks.filter((deck) => deck.downloadedAt != null).length,
     [decks]
+  );
+
+  const handleDownload = useCallback(
+    (deck: Deck) => {
+      downloadDeck(deck).catch((e: unknown) => {
+        Alert.alert(
+          `Couldn't download ${deck.name}`,
+          e instanceof Error ? e.message : 'Something went wrong — try again.'
+        );
+      });
+    },
+    [downloadDeck]
+  );
+
+  const handleRemove = useCallback(
+    (deck: Deck) => {
+      Alert.alert('Remove download?', `${deck.name} will no longer work offline.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => void removeDownload(deck.id),
+        },
+      ]);
+    },
+    [removeDownload]
   );
 
   return (
@@ -66,7 +94,14 @@ export default function DecksScreen() {
       <FlatList
         data={visible}
         keyExtractor={(deck) => deck.id}
-        renderItem={({ item }) => <DeckCard deck={item} />}
+        renderItem={({ item }) => (
+          <DeckCard
+            deck={item}
+            downloading={downloading[item.id] === true}
+            onDownload={handleDownload}
+            onRemove={handleRemove}
+          />
+        )}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         refreshControl={

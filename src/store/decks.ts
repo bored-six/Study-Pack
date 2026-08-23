@@ -1,10 +1,31 @@
 import { create } from 'zustand';
 
-import { fetchCategories } from '@/lib/api';
-import { listDecks, upsertCatalog } from '@/lib/db';
+import { ApiError, fetchCategories, fetchQuestions, type ApiQuestion } from '@/lib/api';
+import {
+  listDecks,
+  removeDownload as dbRemoveDownload,
+  saveDeckDownload,
+  upsertCatalog,
+} from '@/lib/db';
+import { shuffle } from '@/lib/shuffle';
 import { DIFFICULTIES, type Deck } from '@/lib/types';
 
 const DECK_SIZE = 20;
+/** Some category/difficulty pairs have fewer than 20 questions; fall back once. */
+const FALLBACK_SIZES = [DECK_SIZE, 10];
+
+async function fetchDeckQuestions(deck: Deck): Promise<ApiQuestion[]> {
+  let lastError: unknown;
+  for (const amount of FALLBACK_SIZES) {
+    try {
+      return await fetchQuestions(deck.categoryId, deck.difficulty, amount);
+    } catch (e) {
+      lastError = e;
+      if (!(e instanceof ApiError && e.code === 'no_results')) throw e;
+    }
+  }
+  throw lastError;
+}
 
 interface DecksState {
   decks: Deck[];
@@ -12,7 +33,11 @@ interface DecksState {
   /** True when the network failed and we're showing the locally cached catalog. */
   fromCache: boolean;
   error: string | null;
+  /** Deck ids currently downloading (queued behind the API rate limit). */
+  downloading: Record<string, true>;
   refresh: () => Promise<void>;
+  downloadDeck: (deck: Deck) => Promise<void>;
+  removeDownload: (deckId: string) => Promise<void>;
 }
 
 export const useDecksStore = create<DecksState>((set, get) => ({
@@ -20,6 +45,7 @@ export const useDecksStore = create<DecksState>((set, get) => ({
   status: 'idle',
   fromCache: false,
   error: null,
+  downloading: {},
 
   refresh: async () => {
     if (get().status === 'loading') return;
@@ -49,5 +75,32 @@ export const useDecksStore = create<DecksState>((set, get) => ({
         });
       }
     }
+  },
+
+  downloadDeck: async (deck) => {
+    if (get().downloading[deck.id] || deck.downloadedAt != null) return;
+    set((s) => ({ downloading: { ...s.downloading, [deck.id]: true } }));
+    try {
+      const apiQuestions = await fetchDeckQuestions(deck);
+      const questions = apiQuestions.map((q) => ({
+        prompt: q.prompt,
+        correctAnswer: q.correctAnswer,
+        // Shuffled once here, then frozen in the database.
+        answers: shuffle([q.correctAnswer, ...q.incorrectAnswers]),
+      }));
+      await saveDeckDownload(deck.id, questions);
+      set({ decks: await listDecks() });
+    } finally {
+      set((s) => {
+        const next = { ...s.downloading };
+        delete next[deck.id];
+        return { downloading: next };
+      });
+    }
+  },
+
+  removeDownload: async (deckId) => {
+    await dbRemoveDownload(deckId);
+    set({ decks: await listDecks() });
   },
 }));
