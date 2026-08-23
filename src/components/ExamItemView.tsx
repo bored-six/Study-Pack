@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { Squiggle } from '@/components/notebook';
+import { CircledWord } from '@/components/CircledWord';
+import { InkSplat, PenStrike, PenTick, Stamp } from '@/components/penmarks';
 import { Icon } from '@/components/Icon';
 import { emptyDraft, type DraftValue } from '@/lib/draft';
 import type {
@@ -24,6 +27,10 @@ interface Props {
    * the answer has to survive leaving the question and coming back.
    */
   value?: DraftValue;
+  /**
+   * Told about every change, controlled or not, so instant modes can record
+   * what was actually put down without giving up their own state.
+   */
   onChange?: (value: DraftValue) => void;
   /**
    * Show right or wrong the moment the answer is committed. False defers
@@ -123,6 +130,9 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
               </Text>
               {showGood ? <Icon name="check" size={14} color={colors.leaf} strokeWidth={2.8} /> : null}
               {showBad ? <Icon name="cross" size={14} color={colors.coral} strokeWidth={2.8} /> : null}
+              {revealed && !showGood ? (
+                <PenStrike color={showBad ? colors.coral : colors.textFaint} />
+              ) : null}
             </Pressable>
           );
         })}
@@ -147,7 +157,17 @@ function TrueFalse({ item, draft, setDraft, reveal, onDone }: Field<TrueFalseIte
 
   return (
     <View style={styles.body}>
-      <Text style={styles.statement}>{item.statement}</Text>
+      <View style={styles.stampZone}>
+        <Text style={styles.statement}>{item.statement}</Text>
+        {revealed ? (
+          <>
+            <View style={styles.stampOverlay} pointerEvents="none">
+              <Stamp label={item.isTrue ? 'TRUE' : 'FALSE'} tone={correct ? 'right' : 'wrong'} />
+            </View>
+            <InkSplat color={correct ? colors.leaf : colors.coral} nonce={1} />
+          </>
+        ) : null}
+      </View>
       <View style={styles.tfRow}>
         {[true, false].map((value) => {
           const chosen = picked === value;
@@ -317,7 +337,17 @@ function ModifiedTrueFalse({
 
   return (
     <View style={styles.body}>
-      <Text style={styles.statement}>{item.words.join(' ')}</Text>
+      <View style={styles.wordWrap}>
+        {item.words.map((word, i) =>
+          i === item.falseWordIndex && !item.isTrue ? (
+            <CircledWord key={`${i}-${word}`} word={word} />
+          ) : (
+            <Text key={`${i}-${word}`} style={styles.statement}>
+              {word}
+            </Text>
+          )
+        )}
+      </View>
       <Verdict correct={finalCorrect} detail={detail} onNext={() => onDone(finalCorrect)} />
     </View>
   );
@@ -350,6 +380,7 @@ function Typed({ item, draft, setDraft, reveal, onDone }: Field<TypedItem, 'type
           reveal && draft.text.trim() && setDraft({ ...draft, checked: true })
         }
       />
+      {checked && result.correct ? <Squiggle width={120} color={colors.leaf} /> : null}
       {checked ? (
         <Verdict
           correct={result.correct}
@@ -491,7 +522,11 @@ function Enumeration({ item, draft, setDraft, reveal, onDone }: Field<Enumeratio
           const outcome = checked ? result.results[i] : null;
           return (
             <View key={i} style={styles.enumRow}>
-              <Text style={styles.enumNum}>{i + 1}</Text>
+              {outcome?.matched != null ? (
+                <PenTick size={18} />
+              ) : (
+                <Text style={styles.enumNum}>{i + 1}</Text>
+              )}
               <TextInput
                 value={draft.entries[i] ?? ''}
                 onChangeText={(text) =>
@@ -555,8 +590,10 @@ export function ExamItemView({ item, value, onChange, reveal = true, onDone }: P
   if (own.id !== item.id) setOwn({ id: item.id, value: emptyDraft(item) });
 
   const draft = value !== undefined ? value : own.value;
-  const setDraft =
-    onChange !== undefined ? onChange : (next: DraftValue) => setOwn({ id: item.id, value: next });
+  const setDraft = (next: DraftValue) => {
+    if (value === undefined) setOwn({ id: item.id, value: next });
+    onChange?.(next);
+  };
 
   const shared = { setDraft, reveal, onDone };
 
@@ -584,6 +621,15 @@ export function ExamItemView({ item, value, onChange, reveal = true, onDone }: P
 }
 
 const styles = StyleSheet.create({
+  stampZone: {
+    position: 'relative',
+  },
+  stampOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 6,
+  },
   body: {
     gap: 12,
   },

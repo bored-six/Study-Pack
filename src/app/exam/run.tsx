@@ -10,11 +10,22 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, {
+  FadeInDown,
+  SlideOutUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { ComboMeter } from '@/components/ComboMeter';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
+import { ExamSheet } from '@/components/ExamSheet';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { emptyDraft, hasAnswer } from '@/lib/draft';
@@ -72,6 +83,25 @@ export default function ExamRunScreen() {
   const spec = MODES[mode];
   const item = store.current();
 
+  // A run of correct answers, and the soft frame a hot one earns. Only the
+  // modes that mark as they go can have one — a withheld paper would be
+  // telling you the answer through the meter.
+  const scored = spec.feedback === 'instant';
+  const [combo, setCombo] = useState(0);
+  const glow = useSharedValue(0);
+  useEffect(() => {
+    if (combo >= 10) {
+      glow.value = withRepeat(
+        withSequence(withTiming(1, { duration: 900 }), withTiming(0.4, { duration: 900 })),
+        -1,
+        false
+      );
+    } else {
+      glow.value = withTiming(0, { duration: 300 });
+    }
+  }, [combo, glow]);
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.55 }));
+
   const [showHelp, setShowHelp] = useState(false);
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
@@ -107,6 +137,7 @@ export default function ExamRunScreen() {
 
   const handleDone = useCallback(
     (correct: boolean) => {
+      setCombo((c) => (correct ? c + 1 : 0));
       void store.answer(correct).then(finished);
     },
     [store, finished]
@@ -118,6 +149,7 @@ export default function ExamRunScreen() {
     if (spec.clock !== 'per_question' || itemDeadline == null) return;
     if (now < itemDeadline || timedOutAt.current === itemDeadline) return;
     timedOutAt.current = itemDeadline;
+    setCombo(0);
     void store.answer(false, true).then(finished);
   }, [now, itemDeadline, spec.clock, store, finished]);
 
@@ -211,6 +243,8 @@ export default function ExamRunScreen() {
 
           <Text style={styles.counter}>{counterText}</Text>
 
+          {scored ? <ComboMeter combo={combo} /> : null}
+
           {paperLeft != null ? (
             <Text style={[styles.timer, paperLeft < 60_000 && styles.timerLow]}>
               {clock(paperLeft)}
@@ -272,18 +306,20 @@ export default function ExamRunScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <ExamItemView
+          <Animated.View
             key={`${item.id}:${visits}`}
-            item={item}
-            value={spec.feedback === 'deferred' ? (drafts[item.id] ?? emptyDraft(item)) : undefined}
-            onChange={
-              spec.feedback === 'deferred'
-                ? (value) => store.setDraft(item.id, value)
-                : undefined
-            }
-            reveal={spec.feedback === 'instant'}
-            onDone={handleDone}
-          />
+            entering={FadeInDown.springify().damping(16)}
+            exiting={SlideOutUp.duration(220)}>
+            <ExamSheet format={item.format}>
+              <ExamItemView
+                item={item}
+                value={spec.feedback === 'deferred' ? (drafts[item.id] ?? emptyDraft(item)) : undefined}
+                onChange={(value) => store.setDraft(item.id, value)}
+                reveal={scored}
+                onDone={handleDone}
+              />
+            </ExamSheet>
+          </Animated.View>
         </ScrollView>
 
         {spec.feedback === 'deferred' ? (
@@ -312,6 +348,8 @@ export default function ExamRunScreen() {
             />
           </View>
         ) : null}
+
+        <Animated.View pointerEvents="none" style={[styles.glowFrame, glowStyle]} />
       </View>
 
       <Modal
@@ -634,6 +672,13 @@ const styles = StyleSheet.create({
   sheetActions: {
     gap: 9,
     paddingTop: 14,
+  },
+  /** The frame a hot run lights up behind everything. */
+  glowFrame: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 3.5,
+    borderColor: '#C24E38',
+    borderRadius: 26,
   },
   pressed: {
     opacity: 0.7,
