@@ -74,10 +74,15 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
     await addQuestionsToDeck(
       targetId,
+      // kind/sourceLine/ordered must survive the save — they are what decide
+      // which exam formats a question can become.
       draft.map((q) => ({
         prompt: q.prompt,
         correctAnswer: q.correctAnswer,
         answers: q.answers,
+        kind: q.kind,
+        sourceLine: q.sourceLine,
+        ordered: q.ordered ?? false,
       }))
     );
     set({ draft: [], stats: null, subjects: await listDecks('notes') });

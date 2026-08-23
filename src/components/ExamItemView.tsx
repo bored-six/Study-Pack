@@ -317,9 +317,27 @@ function Matching({ item, onDone }: { item: MatchingItem; onDone: (c: boolean) =
   const correct = item.terms.every((_, i) => pairs[i] === item.correctIndexFor[i]);
   const takenMeanings = new Set(Object.values(pairs));
 
+  /** Tapping a paired term releases it, so a mistap is never a dead end. */
+  const tapTerm = (i: number) => {
+    if (pairs[i] != null) {
+      setPairs((p) => {
+        const next = { ...p };
+        delete next[i];
+        return next;
+      });
+      setActiveTerm(i);
+      return;
+    }
+    setActiveTerm(activeTerm === i ? null : i);
+  };
+
   return (
     <View style={styles.body}>
-      <Text style={styles.stepLabel}>Tap a term, then tap its meaning.</Text>
+      <Text style={styles.stepLabel}>
+        {activeTerm == null
+          ? 'Tap a term, then tap its meaning.'
+          : 'Now tap its meaning. Tap a paired term to undo it.'}
+      </Text>
 
       <View style={styles.matchCols}>
         <View style={styles.matchCol}>
@@ -331,7 +349,7 @@ function Matching({ item, onDone }: { item: MatchingItem; onDone: (c: boolean) =
               <Pressable
                 key={term}
                 disabled={checked}
-                onPress={() => setActiveTerm(activeTerm === i ? null : i)}
+                onPress={() => tapTerm(i)}
                 style={({ pressed }) => [
                   styles.matchChip,
                   activeTerm === i && styles.matchActive,

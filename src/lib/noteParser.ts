@@ -333,7 +333,9 @@ function matchDefinition(line: string): Definition | null {
 }
 
 function definitionPrompt(def: Definition): string {
-  const meaning = def.meaning.replace(/\s*[.;]+$/, '');
+  let meaning = def.meaning.replace(/\s*[.;]+$/, '');
+  // Cleaning can eat a closing quote — put it back rather than leave it open.
+  if ((meaning.match(/"/g)?.length ?? 0) % 2 === 1) meaning += '"';
   return def.acronym
     ? `Which term is short for "${meaning}"?`
     : `Which term means: ${meaning}?`;
@@ -573,6 +575,10 @@ function findInlineSeries(line: string): EnumDraft | null {
     .find((n) => n != null);
 
   const title = cleanListTitle(match[1]);
+  // "Example: buzz, clang, hiss" is an illustration, not a list to memorise.
+  const firstWord = words(title)[0]?.toLowerCase().replace(/[^a-z]/g, '') ?? '';
+  if (!title || STRUCTURAL.has(firstWord)) return null;
+
   const tail = match[2].replace(/\.$/, '');
   if (!/,/.test(tail)) return null;
 
@@ -588,6 +594,14 @@ function findInlineSeries(line: string): EnumDraft | null {
   if (stated != null && stated !== items.length) return null;
 
   return { title, items, ordered: false, source: line };
+}
+
+/** Splits a line into sentences, keeping abbreviations intact enough. */
+function splitSentences(line: string): string[] {
+  return line
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function enumerationPrompt(draft: EnumDraft): string {
@@ -661,7 +675,10 @@ export function parseNotes(input: string): ParseResult {
       continue;
     }
 
-    const series = findInlineSeries(line);
+    // A list can be the second sentence of a paragraph, so check each one.
+    const series = splitSentences(line)
+      .map(findInlineSeries)
+      .find((found): found is EnumDraft => found != null);
     if (series) {
       drafts.push({
         prompt: enumerationPrompt(series),
