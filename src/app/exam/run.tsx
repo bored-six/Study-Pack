@@ -1,5 +1,5 @@
 import { Redirect, router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,7 +12,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { ComboMeter } from '@/components/ComboMeter';
 import { ExamItemView } from '@/components/ExamItemView';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
@@ -24,6 +27,26 @@ export default function ExamRunScreen() {
   const insets = useSafeAreaInsets();
   const { status, deck, items, index, briefed, markBriefed, submit } = useExamStore();
   const [showHelp, setShowHelp] = useState(false);
+  const [combo, setCombo] = useState(0);
+  const glow = useSharedValue(0);
+
+  // A soft frame around the screen once a run gets hot.
+  useEffect(() => {
+    if (combo >= 10) {
+      glow.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 900 }),
+          withTiming(0.4, { duration: 900 })
+        ),
+        -1,
+        false
+      );
+    } else {
+      glow.value = withTiming(0, { duration: 300 });
+    }
+  }, [combo, glow]);
+
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.55 }));
 
   const handleQuit = useCallback(() => {
     Alert.alert('Leave this exam?', "Your answers so far won't be saved.", [
@@ -34,6 +57,7 @@ export default function ExamRunScreen() {
 
   const handleDone = useCallback(
     (correct: boolean) => {
+      setCombo((c) => (correct ? c + 1 : 0));
       void submit(correct).then((next) => {
         if (next === 'finished') router.replace('/exam/results');
       });
@@ -105,6 +129,7 @@ export default function ExamRunScreen() {
 
         <View style={styles.formatRow}>
           <Text style={styles.formatLabel}>{FORMAT_LABEL[item.format]}</Text>
+          <ComboMeter combo={combo} />
           <Text style={styles.deckName} numberOfLines={1}>
             {deck?.name}
           </Text>
@@ -115,14 +140,25 @@ export default function ExamRunScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <ExamItemView item={item} onDone={handleDone} />
+          <Animated.View key={index} entering={FadeInDown.springify().damping(16)}>
+            <ExamItemView item={item} onDone={handleDone} />
+          </Animated.View>
         </ScrollView>
+
+        <Animated.View pointerEvents="none" style={[styles.glowFrame, glowStyle]} />
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  glowFrame: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 3.5,
+    borderColor: '#C24E38',
+    borderRadius: 26,
+    margin: 4,
+  },
   fill: {
     flex: 1,
   },
