@@ -8,6 +8,7 @@ import {
   saveAttempt,
   type AnswerInput,
 } from '@/lib/db';
+import { classifyMiss, type SlipKind } from '@/lib/debrief';
 import { gradeDraft, hasAnswer, type DraftValue } from '@/lib/draft';
 import {
   availability,
@@ -39,6 +40,12 @@ export interface ItemResult {
   itemId: string;
   format: ExamFormat;
   correct: boolean;
+  /**
+   * How the mark was lost, or null when it wasn't. Worked out here rather
+   * than at the end because a mastery sitting asks the same question again
+   * until it's right, and by then the draft that missed is long overwritten.
+   */
+  slip: SlipKind | null;
 }
 
 interface ExamState {
@@ -114,8 +121,13 @@ const ZERO: Record<ExamFormat, number> = {
  * One survival round. Rounds after the first carry a suffix so a repeated
  * item is still its own question as far as results and drafts are concerned.
  */
-function survivalRound(questions: Question[], seedText: string, round: number): ExamItem[] {
-  const built = buildExam(questions, fullRequests(questions), `${seedText}:r${round}`);
+function survivalRound(
+  questions: Question[],
+  history: readonly AnswerRecord[],
+  seedText: string,
+  round: number
+): ExamItem[] {
+  const built = buildExam(questions, fullRequests(questions), `${seedText}:r${round}`, history);
   return round === 0 ? built : built.map((item) => ({ ...item, id: `${item.id}#${round}` }));
 }
 
@@ -231,9 +243,11 @@ export const useExamStore = create<ExamState>((set, get) => {
           seedText
         );
       } else if (mode === 'survival') {
-        items = survivalRound(questions, seedText, 0);
+        items = survivalRound(questions, deckAnswers, seedText, 0);
       } else {
-        items = buildExam(questions, requestsFrom(counts), seedText);
+        // The answer log decides which of the deck's questions fill the
+        // request — the shaky and the unseen first. See lib/pick.ts.
+        items = buildExam(questions, requestsFrom(counts), seedText, deckAnswers);
       }
 
       if (items.length === 0) {
@@ -286,7 +300,17 @@ export const useExamStore = create<ExamState>((set, get) => {
       const item = get().current();
       if (!item) return 'finished';
 
-      const results = [...state.results, { itemId: item.id, format: item.format, correct }];
+      const results = [
+        ...state.results,
+        {
+          itemId: item.id,
+          format: item.format,
+          correct,
+          slip: correct
+            ? null
+            : classifyMiss(item, state.drafts[item.id] ?? null, timedOut),
+        },
+      ];
       // A question the clock took off you is not evidence about what you
       // know, so it scores as a miss but never reaches mastery.
       const answerLog = timedOut
@@ -324,7 +348,12 @@ export const useExamStore = create<ExamState>((set, get) => {
           round += 1;
           items = [
             ...items,
-            ...survivalRound(state.questions, `${state.deck?.id ?? 'exam'}:survival`, round),
+            ...survivalRound(
+              state.questions,
+              state.deckAnswers,
+              `${state.deck?.id ?? 'exam'}:survival`,
+              round
+            ),
           ];
         }
         set({
@@ -352,11 +381,16 @@ export const useExamStore = create<ExamState>((set, get) => {
       const { items, drafts } = get();
       const now = Date.now();
 
-      const results = items.map((item) => ({
-        itemId: item.id,
-        format: item.format,
-        correct: gradeDraft(item, drafts[item.id] ?? null),
-      }));
+      const results = items.map((item) => {
+        const draft = drafts[item.id] ?? null;
+        const correct = gradeDraft(item, draft);
+        return {
+          itemId: item.id,
+          format: item.format,
+          correct,
+          slip: correct ? null : classifyMiss(item, draft),
+        };
+      });
       // A blank scores as wrong, the same as on a real paper — but it says
       // nothing about what you know, so it stays out of mastery.
       const answerLog = items

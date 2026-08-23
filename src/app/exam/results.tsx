@@ -4,7 +4,9 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { ExamDebrief } from '@/components/ExamDebrief';
 import { Icon } from '@/components/Icon';
+import { buildDebrief, type NextStep } from '@/lib/debrief';
 import { correctText, draftText, itemPrompt } from '@/lib/draft';
 import { FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
 import { MODES } from '@/lib/mode';
@@ -18,8 +20,18 @@ function formatDuration(ms: number): string {
 
 export default function ExamResultsScreen() {
   const insets = useSafeAreaInsets();
-  const { status, deck, mode, items, drafts, retired, results, durationMs, reset } =
-    useExamStore();
+  const {
+    status,
+    deck,
+    mode,
+    items,
+    drafts,
+    retired,
+    results,
+    deckAnswers,
+    durationMs,
+    reset,
+  } = useExamStore();
 
   const byFormat = useMemo(() => {
     const map = new Map<ExamFormat, { right: number; total: number }>();
@@ -31,6 +43,14 @@ export default function ExamResultsScreen() {
     }
     return [...map.entries()];
   }, [results]);
+
+  // deckAnswers is this subject's history as it stood when the sitting was
+  // loaded, so it still says what the student knew walking in — that is what
+  // makes "you fixed three you used to miss" possible to say at all.
+  const debrief = useMemo(
+    () => buildDebrief({ mode, items, results, history: deckAnswers, durationMs }),
+    [mode, items, results, deckAnswers, durationMs]
+  );
 
   if (status !== 'finished' || !deck) {
     return <Redirect href="/" />;
@@ -52,29 +72,50 @@ export default function ExamResultsScreen() {
         : { big: `${score}/${total}`, small: `${pct}% correct` };
 
   const cleared = retired >= items.length;
+  // The tone still colours the card; the words on it come from the debrief,
+  // so the line at the top is about this paper rather than this bracket.
   const tone =
     spec.repetition === 'until_out'
       ? total >= 25
-        ? { color: colors.leaf, wash: colors.leafWash, label: 'Untouchable' }
+        ? { color: colors.leaf, wash: colors.leafWash }
         : total >= 12
-          ? { color: colors.gold, wash: colors.goldWash, label: 'Good run' }
-          : { color: colors.coral, wash: colors.coralWash, label: 'Short one' }
+          ? { color: colors.gold, wash: colors.goldWash }
+          : { color: colors.coral, wash: colors.coralWash }
       : spec.repetition === 'until_retired'
         ? cleared
-          ? { color: colors.leaf, wash: colors.leafWash, label: 'Pile cleared' }
-          : { color: colors.gold, wash: colors.goldWash, label: 'Some left over' }
+          ? { color: colors.leaf, wash: colors.leafWash }
+          : { color: colors.gold, wash: colors.goldWash }
         : pct >= 80
-          ? { color: colors.leaf, wash: colors.leafWash, label: 'You crushed it!' }
+          ? { color: colors.leaf, wash: colors.leafWash }
           : pct >= 50
-            ? { color: colors.gold, wash: colors.goldWash, label: 'Solid effort' }
-            : { color: colors.coral, wash: colors.coralWash, label: 'Keep at it' };
+            ? { color: colors.gold, wash: colors.goldWash }
+            : { color: colors.coral, wash: colors.coralWash };
+
+  /**
+   * Sends the student where the note told them to go. Everything routes back
+   * through the builder rather than starting a sitting from here: it reloads
+   * the subject, and they get to see what they are about to sit.
+   */
+  const goNext = (next: NextStep) => {
+    if (next.action === 'none') return;
+    const deckId = deck.id;
+    reset();
+    router.replace({
+      pathname: '/exam/[deckId]',
+      params: {
+        deckId,
+        mode: next.action === 'format' ? 'relaxed' : next.action,
+        ...(next.format ? { format: next.format } : {}),
+      },
+    });
+  };
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 20 }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <View style={[styles.badge, { backgroundColor: tone.wash }]}>
-            <Text style={[styles.badgeText, { color: tone.color }]}>{tone.label}</Text>
+            <Text style={[styles.badgeText, { color: tone.color }]}>{debrief.headline}</Text>
           </View>
           <Text style={styles.score}>{hero.big}</Text>
           <Text style={styles.pct}>{hero.small}</Text>
@@ -83,6 +124,9 @@ export default function ExamResultsScreen() {
           </Text>
           <Text style={styles.saved}>Saved to Progress on this device</Text>
         </View>
+
+        <Text style={styles.breakdownLabel}>WHAT THIS PAPER SAYS</Text>
+        <ExamDebrief debrief={debrief} onAction={goNext} />
 
         {spec.feedback === 'deferred' ? (
           <>
@@ -185,14 +229,16 @@ const styles = StyleSheet.create({
     ...shadow.pop,
   },
   badge: {
-    borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    borderRadius: radius.control,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     marginBottom: 8,
   },
   badgeText: {
-    fontFamily: font.heading,
-    fontSize: 13.5,
+    fontFamily: font.hero,
+    fontSize: 21,
+    lineHeight: 26,
+    textAlign: 'center',
   },
   score: {
     fontFamily: font.hero,

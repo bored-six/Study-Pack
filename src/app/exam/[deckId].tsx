@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -25,6 +25,9 @@ import {
 } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+
+/** A drill sent here by the results note asks for this many of one format. */
+const DRILL_COUNT = 12;
 
 /** Order shown to the student — familiar formats first. */
 const ORDER: ExamFormat[] = [
@@ -128,7 +131,13 @@ function ModeCard({
 
 export default function ExamSetupScreen() {
   const insets = useSafeAreaInsets();
-  const { deckId } = useLocalSearchParams<{ deckId: string }>();
+  // `mode` and `format` are how the results note hands a student straight to
+  // the thing it just told them to do, without making them find it again.
+  const { deckId, mode: wantMode, format: wantFormat } = useLocalSearchParams<{
+    deckId: string;
+    mode?: string;
+    format?: string;
+  }>();
   const {
     status,
     deck,
@@ -158,6 +167,37 @@ export default function ExamSetupScreen() {
     start();
     if (useExamStore.getState().status === 'active') router.push('/exam/run');
   };
+
+  // Apply an incoming request once the subject is loaded, and only once —
+  // after that the screen belongs to whatever the student does with it.
+  const applied = useRef<string | null>(null);
+  useEffect(() => {
+    const key = `${deckId}:${wantMode}:${wantFormat}`;
+    if (status !== 'setup' || !wantMode || applied.current === key) return;
+    applied.current = key;
+
+    const wanted = MODE_ORDER.find((id) => id === wantMode);
+    if (!wanted) return;
+    setMode(wanted);
+
+    if (wantFormat) {
+      const drill = ORDER.find((format) => format === wantFormat);
+      const room = useExamStore.getState().available;
+      if (drill) {
+        for (const format of ORDER) {
+          setCount(format, format === drill ? Math.min(DRILL_COUNT, room[format]) : 0);
+        }
+      }
+    }
+
+    // A mode that picks its own questions has nothing left to ask.
+    if (!MODES[wanted].autoBuild) {
+      setStep('counts');
+      return;
+    }
+    start();
+    if (useExamStore.getState().status === 'active') router.push('/exam/run');
+  }, [status, deckId, wantMode, wantFormat, setMode, setCount, start]);
 
   const chooseMode = (id: ExamMode) => {
     setMode(id);
