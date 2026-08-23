@@ -2,11 +2,13 @@ import { create } from 'zustand';
 
 import {
   getDeckById,
+  listAnswersForDeck,
   listQuestions,
   saveAnswers,
   saveAttempt,
   type AnswerInput,
 } from '@/lib/db';
+import { pickQuestions } from '@/lib/pick';
 import { retireSessionForDeck } from '@/lib/notifications';
 import { useAchievementsStore } from '@/store/achievements';
 import { useMomentsStore } from '@/store/moments';
@@ -60,11 +62,17 @@ export const useQuizStore = create<QuizState>((set, get) => ({
     });
     try {
       const deck = await getDeckById(deckId);
-      const questions = await listQuestions(deckId);
-      if (!deck || deck.downloadedAt == null || questions.length === 0) {
+      const roster = await listQuestions(deckId);
+      if (!deck || deck.downloadedAt == null || roster.length === 0) {
         set({ status: 'error', error: 'This deck is not downloaded on this device.' });
         return;
       }
+      // A session is a weighted sample, not the whole deck: what is shaky or
+      // unseen comes round often, what is known comes round rarely, and a big
+      // subject stops meaning a marathon of the same questions in the same
+      // order. See lib/pick.ts.
+      const history = await listAnswersForDeck(deckId);
+      const questions = pickQuestions(roster, history);
       set({ status: 'active', deck, questions, startedAt: Date.now() });
     } catch (e) {
       set({

@@ -600,6 +600,28 @@ export async function listAnswers(): Promise<StoredAnswer[]> {
 }
 
 /**
+ * One subject's answers, oldest first. Picking a session only ever needs the
+ * deck being quizzed, and the (deck_id, answered_at) index makes this cheap
+ * where reading the whole log would grow with every subject ever studied.
+ */
+export async function listAnswersForDeck(deckId: string): Promise<StoredAnswer[]> {
+  const rows = await getDb().getAllAsync<{
+    question_id: string;
+    correct: number;
+    answered_at: number;
+  }>(
+    'SELECT question_id, correct, answered_at FROM answers WHERE deck_id = ? ORDER BY answered_at',
+    deckId
+  );
+  return rows.map((row) => ({
+    deckId,
+    questionId: row.question_id,
+    correct: row.correct === 1,
+    answeredAt: row.answered_at,
+  }));
+}
+
+/**
  * Question ids grouped by subject. Mastery averages over every question a
  * subject holds, so it needs the full roster, not just the answered ones.
  */
