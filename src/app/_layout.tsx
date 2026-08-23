@@ -65,7 +65,7 @@ export default function RootLayout() {
       <View style={styles.errorScreen}>
         <Text style={styles.errorTitle}>Storage failed to start</Text>
         <Text style={styles.errorBody}>
-          StudyPack couldn't open its local database. Restart the app; if it keeps
+          Flipp couldn't open its local database. Restart the app; if it keeps
           happening, reinstall.
         </Text>
       </View>

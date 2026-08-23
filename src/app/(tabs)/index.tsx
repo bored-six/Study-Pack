@@ -37,7 +37,7 @@ export default function HomeScreen() {
   const handleAddNotes = useCallback(() => {
     Alert.alert(
       'Add your notes',
-      "Coming next: paste your class notes and Study Pack turns them into quiz questions — no internet, no AI needed.",
+      "Coming next: paste your class notes and Flipp turns them into quiz questions — no internet, no AI needed.",
       [{ text: 'Got it' }]
     );
   }, []);
@@ -47,7 +47,7 @@ export default function HomeScreen() {
       style={styles.screen}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
       showsVerticalScrollIndicator={false}>
-      <Text style={styles.kicker}>STUDY PACK</Text>
+      <Text style={styles.kicker}>FLIPP</Text>
       <View style={styles.titleRow}>
         <Text style={styles.title}>Let's</Text>
         <View style={styles.titleSticker}>

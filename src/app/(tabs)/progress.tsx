@@ -79,7 +79,7 @@ export default function ProgressScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.kicker}>STUDYPACK</Text>
+      <Text style={styles.kicker}>FLIPP</Text>
       <View style={styles.titleRow}>
         <Text style={styles.title}>Your</Text>
         <View style={styles.titleSticker}>

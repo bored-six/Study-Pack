@@ -1,4 +1,4 @@
-# Study Pack
+# Flipp
 
 An **offline-first** quiz app built with React Native + TypeScript. Browse quiz decks
 from a public REST API, download the ones you want to your device, and take quizzes

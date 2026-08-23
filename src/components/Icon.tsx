@@ -3,7 +3,7 @@ import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
 import { colors } from '@/theme/tokens';
 
 /**
- * StudyPack's duotone sticker icons: candy/paper fills under chunky 2px
+ * Flipp's duotone sticker icons: candy/paper fills under chunky 2px
  * rounded ink strokes on a 24×24 grid — enamel-pin style, not line icons.
  * Pass `fill` for the body color (defaults to transparent for pure-line
  * glyphs like check/cross). `*Filled` variants exist for the tab bar.

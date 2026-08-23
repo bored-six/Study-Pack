@@ -128,7 +128,7 @@ export function IntroOverlay({ onDone }: Props) {
           <Animated.View style={[styles.sticker, cardStyle]}>
             <Icon name="cardsFilled" size={52} color={colors.accent} strokeWidth={1.6} />
           </Animated.View>
-          <Animated.Text style={[styles.wordmark, wordStyle]}>StudyPack</Animated.Text>
+          <Animated.Text style={[styles.wordmark, wordStyle]}>Flipp</Animated.Text>
           <Animated.View style={[styles.taglineRow, tagStyle]}>
             <Text style={styles.tagline}>Play · learn · streak</Text>
             <Icon name="flame" size={15} color={colors.ink} fill={colors.gold} strokeWidth={2.2} />

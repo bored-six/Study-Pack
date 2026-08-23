@@ -1,5 +1,5 @@
 /**
- * StudyPack design tokens — soft sticker book.
+ * Flipp design tokens — soft sticker book.
  * Warm paper ground; surfaces are gentle "stickers": soft warm-ink edges,
  * lightly tinted offset shadows, candy washes, small tilts, duotone icons,
  * and a chunky hero font. Deliberately calm — no harsh outlines or solid
