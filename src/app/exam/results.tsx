@@ -1,0 +1,209 @@
+import { Redirect, router } from 'expo-router';
+import { useMemo } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { ChunkyButton } from '@/components/ChunkyButton';
+import { FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
+import { useExamStore } from '@/store/exam';
+import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+
+function formatDuration(ms: number): string {
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+export default function ExamResultsScreen() {
+  const insets = useSafeAreaInsets();
+  const { status, deck, results, durationMs, reset } = useExamStore();
+
+  const byFormat = useMemo(() => {
+    const map = new Map<ExamFormat, { right: number; total: number }>();
+    for (const result of results) {
+      const entry = map.get(result.format) ?? { right: 0, total: 0 };
+      entry.total++;
+      if (result.correct) entry.right++;
+      map.set(result.format, entry);
+    }
+    return [...map.entries()];
+  }, [results]);
+
+  if (status !== 'finished' || !deck) {
+    return <Redirect href="/" />;
+  }
+
+  const score = results.filter((r) => r.correct).length;
+  const total = results.length;
+  const pct = total === 0 ? 0 : Math.round((score / total) * 100);
+  const tone =
+    pct >= 80
+      ? { color: colors.leaf, wash: colors.leafWash, label: 'You crushed it!' }
+      : pct >= 50
+        ? { color: colors.gold, wash: colors.goldWash, label: 'Solid effort' }
+        : { color: colors.coral, wash: colors.coralWash, label: 'Keep at it' };
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top + 20 }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <View style={styles.card}>
+          <View style={[styles.badge, { backgroundColor: tone.wash }]}>
+            <Text style={[styles.badgeText, { color: tone.color }]}>{tone.label}</Text>
+          </View>
+          <Text style={styles.score}>
+            {score}/{total}
+          </Text>
+          <Text style={styles.pct}>{pct}% correct</Text>
+          <Text style={styles.meta}>
+            {deck.name} · {formatDuration(durationMs)}
+          </Text>
+          <Text style={styles.saved}>Saved to Progress on this device</Text>
+        </View>
+
+        <Text style={styles.breakdownLabel}>BY QUESTION TYPE</Text>
+        <View style={styles.breakdown}>
+          {byFormat.map(([format, entry]) => {
+            const share = entry.right / entry.total;
+            const color =
+              share >= 0.8 ? colors.leaf : share >= 0.5 ? colors.gold : colors.coral;
+            return (
+              <View key={format} style={styles.breakRow}>
+                <Text style={styles.breakName}>{FORMAT_LABEL[format]}</Text>
+                <View style={styles.breakTrack}>
+                  <View
+                    style={[styles.breakFill, { width: `${share * 100}%`, backgroundColor: color }]}
+                  />
+                </View>
+                <Text style={[styles.breakScore, { color }]}>
+                  {entry.right}/{entry.total}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <View style={[styles.actions, { paddingBottom: insets.bottom + 14 }]}>
+        <ChunkyButton
+          label="Another exam"
+          variant="soft"
+          size="lg"
+          onPress={() => {
+            reset();
+            router.replace({ pathname: '/exam/[deckId]', params: { deckId: deck.id } });
+          }}
+        />
+        <ChunkyButton
+          label="Done"
+          size="lg"
+          onPress={() => {
+            reset();
+            router.dismissAll();
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    paddingHorizontal: 16,
+  },
+  content: {
+    paddingBottom: 16,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.card,
+    padding: 26,
+    alignItems: 'center',
+    gap: 5,
+    ...shadow.pop,
+  },
+  badge: {
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  badgeText: {
+    fontFamily: font.heading,
+    fontSize: 13.5,
+  },
+  score: {
+    fontFamily: font.hero,
+    fontSize: 54,
+    lineHeight: 62,
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  pct: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 15,
+    color: colors.textDim,
+  },
+  meta: {
+    fontFamily: font.bodySemibold,
+    fontSize: 12.5,
+    color: colors.textFaint,
+    marginTop: 10,
+  },
+  saved: {
+    fontFamily: font.bodyBold,
+    fontSize: 12,
+    color: colors.accentDeep,
+    marginTop: 8,
+  },
+  breakdownLabel: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    color: colors.textDim,
+    marginTop: 24,
+    marginBottom: 10,
+  },
+  breakdown: {
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.card,
+    padding: 14,
+    gap: 12,
+    ...shadow.card,
+  },
+  breakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  breakName: {
+    width: 108,
+    fontFamily: font.bodySemibold,
+    fontSize: 12,
+    color: colors.textDim,
+  },
+  breakTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.track,
+    overflow: 'hidden',
+  },
+  breakFill: {
+    height: '100%',
+    borderRadius: radius.pill,
+  },
+  breakScore: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    width: 34,
+    textAlign: 'right',
+  },
+  actions: {
+    paddingTop: 10,
+    gap: 10,
+  },
+});

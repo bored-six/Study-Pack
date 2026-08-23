@@ -21,15 +21,17 @@ export const LIMITS = {
   maxAnswerWords: 5,
 } as const;
 
-export type QuestionKind = 'definition' | 'cloze';
+export type QuestionKind = 'definition' | 'cloze' | 'enumeration';
 
 export interface ParsedQuestion {
   prompt: string;
   correctAnswer: string;
-  /** Exactly 4 options, shuffled. */
+  /** Exactly 4 options, shuffled — or every list item, for enumeration. */
   answers: string[];
   kind: QuestionKind;
   sourceLine: string;
+  /** Enumeration only: items were numbered, so order is part of the answer. */
+  ordered?: boolean;
 }
 
 export type SkipReason = 'too_short' | 'heading' | 'too_long' | 'no_fact' | 'no_options';
@@ -179,12 +181,24 @@ function normalize(text: string): string {
     .replace(/[ \t]+/g, ' ');
 }
 
-/** Strips bullets, numbering, and trailing punctuation noise. */
-function stripMarkers(line: string): string {
-  return line
+/** A note line, remembering how it was marked up before cleaning. */
+interface Line {
+  text: string;
+  /** Was it a bullet or numbered item? List detection needs this. */
+  marked: boolean;
+  /** Numbered items imply a sequence; bullets do not. */
+  numbered: boolean;
+}
+
+/** Strips bullets, numbering, and heading hashes, keeping what was there. */
+function stripMarkers(raw: string): Line {
+  const numbered = /^\s*\(?\d{1,2}[.)]\s+/.test(raw);
+  const bulleted = /^\s*[-*•·>+]\s+/.test(raw) || /^\s*[a-z][.)]\s+/i.test(raw);
+  const text = raw
     .replace(/^\s*(?:[-*•·>+]|\(?\d{1,2}[.)]|[a-z][.)])\s+/i, '')
     .replace(/^#+\s*/, '')
     .trim();
+  return { text, marked: numbered || bulleted, numbered };
 }
 
 function words(text: string): string[] {
@@ -463,16 +477,135 @@ function termDistractors(answer: string, pool: string[], seed: string): string[]
   return chosen;
 }
 
+// --- enumeration --------------------------------------------------------
+
+const NUMBER_WORD: Record<string, number> = {
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+};
+
+export const ENUM_LIMITS = { min: 3, max: 6 } as const;
+
+interface EnumDraft {
+  title: string;
+  items: string[];
+  ordered: boolean;
+  source: string;
+}
+
+/** Instructions ("read chapter 4") are tasks to do, not facts to learn. */
+const TASK_LINE =
+  /^(?:read|answer|do|study|watch|bring|submit|review|finish|complete|practice|memorise|memorize|revise|prepare|email|print|ask)\b/i;
+
+/**
+ * The text before the colon. The count word is dropped because the prompt
+ * already states the number — "List the 4: four stages" reads badly.
+ */
+function cleanListTitle(raw: string): string {
+  return raw
+    .replace(/\s*:\s*$/, '')
+    .replace(/^(?:the|these|those)\s+/i, '')
+    .replace(/^(?:two|three|four|five|six|seven|eight)\s+/i, '')
+    .trim();
+}
+
+function plausibleItem(text: string): boolean {
+  const count = wordCount(text);
+  if (count < 1 || count > 5) return false;
+  return !TASK_LINE.test(text);
+}
+
+/**
+ * "Stages of mitosis:" followed by marked short lines. The colon line must
+ * have nothing substantial after it, or it's a definition instead.
+ */
+function findListBlocks(lines: Line[]): { drafts: EnumDraft[]; consumed: Set<number> } {
+  const drafts: EnumDraft[] = [];
+  const consumed = new Set<number>();
+
+  for (let i = 0; i < lines.length; i++) {
+    const head = lines[i];
+    if (!/:\s*$/.test(head.text)) continue;
+
+    const title = cleanListTitle(head.text);
+    const firstWord = words(title)[0]?.toLowerCase().replace(/[^a-z]/g, '') ?? '';
+    if (!title || STRUCTURAL.has(firstWord)) continue;
+
+    const items: string[] = [];
+    let numbered = false;
+    let j = i + 1;
+    while (j < lines.length && lines[j].marked && plausibleItem(lines[j].text)) {
+      items.push(lines[j].text.replace(/[.;,]$/, ''));
+      numbered = numbered || lines[j].numbered;
+      j++;
+    }
+
+    if (items.length < ENUM_LIMITS.min || items.length > ENUM_LIMITS.max) continue;
+
+    drafts.push({
+      title,
+      items,
+      ordered: numbered,
+      source: `${head.text} ${items.join(', ')}`,
+    });
+    for (let k = i; k < j; k++) consumed.add(k);
+    i = j - 1;
+  }
+
+  return { drafts, consumed };
+}
+
+/** "The four stages of mitosis are prophase, metaphase, anaphase and telophase." */
+function findInlineSeries(line: string): EnumDraft | null {
+  const match =
+    /^(.{3,60}?)\s+(?:are|include|consist of|comprise)\s+(.+)$/i.exec(line) ??
+    /^(.{3,60}?):\s+(.+,.+)$/.exec(line);
+  if (!match) return null;
+
+  // Read the count from the raw title — cleanListTitle removes it.
+  const stated = words(match[1])
+    .map((w) => NUMBER_WORD[w.toLowerCase().replace(/[^a-z]/g, '')])
+    .find((n) => n != null);
+
+  const title = cleanListTitle(match[1]);
+  const tail = match[2].replace(/\.$/, '');
+  if (!/,/.test(tail)) return null;
+
+  const items = tail
+    .split(/\s*,\s*|\s+and\s+|\s+or\s+/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (items.length < ENUM_LIMITS.min || items.length > ENUM_LIMITS.max) return null;
+  if (!items.every(plausibleItem)) return null;
+
+  // When the title states a count, it must agree — otherwise we split wrong.
+  if (stated != null && stated !== items.length) return null;
+
+  return { title, items, ordered: false, source: line };
+}
+
+function enumerationPrompt(draft: EnumDraft): string {
+  const title = draft.title.replace(/^(?:list|name)\s+/i, '');
+  return `List the ${draft.items.length}: ${title}`;
+}
+
 // --- main ---------------------------------------------------------------
 
 export function parseNotes(input: string): ParseResult {
   const truncatedInput = input.length > LIMITS.maxInputChars;
   const text = normalize(truncatedInput ? input.slice(0, LIMITS.maxInputChars) : input);
 
-  const rawLines = text
+  const lines = text
     .split('\n')
     .map(stripMarkers)
-    .filter((line) => line.length > 0);
+    .filter((line) => line.text.length > 0);
+  const rawLines = lines.map((line) => line.text);
 
   // Word frequency across the whole note — repeated words are likely key terms.
   const frequency = new Map<string, number>();
@@ -486,15 +619,60 @@ export function parseNotes(input: string): ParseResult {
     answer: string;
     kind: QuestionKind;
     source: string;
+    /** Enumeration carries its whole item list instead of one answer. */
+    items?: string[];
+    ordered?: boolean;
   }
   const drafts: Draft[] = [];
   const termPool = new Set<string>();
   const skipped: SkippedLine[] = [];
   let linesUsed = 0;
 
-  for (const line of rawLines) {
+  // Lists first — they span several lines, and those lines must not then be
+  // read again as standalone facts.
+  const { drafts: listDrafts, consumed } = findListBlocks(lines);
+  for (const draft of listDrafts) {
+    drafts.push({
+      prompt: enumerationPrompt(draft),
+      answer: draft.items[0],
+      kind: 'enumeration',
+      source: draft.source,
+      items: draft.items,
+      ordered: draft.ordered,
+    });
+    // List items are exactly the kind of sibling terms that make good decoys
+    // for the other questions in these notes.
+    draft.items.forEach((item) => termPool.add(item));
+    linesUsed++;
+  }
+
+  for (let index = 0; index < rawLines.length; index++) {
+    if (consumed.has(index)) continue;
+    const line = rawLines[index];
+
     if (wordCount(line) < LIMITS.minWordsPerLine) {
       skipped.push({ text: line, reason: 'too_short' });
+      continue;
+    }
+
+    // A to-do line has nothing to learn, even when it parses cleanly.
+    if (TASK_LINE.test(line)) {
+      skipped.push({ text: line, reason: 'no_fact' });
+      continue;
+    }
+
+    const series = findInlineSeries(line);
+    if (series) {
+      drafts.push({
+        prompt: enumerationPrompt(series),
+        answer: series.items[0],
+        kind: 'enumeration',
+        source: series.source,
+        items: series.items,
+        ordered: series.ordered,
+      });
+      series.items.forEach((item) => termPool.add(item));
+      linesUsed++;
       continue;
     }
 
@@ -569,6 +747,20 @@ export function parseNotes(input: string): ParseResult {
 
     const key = draft.prompt.toLowerCase();
     if (seenPrompts.has(key)) continue;
+
+    // Enumeration needs no decoys — the items are the answer.
+    if (draft.kind === 'enumeration' && draft.items) {
+      seenPrompts.add(key);
+      questions.push({
+        prompt: draft.prompt,
+        correctAnswer: draft.items[0],
+        answers: draft.items,
+        kind: 'enumeration',
+        sourceLine: draft.source,
+        ordered: draft.ordered,
+      });
+      continue;
+    }
 
     const seed = draft.prompt + draft.answer;
     const distractors = isNumeric(draft.answer)

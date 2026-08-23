@@ -27,14 +27,29 @@ export interface Deck {
   downloadedAt: number | null;
 }
 
+/** How a question was derived, which decides the exam formats it supports. */
+export type QuestionKind = 'definition' | 'cloze' | 'enumeration' | 'trivia';
+
 export interface Question {
   id: string; // `${deckId}:${position}`
   deckId: string;
   position: number;
   prompt: string;
   correctAnswer: string;
-  /** All four options, shuffled once at download time and frozen. */
+  /**
+   * The options, shuffled once at save time and frozen. For an enumeration
+   * question this holds every item in the list instead.
+   */
   answers: string[];
+  /** Trivia for API decks; the parser's classification for notes decks. */
+  kind: QuestionKind;
+  /**
+   * The sentence this came from. Needed to rebuild a declarative statement
+   * for true/false. Null for trivia and for questions saved before v4.
+   */
+  sourceLine: string | null;
+  /** Enumeration only: whether the listed items must be given in order. */
+  ordered: boolean;
 }
 
 export interface Attempt {

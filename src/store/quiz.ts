@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 
-import { getDeckById, listQuestions, saveAttempt } from '@/lib/db';
+import {
+  getDeckById,
+  listQuestions,
+  saveAnswers,
+  saveAttempt,
+  type AnswerInput,
+} from '@/lib/db';
 import { retireSessionForDeck } from '@/lib/notifications';
 import type { Deck, Question } from '@/lib/types';
 
@@ -14,6 +20,8 @@ interface QuizState {
   /** The answer picked for the current question; null until answered. */
   selected: string | null;
   score: number;
+  /** Per-question results for this run; persisted with the attempt. */
+  answers: AnswerInput[];
   startedAt: number;
   durationMs: number;
   error: string | null;
@@ -31,6 +39,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   index: 0,
   selected: null,
   score: 0,
+  answers: [],
   startedAt: 0,
   durationMs: 0,
   error: null,
@@ -43,6 +52,7 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       index: 0,
       selected: null,
       score: 0,
+      answers: [],
       durationMs: 0,
       error: null,
     });
@@ -65,8 +75,16 @@ export const useQuizStore = create<QuizState>((set, get) => ({
   choose: (answer) => {
     const { status, selected, questions, index } = get();
     if (status !== 'active' || selected != null) return;
-    const correct = questions[index].correctAnswer === answer;
-    set((s) => ({ selected: answer, score: correct ? s.score + 1 : s.score }));
+    const question = questions[index];
+    const correct = question.correctAnswer === answer;
+    set((s) => ({
+      selected: answer,
+      score: correct ? s.score + 1 : s.score,
+      answers: [
+        ...s.answers,
+        { questionId: question.id, correct, answeredAt: Date.now() },
+      ],
+    }));
   },
 
   advance: async () => {
@@ -76,18 +94,21 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       set({ index: index + 1, selected: null });
       return 'question';
     }
-    const { deck, score, startedAt } = get();
+    const { deck, score, startedAt, answers } = get();
     const completedAt = Date.now();
     const durationMs = completedAt - startedAt;
     set({ status: 'finished', durationMs });
     if (deck) {
-      await saveAttempt({
+      const attemptId = await saveAttempt({
         deckId: deck.id,
         score,
         total: questions.length,
         durationMs,
         completedAt,
       });
+      // Which questions were missed is what mastery and weak spots read;
+      // the score alone could never tell them apart.
+      await saveAnswers(attemptId, deck.id, answers);
       // Stop any reminder still pending for the sitting this deck was
       // planned in — finishing early must not earn you a nag.
       await retireSessionForDeck(deck.id, completedAt);

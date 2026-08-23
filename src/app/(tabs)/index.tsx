@@ -123,7 +123,8 @@ export default function HomeScreen() {
         <Pressable
           key={deck.id}
           onPress={() =>
-            router.push({ pathname: '/quiz/[deckId]', params: { deckId: deck.id } })
+            // Subjects open the exam builder; trivia keeps the plain quiz.
+            router.push({ pathname: '/exam/[deckId]', params: { deckId: deck.id } })
           }
           onLongPress={() => handleDeleteNote(deck)}
           style={({ pressed }) => [styles.noteDeckCard, pressed && styles.pressed]}>

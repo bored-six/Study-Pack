@@ -6,12 +6,13 @@ import type {
   DeckSource,
   Difficulty,
   Question,
+  QuestionKind,
   Repeat,
   Schedule,
 } from './types';
 
 const DB_NAME = 'studypack.db';
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 5;
 
 let instance: SQLiteDatabase | null = null;
 
@@ -91,6 +92,35 @@ export async function initDb(): Promise<void> {
     `);
   }
 
+  if (version < 4) {
+    // Exam formats need to know how a question was derived and what sentence
+    // it came from. Questions saved before this default to trivia, which
+    // supports multiple choice only.
+    await db.execAsync(`
+      ALTER TABLE questions ADD COLUMN kind TEXT NOT NULL DEFAULT 'trivia';
+      ALTER TABLE questions ADD COLUMN source_line TEXT;
+      ALTER TABLE questions ADD COLUMN ordered INTEGER NOT NULL DEFAULT 0;
+    `);
+  }
+
+  if (version < 5) {
+    // Per-question results. Scores alone could never say *which* questions
+    // are shaky, so mastery and weak spots both start here. Recorded from
+    // this version on; earlier attempts simply have no detail to show.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS answers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        attempt_id INTEGER REFERENCES attempts(id) ON DELETE CASCADE,
+        deck_id TEXT NOT NULL,
+        question_id TEXT NOT NULL,
+        correct INTEGER NOT NULL,
+        answered_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_answers_deck ON answers(deck_id, answered_at);
+      CREATE INDEX IF NOT EXISTS idx_answers_question ON answers(question_id);
+    `);
+  }
+
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -158,7 +188,8 @@ export async function upsertCatalog(
   });
 }
 
-export type DownloadableQuestion = Pick<Question, 'prompt' | 'correctAnswer' | 'answers'>;
+export type DownloadableQuestion = Pick<Question, 'prompt' | 'correctAnswer' | 'answers'> &
+  Partial<Pick<Question, 'kind' | 'sourceLine' | 'ordered'>>;
 
 /**
  * Persists a deck's questions and marks it downloaded, atomically.
@@ -175,14 +206,18 @@ export async function saveDeckDownload(
     for (let position = 0; position < questions.length; position++) {
       const q = questions[position];
       await db.runAsync(
-        `INSERT INTO questions (id, deck_id, position, prompt, correct_answer, answers_json)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO questions
+           (id, deck_id, position, prompt, correct_answer, answers_json, kind, source_line, ordered)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         `${deckId}:${position}`,
         deckId,
         position,
         q.prompt,
         q.correctAnswer,
-        JSON.stringify(q.answers)
+        JSON.stringify(q.answers),
+        q.kind ?? 'trivia',
+        q.sourceLine ?? null,
+        q.ordered ? 1 : 0
       );
     }
     await db.runAsync(
@@ -239,14 +274,18 @@ export async function addQuestionsToDeck(
 
     for (const q of questions) {
       await db.runAsync(
-        `INSERT INTO questions (id, deck_id, position, prompt, correct_answer, answers_json)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO questions
+           (id, deck_id, position, prompt, correct_answer, answers_json, kind, source_line, ordered)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         `${deckId}:${position}`,
         deckId,
         position,
         q.prompt,
         q.correctAnswer,
-        JSON.stringify(q.answers)
+        JSON.stringify(q.answers),
+        q.kind ?? 'trivia',
+        q.sourceLine ?? null,
+        q.ordered ? 1 : 0
       );
       position++;
     }
@@ -282,6 +321,9 @@ interface QuestionRow {
   prompt: string;
   correct_answer: string;
   answers_json: string;
+  kind: string | null;
+  source_line: string | null;
+  ordered: number | null;
 }
 
 /** The quiz reads exclusively from here — it never touches the network. */
@@ -297,11 +339,14 @@ export async function listQuestions(deckId: string): Promise<Question[]> {
     prompt: row.prompt,
     correctAnswer: row.correct_answer,
     answers: JSON.parse(row.answers_json) as string[],
+    kind: (row.kind as QuestionKind) ?? 'trivia',
+    sourceLine: row.source_line,
+    ordered: row.ordered === 1,
   }));
 }
 
-export async function saveAttempt(attempt: Omit<Attempt, 'id'>): Promise<void> {
-  await getDb().runAsync(
+export async function saveAttempt(attempt: Omit<Attempt, 'id'>): Promise<number> {
+  const result = await getDb().runAsync(
     `INSERT INTO attempts (deck_id, score, total, duration_ms, completed_at)
      VALUES (?, ?, ?, ?, ?)`,
     attempt.deckId,
@@ -310,6 +355,7 @@ export async function saveAttempt(attempt: Omit<Attempt, 'id'>): Promise<void> {
     attempt.durationMs,
     attempt.completedAt
   );
+  return result.lastInsertRowId;
 }
 
 export interface AttemptWithDeck extends Attempt {
@@ -356,13 +402,6 @@ export async function listAttemptTimestamps(): Promise<number[]> {
     'SELECT completed_at FROM attempts'
   );
   return rows.map((row) => row.completed_at);
-}
-
-export async function getBestScoreRatio(): Promise<number | null> {
-  const row = await getDb().getFirstAsync<{ best: number | null }>(
-    'SELECT MAX(CAST(score AS REAL) / total) AS best FROM attempts'
-  );
-  return row?.best ?? null;
 }
 
 interface ScheduleRow {
@@ -442,4 +481,74 @@ export async function writeSetting(key: string, value: string): Promise<void> {
     key,
     value
   );
+}
+
+export interface AnswerInput {
+  questionId: string;
+  correct: boolean;
+  answeredAt: number;
+}
+
+/** Writes a quiz's per-question results in one transaction. */
+export async function saveAnswers(
+  attemptId: number,
+  deckId: string,
+  answers: readonly AnswerInput[]
+): Promise<void> {
+  if (answers.length === 0) return;
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    for (const answer of answers) {
+      await db.runAsync(
+        `INSERT INTO answers (attempt_id, deck_id, question_id, correct, answered_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        attemptId,
+        deckId,
+        answer.questionId,
+        answer.correct ? 1 : 0,
+        answer.answeredAt
+      );
+    }
+  });
+}
+
+export interface StoredAnswer extends AnswerInput {
+  deckId: string;
+}
+
+/** Every recorded answer, oldest first — the input to mastery. */
+export async function listAnswers(): Promise<StoredAnswer[]> {
+  const rows = await getDb().getAllAsync<{
+    deck_id: string;
+    question_id: string;
+    correct: number;
+    answered_at: number;
+  }>('SELECT deck_id, question_id, correct, answered_at FROM answers ORDER BY answered_at');
+  return rows.map((row) => ({
+    deckId: row.deck_id,
+    questionId: row.question_id,
+    correct: row.correct === 1,
+    answeredAt: row.answered_at,
+  }));
+}
+
+/**
+ * Question ids grouped by subject. Mastery averages over every question a
+ * subject holds, so it needs the full roster, not just the answered ones.
+ */
+export async function listQuestionIdsBySubject(): Promise<Map<string, string[]>> {
+  const rows = await getDb().getAllAsync<{ deck_id: string; id: string }>(
+    `SELECT q.deck_id, q.id
+     FROM questions q
+     JOIN decks d ON d.id = q.deck_id
+     WHERE d.source = 'notes'
+     ORDER BY q.deck_id, q.position`
+  );
+  const map = new Map<string, string[]>();
+  for (const row of rows) {
+    const list = map.get(row.deck_id);
+    if (list) list.push(row.id);
+    else map.set(row.deck_id, [row.id]);
+  }
+  return map;
 }

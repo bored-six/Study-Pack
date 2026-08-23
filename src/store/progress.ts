@@ -1,17 +1,23 @@
 import { create } from 'zustand';
 
 import {
-  getBestScoreRatio,
+  listAnswers,
   listAttempts,
   listAttemptTimestamps,
+  listDecks,
+  listQuestionIdsBySubject,
   type AttemptWithDeck,
 } from '@/lib/db';
+import { subjectMastery, weakSpots, type SubjectMastery } from '@/lib/mastery';
 import { computeStreaks } from '@/lib/streak';
 
 interface ProgressState {
   attempts: AttemptWithDeck[];
   totalAttempts: number;
-  bestPct: number | null;
+  /** One row per subject, strongest first. */
+  subjects: SubjectMastery[];
+  /** Questions seen but still shaky, across every subject. */
+  weakCount: number;
   currentStreak: number;
   longestStreak: number;
   status: 'idle' | 'loading' | 'ready';
@@ -21,7 +27,8 @@ interface ProgressState {
 export const useProgressStore = create<ProgressState>((set, get) => ({
   attempts: [],
   totalAttempts: 0,
-  bestPct: null,
+  subjects: [],
+  weakCount: 0,
   currentStreak: 0,
   longestStreak: 0,
   status: 'idle',
@@ -29,16 +36,36 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
   refresh: async () => {
     if (get().status === 'idle') set({ status: 'loading' });
     try {
-      const [attempts, timestamps, bestRatio] = await Promise.all([
-        listAttempts(50),
-        listAttemptTimestamps(),
-        getBestScoreRatio(),
-      ]);
+      const [attempts, timestamps, answers, questionsBySubject, subjectDecks] =
+        await Promise.all([
+          listAttempts(50),
+          listAttemptTimestamps(),
+          listAnswers(),
+          listQuestionIdsBySubject(),
+          listDecks('notes'),
+        ]);
+
+      const now = Date.now();
+      const subjects = subjectDecks
+        .map((deck) =>
+          subjectMastery(
+            deck.id,
+            deck.name,
+            questionsBySubject.get(deck.id) ?? [],
+            answers.filter((answer) => answer.deckId === deck.id),
+            now
+          )
+        )
+        .filter((subject) => subject.questionCount > 0)
+        .sort((a, b) => b.percent - a.percent);
+
       const { current, longest } = computeStreaks(timestamps);
+
       set({
         attempts,
         totalAttempts: timestamps.length,
-        bestPct: bestRatio == null ? null : Math.round(bestRatio * 100),
+        subjects,
+        weakCount: weakSpots(answers, now).length,
         currentStreak: current,
         longestStreak: longest,
         status: 'ready',

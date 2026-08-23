@@ -1,19 +1,18 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
-import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
+import { RuledPaper, Squiggle } from '@/components/notebook';
 import { type AttemptWithDeck } from '@/lib/db';
+import { masteryLabel, type SubjectMastery } from '@/lib/mastery';
 import { useProgressStore } from '@/store/progress';
-import { colors, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
+import { colors, font, radius, tabClearance } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
 }
 
 function localDayIndex(timestamp: number): number {
@@ -30,30 +29,55 @@ function formatWhen(timestamp: number): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function scoreTone(score: number, total: number) {
-  const pct = (score / total) * 100;
-  if (pct >= 80) return { bg: colors.leafWash, fg: colors.leaf };
-  if (pct >= 50) return { bg: colors.goldWash, fg: colors.gold };
-  return { bg: colors.coralWash, fg: colors.coral };
+/** Warm for shaky, green for solid — the bar reads before the number does. */
+function masteryColor(percent: number): string {
+  if (percent >= 85) return colors.leaf;
+  if (percent >= 60) return colors.accentDeep;
+  if (percent >= 30) return colors.gold;
+  return colors.coral;
+}
+
+function SubjectRow({ subject }: { subject: SubjectMastery }) {
+  const tone = masteryColor(subject.percent);
+  const note =
+    subject.unseen > 0
+      ? `${subject.unseen} not seen yet`
+      : subject.weak > 0
+        ? `${subject.weak} to review`
+        : 'all steady';
+
+  return (
+    <View style={styles.subjectRow}>
+      <View style={styles.subjectHead}>
+        <Text style={styles.subjectName} numberOfLines={1}>
+          {subject.deckName}
+        </Text>
+        <Text style={[styles.subjectPct, { color: tone }]}>{subject.percent}%</Text>
+      </View>
+      <View style={styles.track}>
+        <View
+          style={[styles.barFill, { width: `${subject.percent}%`, backgroundColor: tone }]}
+        />
+      </View>
+      <Text style={styles.subjectNote}>
+        {masteryLabel(subject.percent)} · {note}
+      </Text>
+    </View>
+  );
 }
 
 function AttemptRow({ attempt }: { attempt: AttemptWithDeck }) {
-  const tone = scoreTone(attempt.score, attempt.total);
   return (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        <Text style={styles.rowName} numberOfLines={1}>
-          {attempt.deckName}
-        </Text>
-        <Text style={styles.rowWhen}>
-          {formatWhen(attempt.completedAt)} · {formatDuration(attempt.durationMs)}
-        </Text>
-      </View>
-      <View style={[styles.chip, { backgroundColor: tone.bg }]}>
-        <Text style={[styles.chipText, { color: tone.fg }]}>
-          {attempt.score}/{attempt.total}
-        </Text>
-      </View>
+    <View style={styles.attemptRow}>
+      <Text style={styles.attemptName} numberOfLines={1}>
+        {attempt.deckName}
+      </Text>
+      <Text style={styles.attemptMeta}>
+        {formatWhen(attempt.completedAt)} · {formatDuration(attempt.durationMs)}
+      </Text>
+      <Text style={styles.attemptScore}>
+        {attempt.score}/{attempt.total}
+      </Text>
     </View>
   );
 }
@@ -63,7 +87,8 @@ export default function ProgressScreen() {
   const {
     attempts,
     totalAttempts,
-    bestPct,
+    subjects,
+    weakCount,
     currentStreak,
     longestStreak,
     status,
@@ -76,265 +101,195 @@ export default function ProgressScreen() {
     }, [refresh])
   );
 
-  const empty = status === 'ready' && attempts.length === 0;
+  if (status !== 'ready') {
+    return (
+      <View style={[styles.screen, styles.centre]}>
+        <ActivityIndicator color={colors.accentDeep} />
+      </View>
+    );
+  }
+
+  const nothingYet = totalAttempts === 0 && subjects.length === 0;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+    <View style={styles.screen}>
       <RuledPaper />
-      <Text style={styles.kicker}>FLIPP</Text>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>Your</Text>
-        <View style={styles.titleSticker}>
-          <Text style={styles.titleStickerText}>progress</Text>
-        </View>
-      </View>
-      <Squiggle color={colors.gold} style={styles.squiggle} />
-      <Text style={styles.sub}>
-        {totalAttempts > 0
-          ? `${totalAttempts} ${totalAttempts === 1 ? 'quiz' : 'quizzes'} · saved on this device`
-          : 'Saved on this device'}
-      </Text>
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        showsVerticalScrollIndicator={false}>
+        <Text style={styles.kicker}>FLIPP</Text>
+        <Text style={styles.title}>Progress</Text>
+        <Squiggle color={colors.gold} style={styles.squiggle} />
 
-      {status === 'loading' || status === 'idle' ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accentDeep} />
-        </View>
-      ) : empty ? (
-        <View style={styles.empty}>
-          <View style={styles.emptyBadge}>
-            <Icon name="sprout" size={26} color={colors.ink} fill={colors.accentWash} />
-          </View>
-          <Text style={styles.emptyTitle}>No quizzes yet</Text>
-          <Text style={styles.emptyBody}>
-            Download a deck and take your first quiz — your scores and streak will live
-            here, even offline.
-          </Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.stats}>
-            <View style={[styles.stat, styles.statStreak]}>
-              <Tape />
-              <Icon name="flame" size={24} color={colors.ink} fill={colors.gold} />
-              <Text style={[styles.statNum, { color: colors.gold }]}>{currentStreak}</Text>
-              <Text style={styles.statLabel}>day streak</Text>
-            </View>
-            <View style={[styles.stat, styles.statBest]}>
-              <Tape rotate="4deg" />
-              <Icon name="trophy" size={24} color={colors.ink} fill={colors.accent} />
-              <Text style={[styles.statNum, { color: colors.accentDeep }]}>
-                {bestPct != null ? `${bestPct}%` : '—'}
-              </Text>
-              <Text style={styles.statLabel}>best score</Text>
-            </View>
-          </View>
-
-          <FlatList
-            data={attempts}
-            keyExtractor={(attempt) => String(attempt.id)}
-            renderItem={({ item }) => <AttemptRow attempt={item} />}
-            style={styles.listCard}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
-
-          <View style={styles.longestPill}>
-            <Icon name="bolt" size={13} color={colors.ink} fill={colors.gold} strokeWidth={2.2} />
-            <Text style={styles.longestText}>Longest streak: {longestStreak}{' '}
-              {longestStreak === 1 ? 'day' : 'days'}
+        {nothingYet ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>Nothing to show yet</Text>
+            <Text style={styles.emptyBody}>
+              Add your notes and take a quiz. Every answer counts towards how well you
+              know each subject — so this fills in as you go.
             </Text>
           </View>
-        </>
-      )}
+        ) : (
+          <>
+            <View style={styles.streak}>
+              <View style={styles.streakRow}>
+                <Icon name="flame" size={26} color={colors.ink} fill={colors.gold} />
+                <Text style={styles.streakNum}>{currentStreak}</Text>
+              </View>
+              <Text style={styles.streakLabel}>
+                day streak{longestStreak > currentStreak ? ` · best ${longestStreak}` : ''}
+              </Text>
+            </View>
+
+            {subjects.length > 0 ? (
+              <>
+                <Text style={styles.section}>SUBJECTS</Text>
+                {subjects.map((subject) => (
+                  <SubjectRow key={subject.deckId} subject={subject} />
+                ))}
+              </>
+            ) : null}
+
+            {weakCount > 0 ? (
+              <View style={styles.weak}>
+                <Text style={styles.weakNum}>{weakCount}</Text>
+                <Text style={styles.weakLabel}>
+                  question{weakCount === 1 ? '' : 's'} keep tripping you up
+                </Text>
+              </View>
+            ) : null}
+
+            {attempts.length > 0 ? (
+              <>
+                <Text style={styles.section}>RECENT</Text>
+                {attempts.slice(0, 8).map((attempt) => (
+                  <AttemptRow key={attempt.id} attempt={attempt} />
+                ))}
+              </>
+            ) : null}
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    paddingHorizontal: 16,
-  },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  fill: { flex: 1 },
+  centre: { alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 24, paddingBottom: tabClearance },
+
   kicker: {
     fontFamily: font.bodyHeavy,
     fontSize: 11,
     letterSpacing: 2,
     color: colors.accentDeep,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-  title: {
+  title: { fontFamily: font.hero, fontSize: 34, lineHeight: 44, color: colors.text },
+  squiggle: { marginTop: 2, marginLeft: 2 },
+
+  streak: { marginTop: 40 },
+  streakRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  streakNum: {
     fontFamily: font.hero,
-    fontSize: 32,
-    lineHeight: 42,
+    fontSize: 52,
+    lineHeight: 60,
     color: colors.text,
   },
-  titleSticker: {
-    backgroundColor: colors.goldWash,
-    ...outline,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    transform: [{ rotate: '-2.5deg' }],
-    ...shadow.card,
-  },
-  titleStickerText: {
-    fontFamily: font.hero,
-    fontSize: 24,
-    lineHeight: 32,
-    color: colors.ink,
-  },
-  sub: {
+  streakLabel: {
     fontFamily: font.bodySemibold,
-    fontSize: 13,
-    color: colors.textFaint,
-    marginTop: 1,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stats: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  stat: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.card,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    ...shadow.card,
-  },
-  statStreak: {
-    backgroundColor: colors.goldWash,
-    transform: [{ rotate: '-1.2deg' }],
-  },
-  statBest: {
-    transform: [{ rotate: '0.8deg' }],
-  },
-  squiggle: {
-    marginTop: 2,
-    marginLeft: 2,
-  },
-  statNum: {
-    marginTop: 4,
-    fontFamily: font.hero,
-    fontSize: 32,
-    lineHeight: 38,
-    fontVariant: ['tabular-nums'],
-  },
-  statLabel: {
-    fontFamily: font.bodyBold,
-    fontSize: 12,
-    color: colors.textDim,
-  },
-  listCard: {
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.card,
-    marginTop: 14,
-    flexGrow: 0,
-    flexShrink: 1,
-    ...shadow.card,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 5,
-  },
-  separator: {
-    height: 1,
-    backgroundColor: colors.lineSoft,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingVertical: 11,
-  },
-  rowLeft: {
-    flexShrink: 1,
-  },
-  rowName: {
-    fontFamily: font.bodyBold,
     fontSize: 14,
-    color: colors.text,
-  },
-  rowWhen: {
-    fontFamily: font.bodySemibold,
-    fontSize: 11.5,
     color: colors.textFaint,
-    marginTop: 1,
+    marginTop: -2,
   },
-  chip: {
-    borderRadius: 10,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-  chipText: {
+
+  section: {
     fontFamily: font.bodyHeavy,
-    fontSize: 12.5,
-    fontVariant: ['tabular-nums'],
+    fontSize: 11,
+    letterSpacing: 1.6,
+    color: colors.textFaint,
+    marginTop: 44,
+    marginBottom: 14,
   },
-  longestPill: {
-    alignSelf: 'flex-start',
+
+  subjectRow: { marginBottom: 26 },
+  subjectHead: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.goldWash,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    borderRadius: radius.pill,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    marginTop: 12,
-    marginBottom: tabClearance,
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  longestText: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 12,
-    color: colors.gold,
-  },
-  empty: {
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.card,
-    padding: 22,
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 16,
-    ...shadow.card,
-  },
-  emptyBadge: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    backgroundColor: colors.surface2,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    transform: [{ rotate: '-3deg' }],
-  },
-  emptyTitle: {
-    fontFamily: font.heading,
+  subjectName: {
+    flex: 1,
+    fontFamily: font.bodyBold,
     fontSize: 16,
     color: colors.text,
   },
+  subjectPct: {
+    fontFamily: font.hero,
+    fontSize: 22,
+    fontVariant: ['tabular-nums'],
+  },
+  track: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.track,
+    overflow: 'hidden',
+    marginTop: 7,
+  },
+  barFill: { height: '100%', borderRadius: radius.pill },
+  subjectNote: {
+    fontFamily: font.body,
+    fontSize: 12.5,
+    color: colors.textFaint,
+    marginTop: 6,
+  },
+
+  weak: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 9,
+    marginTop: 18,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.lineSoft,
+  },
+  weakNum: { fontFamily: font.hero, fontSize: 28, color: colors.coral },
+  weakLabel: {
+    flex: 1,
+    fontFamily: font.bodySemibold,
+    fontSize: 14,
+    color: colors.textDim,
+  },
+
+  attemptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: colors.lineSoft,
+  },
+  attemptName: { flex: 1, fontFamily: font.bodyBold, fontSize: 14, color: colors.textDim },
+  attemptMeta: { fontFamily: font.body, fontSize: 12, color: colors.textFaint },
+  attemptScore: {
+    fontFamily: font.hero,
+    fontSize: 17,
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+    minWidth: 44,
+    textAlign: 'right',
+  },
+
+  empty: { marginTop: 40 },
+  emptyTitle: { fontFamily: font.hero, fontSize: 26, lineHeight: 34, color: colors.text },
   emptyBody: {
     fontFamily: font.body,
-    fontSize: 13.5,
+    fontSize: 14.5,
+    lineHeight: 21,
     color: colors.textDim,
-    textAlign: 'center',
+    marginTop: 8,
   },
 });
