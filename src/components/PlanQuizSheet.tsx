@@ -6,10 +6,9 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon } from '@/components/Icon';
-import { Tape } from '@/components/notebook';
 import { formatClock } from '@/lib/schedule';
 import { REPEATS, REPEAT_LABEL, type Deck, type Repeat } from '@/lib/types';
-import { colors, derpRadius, font, outline, radius, shadow } from '@/theme/tokens';
+import { colors, font, radius } from '@/theme/tokens';
 
 export interface PlanDraft {
   deckId: string;
@@ -20,7 +19,8 @@ export interface PlanDraft {
 
 interface Props {
   visible: boolean;
-  decks: readonly Deck[];
+  /** The student's own subjects — the only thing worth planning. */
+  subjects: readonly Deck[];
   onCancel: () => void;
   onSave: (draft: PlanDraft) => void;
 }
@@ -36,15 +36,14 @@ function firstDateFor(timeOfDay: number, now: number): number {
   return today + timeOfDay * 60_000 <= now ? today + 86_400_000 : today;
 }
 
-export function PlanQuizSheet({ visible, decks, onCancel, onSave }: Props) {
+export function PlanQuizSheet({ visible, subjects, onCancel, onSave }: Props) {
   const [deckId, setDeckId] = useState<string | null>(null);
   const [timeOfDay, setTimeOfDay] = useState(19 * 60);
   const [repeat, setRepeat] = useState<Repeat>('daily');
   const [picking, setPicking] = useState(false);
 
-  const selected = deckId ?? decks[0]?.id ?? null;
+  const selected = deckId ?? subjects[0]?.id ?? null;
 
-  // A plain Date carrying the chosen wall-clock time, for the OS picker.
   const timeValue = useMemo(() => {
     const d = new Date();
     d.setHours(Math.floor(timeOfDay / 60), timeOfDay % 60, 0, 0);
@@ -68,56 +67,44 @@ export function PlanQuizSheet({ visible, decks, onCancel, onSave }: Props) {
     });
   };
 
-  const preview = formatClock(timeValue.getTime());
-
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onCancel}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <Tape />
-          <Text style={styles.title}>Plan a quiz</Text>
+      <Pressable style={styles.backdrop} onPress={onCancel}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.grabber} />
 
-          {decks.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Icon name="sprout" size={24} color={colors.ink} fill={colors.accentWash} />
-              <Text style={styles.emptyText}>
-                Add some notes or download a trivia deck first — then you can plan it.
+          {subjects.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>No subjects yet</Text>
+              <Text style={styles.emptyBody}>
+                Add your notes first — then you can plan when to study them.
               </Text>
+              <ChunkyButton label="Got it" size="lg" onPress={onCancel} style={styles.fullBtn} />
             </View>
           ) : (
-            <>
-              <Text style={styles.label}>WHICH DECK</Text>
-              <ScrollView style={styles.deckList} showsVerticalScrollIndicator={false}>
-                {decks.map((deck) => {
-                  const active = deck.id === selected;
-                  return (
-                    <Pressable
-                      key={deck.id}
-                      onPress={() => setDeckId(deck.id)}
-                      style={[styles.deckRow, active && styles.deckRowActive]}>
-                      <Icon
-                        name={deck.source === 'notes' ? 'book' : 'dice'}
-                        size={18}
-                        color={colors.ink}
-                        fill={active ? colors.accent : colors.surface2}
-                        strokeWidth={1.9}
-                      />
-                      <Text style={styles.deckName} numberOfLines={1}>
-                        {deck.name}
-                      </Text>
-                      {active ? (
-                        <Icon name="check" size={15} color={colors.accentDeep} strokeWidth={2.6} />
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>Subject</Text>
+              {subjects.map((subject) => {
+                const active = subject.id === selected;
+                return (
+                  <Pressable
+                    key={subject.id}
+                    onPress={() => setDeckId(subject.id)}
+                    style={styles.subjectRow}>
+                    <Text style={[styles.subjectName, active && styles.subjectNameActive]}>
+                      {subject.name}
+                    </Text>
+                    {active ? (
+                      <Icon name="check" size={17} color={colors.accentDeep} strokeWidth={2.6} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
 
-              <Text style={styles.label}>WHAT TIME</Text>
+              <Text style={styles.label}>Time</Text>
               <Pressable onPress={() => setPicking(true)} style={styles.timeRow}>
-                <Icon name="clock" size={20} color={colors.ink} fill={colors.goldWash} />
-                <Text style={styles.timeText}>{preview}</Text>
-                <Text style={styles.timeHint}>tap to change</Text>
+                <Text style={styles.timeText}>{formatClock(timeValue.getTime())}</Text>
+                <Text style={styles.timeHint}>change</Text>
               </Pressable>
 
               {picking ? (
@@ -129,7 +116,7 @@ export function PlanQuizSheet({ visible, decks, onCancel, onSave }: Props) {
                 />
               ) : null}
 
-              <Text style={styles.label}>HOW OFTEN</Text>
+              <Text style={styles.label}>Repeat</Text>
               <View style={styles.chips}>
                 {REPEATS.map((option) => {
                   const active = option === repeat;
@@ -145,22 +132,17 @@ export function PlanQuizSheet({ visible, decks, onCancel, onSave }: Props) {
                   );
                 })}
               </View>
-            </>
-          )}
 
-          <View style={styles.actions}>
-            <ChunkyButton label="Cancel" variant="paper" size="md" onPress={onCancel} />
-            <ChunkyButton
-              label="Save plan"
-              icon="check"
-              size="md"
-              disabled={!selected}
-              onPress={handleSave}
-              style={styles.saveBtn}
-            />
-          </View>
-        </View>
-      </View>
+              <ChunkyButton
+                label="Save plan"
+                size="lg"
+                onPress={handleSave}
+                style={styles.fullBtn}
+              />
+            </ScrollView>
+          )}
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -168,80 +150,69 @@ export function PlanQuizSheet({ visible, decks, onCancel, onSave }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(39, 54, 43, 0.35)',
+    backgroundColor: 'rgba(39, 54, 43, 0.3)',
     justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: colors.bg,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 22,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    paddingHorizontal: 18,
-    paddingTop: 22,
-    paddingBottom: 26,
-    gap: 8,
-    maxHeight: '88%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 32,
+    maxHeight: '85%',
   },
-  title: {
-    fontFamily: font.hero,
-    fontSize: 26,
-    lineHeight: 34,
-    color: colors.text,
+  grabber: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.line,
+    marginBottom: 18,
   },
   label: {
     fontFamily: font.bodyHeavy,
     fontSize: 11,
-    letterSpacing: 1.4,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
     color: colors.textFaint,
-    marginTop: 10,
+    marginTop: 26,
+    marginBottom: 6,
   },
-  deckList: {
-    maxHeight: 168,
-    flexGrow: 0,
-  },
-  deckRow: {
+  subjectRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    borderRadius: radius.control,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    marginBottom: 7,
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
   },
-  deckRowActive: {
-    backgroundColor: colors.accentWash,
-  },
-  deckName: {
-    flex: 1,
+  subjectName: {
     fontFamily: font.bodyBold,
-    fontSize: 14,
+    fontSize: 16,
+    color: colors.textDim,
+  },
+  subjectNameActive: {
+    fontFamily: font.hero,
+    fontSize: 20,
     color: colors.text,
   },
   timeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.control,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    ...shadow.card,
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
   },
   timeText: {
-    flex: 1,
     fontFamily: font.hero,
-    fontSize: 24,
+    fontSize: 44,
+    lineHeight: 54,
     color: colors.text,
   },
   timeHint: {
-    fontFamily: font.bodySemibold,
-    fontSize: 11.5,
-    color: colors.textFaint,
+    fontFamily: font.bodyBold,
+    fontSize: 13,
+    color: colors.accentDeep,
   },
   chips: {
     flexDirection: 'row',
@@ -249,48 +220,38 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
     borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    backgroundColor: colors.surface2,
   },
   chipActive: {
     backgroundColor: colors.accent,
-    ...shadow.card,
   },
   chipText: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 12.5,
+    fontFamily: font.bodyBold,
+    fontSize: 13.5,
     color: colors.textDim,
   },
   chipTextActive: {
     color: colors.ink,
   },
-  emptyBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    backgroundColor: colors.surface,
-    ...outline,
-    ...derpRadius,
-    padding: 16,
-    marginTop: 12,
+  fullBtn: {
+    marginTop: 32,
   },
-  emptyText: {
-    flex: 1,
+  empty: {
+    paddingVertical: 12,
+  },
+  emptyTitle: {
+    fontFamily: font.hero,
+    fontSize: 24,
+    color: colors.text,
+  },
+  emptyBody: {
     fontFamily: font.body,
-    fontSize: 13.5,
-    lineHeight: 18,
+    fontSize: 14.5,
+    lineHeight: 20,
     color: colors.textDim,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 20,
-  },
-  saveBtn: {
-    flex: 1,
+    marginTop: 6,
   },
 });

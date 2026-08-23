@@ -443,17 +443,3 @@ export async function writeSetting(key: string, value: string): Promise<void> {
     value
   );
 }
-
-/**
- * Decks a quiz can actually run on right now: notes subjects with
- * questions, plus downloaded trivia. Scheduling a deck you have not
- * downloaded would produce a reminder that leads to a dead end.
- */
-export async function listPlayableDecks(): Promise<Deck[]> {
-  const rows = await getDb().getAllAsync<DeckRow>(
-    `SELECT * FROM decks
-     WHERE downloaded_at IS NOT NULL AND question_count > 0
-     ORDER BY source DESC, name`
-  );
-  return rows.map(toDeck);
-}
