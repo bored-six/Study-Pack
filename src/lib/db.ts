@@ -1,6 +1,6 @@
 import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 
-import type { Deck, Difficulty } from './types';
+import type { Deck, Difficulty, Question } from './types';
 
 const DB_NAME = 'studypack.db';
 const SCHEMA_VERSION = 1;
@@ -100,7 +100,10 @@ export async function upsertCatalog(decks: Omit<Deck, 'downloadedAt'>[]): Promis
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name,
-           question_count = excluded.question_count`,
+           question_count = CASE
+             WHEN downloaded_at IS NULL THEN excluded.question_count
+             ELSE question_count
+           END`,
         deck.id,
         deck.categoryId,
         deck.name,
@@ -108,5 +111,49 @@ export async function upsertCatalog(decks: Omit<Deck, 'downloadedAt'>[]): Promis
         deck.questionCount
       );
     }
+  });
+}
+
+export type DownloadableQuestion = Pick<Question, 'prompt' | 'correctAnswer' | 'answers'>;
+
+/**
+ * Persists a deck's questions and marks it downloaded, atomically.
+ * If any insert fails the transaction rolls back and the deck stays
+ * not-downloaded — there is no half-downloaded state.
+ */
+export async function saveDeckDownload(
+  deckId: string,
+  questions: DownloadableQuestion[]
+): Promise<void> {
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM questions WHERE deck_id = ?', deckId);
+    for (let position = 0; position < questions.length; position++) {
+      const q = questions[position];
+      await db.runAsync(
+        `INSERT INTO questions (id, deck_id, position, prompt, correct_answer, answers_json)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        `${deckId}:${position}`,
+        deckId,
+        position,
+        q.prompt,
+        q.correctAnswer,
+        JSON.stringify(q.answers)
+      );
+    }
+    await db.runAsync(
+      'UPDATE decks SET downloaded_at = ?, question_count = ? WHERE id = ?',
+      Date.now(),
+      questions.length,
+      deckId
+    );
+  });
+}
+
+export async function removeDownload(deckId: string): Promise<void> {
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM questions WHERE deck_id = ?', deckId);
+    await db.runAsync('UPDATE decks SET downloaded_at = NULL WHERE id = ?', deckId);
   });
 }
