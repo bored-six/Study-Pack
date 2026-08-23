@@ -13,12 +13,31 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { DeckCard } from '@/components/DeckCard';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useOnline } from '@/hooks/useOnline';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
 import { colors, font, outline, radius, shadow, tabClearance, textPop } from '@/theme/tokens';
 import { useDecksStore } from '@/store/decks';
+
+/** What each difficulty actually means, so the levels aren't just labels. */
+const DIFFICULTY_HINT: Record<Difficulty, string> = {
+  easy: 'Warm-up questions — good for a quick round.',
+  medium: 'A fair challenge. Most people land here.',
+  hard: 'Specialist territory. Expect to miss a few.',
+};
+
+function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
+  return (
+    <View style={styles.sectionHead}>
+      <View style={styles.sectionBadge}>
+        <Icon name={icon} size={14} color={colors.ink} strokeWidth={2.4} />
+      </View>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      <View style={styles.sectionRule} />
+    </View>
+  );
+}
 
 export default function DecksScreen() {
   const insets = useSafeAreaInsets();
@@ -31,10 +50,17 @@ export default function DecksScreen() {
     void refresh();
   }, [refresh]);
 
-  const visible = useMemo(
-    () => decks.filter((deck) => deck.difficulty === difficulty),
-    [decks, difficulty]
-  );
+  /** Downloaded decks float to the top — they're the ones playable offline. */
+  const trivia = useMemo(() => {
+    const filtered = decks.filter((deck) => deck.difficulty === difficulty);
+    return [...filtered].sort((a, b) => {
+      const aSaved = a.downloadedAt != null ? 0 : 1;
+      const bSaved = b.downloadedAt != null ? 0 : 1;
+      if (aSaved !== bSaved) return aSaved - bSaved;
+      return a.name.localeCompare(b.name);
+    });
+  }, [decks, difficulty]);
+
   const downloadedCount = useMemo(
     () => decks.filter((deck) => deck.downloadedAt != null).length,
     [decks]
@@ -70,25 +96,26 @@ export default function DecksScreen() {
     [removeDownload]
   );
 
-  return (
-    <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.kicker}>STUDYPACK</Text>
+  const handleAddNotes = useCallback(() => {
+    Alert.alert(
+      'Add your notes',
+      "Coming next: paste your class notes and Study Pack turns them into quiz questions — no internet, no AI needed.",
+      [{ text: 'Got it' }]
+    );
+  }, []);
+
+  const header = (
+    <View>
+      <Text style={styles.kicker}>STUDY PACK</Text>
       <View style={styles.titleRow}>
-        <Text style={styles.title}>Pick a</Text>
+        <Text style={styles.title}>Let's</Text>
         <View style={styles.titleSticker}>
-          <Text style={styles.titleStickerText}>deck!</Text>
+          <Text style={styles.titleStickerText}>study!</Text>
         </View>
       </View>
-      <Text style={styles.sub}>
-        {decks.length > 0
-          ? `${downloadedCount} of ${decks.length} saved for offline`
-          : 'Quiz decks from Open Trivia DB'}
-      </Text>
+      <Text style={styles.sub}>Your own notes, plus trivia to practice on.</Text>
 
-      <OfflineBanner
-        message="Offline — showing your saved catalog"
-        style={styles.cacheNote}
-      />
+      <OfflineBanner message="Offline — everything saved still works" style={styles.cacheNote} />
       {fromCache && online ? (
         <View style={styles.cacheNote}>
           <Text style={styles.cacheNoteText}>
@@ -96,6 +123,27 @@ export default function DecksScreen() {
           </Text>
         </View>
       ) : null}
+
+      <SectionHeading icon="book" label="MY NOTES" />
+      <Pressable
+        onPress={handleAddNotes}
+        style={({ pressed }) => [styles.notesCard, pressed && styles.pressed]}>
+        <View style={styles.notesBadge}>
+          <Icon name="bulb" size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
+        </View>
+        <View style={styles.notesText}>
+          <Text style={styles.notesTitle}>Add your notes</Text>
+          <Text style={styles.notesBody}>
+            Paste notes from class and we'll turn them into a quiz you can take anywhere.
+          </Text>
+        </View>
+      </Pressable>
+
+      <SectionHeading icon="dice" label="TRIVIA" />
+      <Text style={styles.sectionSub}>
+        Practice decks from Open Trivia DB
+        {downloadedCount > 0 ? ` · ${downloadedCount} saved offline` : ''}
+      </Text>
 
       <View style={styles.chips}>
         {DIFFICULTIES.map((level) => {
@@ -116,10 +164,16 @@ export default function DecksScreen() {
           );
         })}
       </View>
+      <Text style={styles.levelHint}>{DIFFICULTY_HINT[difficulty]}</Text>
+    </View>
+  );
 
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <FlatList
-        data={visible}
+        data={trivia}
         keyExtractor={(deck) => deck.id}
+        ListHeaderComponent={header}
         renderItem={({ item, index }) => (
           <DeckCard
             deck={item}
@@ -146,7 +200,7 @@ export default function DecksScreen() {
               <View style={styles.emptyBadge}>
                 <Icon name="alert" size={26} color={colors.ink} fill={colors.coralWash} />
               </View>
-              <Text style={styles.emptyTitle}>Couldn't load decks</Text>
+              <Text style={styles.emptyTitle}>Couldn't load trivia</Text>
               <Text style={styles.emptyBody}>{error}</Text>
               <ChunkyButton label="Try again" size="md" onPress={refresh} style={styles.retry} />
             </View>
@@ -222,11 +276,83 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.gold,
   },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 22,
+    marginBottom: 10,
+  },
+  sectionBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    backgroundColor: colors.surface2,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-4deg' }],
+  },
+  sectionLabel: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 12,
+    letterSpacing: 1.4,
+    color: colors.text,
+  },
+  sectionRule: {
+    flex: 1,
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: colors.lineSoft,
+  },
+  sectionSub: {
+    fontFamily: font.bodySemibold,
+    fontSize: 12.5,
+    color: colors.textFaint,
+    marginTop: -4,
+  },
+  notesCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.accentWash,
+    ...outline,
+    borderRadius: radius.card,
+    padding: 14,
+    ...shadow.card,
+  },
+  notesBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
+  },
+  notesText: {
+    flex: 1,
+  },
+  notesTitle: {
+    fontFamily: font.heading,
+    fontSize: 16.5,
+    lineHeight: 21,
+    color: colors.text,
+  },
+  notesBody: {
+    fontFamily: font.bodySemibold,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: colors.textDim,
+    marginTop: 1,
+  },
   chips: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 14,
-    marginBottom: 14,
+    marginTop: 12,
   },
   chip: {
     backgroundColor: colors.surface,
@@ -250,6 +376,13 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.ink,
+  },
+  levelHint: {
+    fontFamily: font.body,
+    fontSize: 12,
+    color: colors.textFaint,
+    marginTop: 9,
+    marginBottom: 13,
   },
   list: {
     gap: 13,
@@ -292,5 +425,8 @@ const styles = StyleSheet.create({
   retry: {
     marginTop: 10,
     alignSelf: 'stretch',
+  },
+  pressed: {
+    opacity: 0.8,
   },
 });
