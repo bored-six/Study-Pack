@@ -1,49 +1,107 @@
-import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon, type IconName } from '@/components/Icon';
 import type { Deck } from '@/lib/types';
-import { colors, font, radius, subjectPalette } from '@/theme/tokens';
+import { colors, font, outline, radius, subjectPalette } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
   subject: Deck | null;
   onClose: () => void;
-  onSave: (deckId: string, color: string | null, icon: string | null) => void;
+  onSave: (deckId: string, name: string, color: string | null, icon: string | null) => void;
   onDelete: (deckId: string) => void;
 }
 
+const NAME_MAX = 40;
+
 /**
- * Every glyph in the set, subject-flavoured ones first — the student
- * asked for the whole box of stickers, not a curated few.
+ * Every glyph in the set, sorted into shelves. The whole box of stickers is
+ * still here — but a shelf at a time, so the sheet stays two or three rows
+ * tall instead of a page you have to scroll past to reach Save.
  */
-const ICON_CHOICES: IconName[] = [
-  'book', 'flask', 'leaf', 'globe', 'calculator', 'museum', 'palette', 'note',
-  'monitor', 'paw', 'flag', 'car', 'flower', 'burst', 'smartphone', 'gamepad',
-  'dice', 'clapper', 'tv', 'bulb', 'star', 'heart', 'trophy', 'bolt',
-  'flame', 'flameSmall', 'flameBig', 'flameCrown', 'spark', 'sprout', 'plane',
-  'clock', 'calendar', 'bell', 'pencil', 'question', 'check', 'cross',
-  'cards', 'chart', 'download', 'play', 'alert',
+const ICON_SHELVES: { key: string; label: string; icons: IconName[] }[] = [
+  {
+    key: 'school',
+    label: 'School',
+    icons: [
+      'book', 'note', 'pencil', 'calculator', 'flask', 'globe',
+      'museum', 'monitor', 'chart', 'cards', 'question',
+    ],
+  },
+  {
+    key: 'nature',
+    label: 'Nature',
+    icons: [
+      'leaf', 'sprout', 'flower', 'paw', 'star', 'spark',
+      'burst', 'flame', 'flameSmall', 'flameBig', 'flameCrown', 'heart',
+    ],
+  },
+  {
+    key: 'fun',
+    label: 'Fun',
+    icons: [
+      'palette', 'gamepad', 'dice', 'clapper', 'tv', 'trophy',
+      'smartphone', 'car', 'plane', 'flag', 'bolt',
+    ],
+  },
+  {
+    key: 'day',
+    label: 'Day',
+    icons: [
+      'clock', 'calendar', 'bell', 'bulb', 'check',
+      'cross', 'play', 'download', 'alert',
+    ],
+  },
 ];
 
+/** The shelf an icon lives on, so the picker opens where the current one is. */
+function shelfFor(icon: string | null): string {
+  if (!icon) return ICON_SHELVES[0].key;
+  return (
+    ICON_SHELVES.find((shelf) => shelf.icons.includes(icon as IconName))?.key ??
+    ICON_SHELVES[0].key
+  );
+}
+
 export function SubjectSheet({ visible, subject, onClose, onSave, onDelete }: Props) {
+  const [name, setName] = useState('');
   const [color, setColor] = useState<string | null>(null);
   const [icon, setIcon] = useState<string | null>(null);
+  const [shelf, setShelf] = useState(ICON_SHELVES[0].key);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  // Load the subject's current look each time the sheet opens.
+  // Load the subject's current name and look each time the sheet opens.
   useEffect(() => {
     if (visible && subject) {
+      setName(subject.name);
       setColor(subject.color);
       setIcon(subject.icon);
+      setShelf(shelfFor(subject.icon));
       setConfirmingDelete(false);
     }
   }, [visible, subject]);
 
+  const shownIcons = useMemo(
+    () => ICON_SHELVES.find((s) => s.key === shelf)?.icons ?? [],
+    [shelf]
+  );
+
   if (!subject) return null;
 
+  const trimmed = name.trim();
   const previewWash = color ?? colors.surface2;
   const previewIcon = (icon as IconName | null) ?? 'book';
 
@@ -55,87 +113,116 @@ export function SubjectSheet({ visible, subject, onClose, onSave, onDelete }: Pr
       statusBarTranslucent
       onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.grabber} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.lift}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.grabber} />
 
-          <View style={styles.header}>
-            <View style={[styles.preview, { backgroundColor: previewWash }]}>
-              <Icon name={previewIcon} size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
-            </View>
-            <Text style={styles.title} numberOfLines={1}>
-              {subject.name}
-            </Text>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.label}>Colour</Text>
-            <View style={styles.swatches}>
-              {subjectPalette.map((tone) => {
-                const active = tone.wash === color;
-                return (
-                  <Pressable
-                    key={tone.wash}
-                    onPress={() => setColor(active ? null : tone.wash)}
-                    style={[
-                      styles.swatch,
-                      { backgroundColor: tone.wash },
-                      active && styles.swatchActive,
-                    ]}>
-                    {active ? (
-                      <Icon name="check" size={15} color={tone.ink} strokeWidth={2.8} />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
+            <View style={styles.header}>
+              <View style={[styles.preview, { backgroundColor: previewWash }]}>
+                <Icon name={previewIcon} size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
+              </View>
+              {/* The title doubles as the rename field — tap it and type. */}
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Subject name"
+                placeholderTextColor={colors.textFaint}
+                style={styles.nameInput}
+                maxLength={NAME_MAX}
+                selectTextOnFocus
+                returnKeyType="done"
+              />
             </View>
 
-            <Text style={styles.label}>Icon</Text>
-            <View style={styles.iconGrid}>
-              {ICON_CHOICES.map((name) => {
-                const active = name === icon;
-                return (
-                  <Pressable
-                    key={name}
-                    onPress={() => setIcon(active ? null : name)}
-                    style={[styles.iconCell, active && styles.iconCellActive]}>
-                    <Icon
-                      name={name}
-                      size={22}
-                      color={colors.ink}
-                      fill={active ? (color ?? colors.accentWash) : colors.surface2}
-                      strokeWidth={1.9}
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.label}>Colour</Text>
+              <View style={styles.swatches}>
+                {subjectPalette.map((tone) => {
+                  const active = tone.wash === color;
+                  return (
+                    <Pressable
+                      key={tone.wash}
+                      onPress={() => setColor(active ? null : tone.wash)}
+                      style={[
+                        styles.swatch,
+                        { backgroundColor: tone.wash },
+                        active && styles.swatchActive,
+                      ]}>
+                      {active ? (
+                        <Icon name="check" size={14} color={tone.ink} strokeWidth={2.8} />
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
 
-            <ChunkyButton
-              label="Save look"
-              size="lg"
-              onPress={() => onSave(subject.id, color, icon)}
-              style={styles.saveBtn}
+              <Text style={styles.label}>Icon</Text>
+              <View style={styles.shelfRow}>
+                {ICON_SHELVES.map((option) => {
+                  const active = option.key === shelf;
+                  return (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => setShelf(option.key)}
+                      style={[styles.shelfChip, active && styles.shelfChipActive]}>
+                      <Text style={[styles.shelfText, active && styles.shelfTextActive]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.iconGrid}>
+                {shownIcons.map((glyph) => {
+                  const active = glyph === icon;
+                  return (
+                    <Pressable
+                      key={glyph}
+                      onPress={() => setIcon(active ? null : glyph)}
+                      style={[styles.iconCell, active && styles.iconCellActive]}>
+                      <Icon
+                        name={glyph}
+                        size={22}
+                        color={colors.ink}
+                        fill={active ? (color ?? colors.accentWash) : colors.surface2}
+                        strokeWidth={1.9}
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <ChunkyButton
+                label="Save subject"
+                size="lg"
+                disabled={trimmed.length === 0}
+                onPress={() => onSave(subject.id, trimmed, color, icon)}
+                style={styles.saveBtn}
+              />
+
+              <Pressable onPress={() => setConfirmingDelete(true)} style={styles.deleteRow}>
+                <Icon name="trash" size={17} color={colors.coral} strokeWidth={1.9} />
+                <Text style={styles.deleteText}>Delete this subject</Text>
+              </Pressable>
+            </ScrollView>
+
+            <ConfirmModal
+              visible={confirmingDelete}
+              title="Delete this subject?"
+              message={`"${subject.name}" and all its questions will be removed. This can't be undone.`}
+              confirmLabel="Delete"
+              destructive
+              onCancel={() => setConfirmingDelete(false)}
+              onConfirm={() => {
+                setConfirmingDelete(false);
+                onDelete(subject.id);
+              }}
             />
-
-            <Pressable onPress={() => setConfirmingDelete(true)} style={styles.deleteRow}>
-              <Icon name="trash" size={17} color={colors.coral} strokeWidth={1.9} />
-              <Text style={styles.deleteText}>Delete this subject</Text>
-            </Pressable>
-          </ScrollView>
-
-          <ConfirmModal
-            visible={confirmingDelete}
-            title="Delete this subject?"
-            message={`"${subject.name}" and all its questions will be removed. This can't be undone.`}
-            confirmLabel="Delete"
-            destructive
-            onCancel={() => setConfirmingDelete(false)}
-            onConfirm={() => {
-              setConfirmingDelete(false);
-              onDelete(subject.id);
-            }}
-          />
-        </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
     </Modal>
   );
@@ -145,6 +232,9 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(39, 54, 43, 0.3)',
+  },
+  lift: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   sheet: {
@@ -183,12 +273,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ rotate: '-3deg' }],
   },
-  title: {
+  nameInput: {
     flex: 1,
     fontFamily: font.hero,
-    fontSize: 26,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 30,
     color: colors.text,
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.control,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 2,
   },
   label: {
     fontFamily: font.bodyHeavy,
@@ -202,12 +297,12 @@ const styles = StyleSheet.create({
   swatches: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 9,
   },
   swatch: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    width: 38,
+    height: 38,
+    borderRadius: 13,
     borderWidth: 1.5,
     borderColor: colors.edge,
     alignItems: 'center',
@@ -216,6 +311,32 @@ const styles = StyleSheet.create({
   swatchActive: {
     borderWidth: 2,
     borderColor: colors.ink,
+  },
+  shelfRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  shelfChip: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+  },
+  shelfChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.ink,
+  },
+  shelfText: {
+    fontFamily: font.bodyBold,
+    fontSize: 13,
+    color: colors.textDim,
+  },
+  shelfTextActive: {
+    color: colors.ink,
   },
   iconGrid: {
     flexDirection: 'row',

@@ -47,18 +47,33 @@ export const candy = [
   { wash: '#EAE2FA', ink: '#6C51A8' }, // lilac
 ] as const;
 
-/** Washes a subject can wear, each with its matching deep ink. */
+/**
+ * Washes a subject can wear, each with its matching deep ink.
+ * Ordered around the wheel — greens, yellows, warms, pinks, purples,
+ * blues, teals, then a neutral — so the picker reads as a paint strip.
+ * Never reorder or remove a wash: the hex is what's stored on the deck.
+ */
 export const subjectPalette = [
   { wash: '#DDF3DC', ink: '#2C8A4A' }, // mint
-  { wash: '#FFE5D2', ink: '#BC5A2E' }, // peach
-  { wash: '#FCEBC0', ink: '#A0731A' }, // sun
-  { wash: '#DBEEFB', ink: '#2E6FA3' }, // sky
-  { wash: '#EAE2FA', ink: '#6C51A8' }, // lilac
-  { wash: '#F9DEE7', ink: '#B04A6E' }, // rose
+  { wash: '#CFEBBD', ink: '#4E7B2C' }, // grass
   { wash: '#E3EBD3', ink: '#5F7A34' }, // sage
+  { wash: '#F6F3BE', ink: '#8A7C1E' }, // lemon
+  { wash: '#FCEBC0', ink: '#A0731A' }, // sun
   { wash: '#EFE3CE', ink: '#8A6B3F' }, // sand
-  { wash: '#D9F0EA', ink: '#2F7D6D' }, // aqua
+  { wash: '#FFDDB8', ink: '#B06F1F' }, // apricot
+  { wash: '#FFE5D2', ink: '#BC5A2E' }, // peach
+  { wash: '#FBD5CC', ink: '#B24A38' }, // coral
+  { wash: '#F7CFD3', ink: '#A94050' }, // cherry
+  { wash: '#F9DEE7', ink: '#B04A6E' }, // rose
+  { wash: '#F2D9F0', ink: '#8E4C8B' }, // orchid
+  { wash: '#EAE2FA', ink: '#6C51A8' }, // lilac
+  { wash: '#DCD5F2', ink: '#5B4AA0' }, // grape
   { wash: '#E0E4F5', ink: '#4A5AA8' }, // periwinkle
+  { wash: '#DBEEFB', ink: '#2E6FA3' }, // sky
+  { wash: '#CDE0F2', ink: '#33628F' }, // denim
+  { wash: '#D9F0EA', ink: '#2F7D6D' }, // aqua
+  { wash: '#C9E9E4', ink: '#2C6F68' }, // teal
+  { wash: '#E2E5E0', ink: '#5C6A5B' }, // stone
 ] as const;
 
 /** The deep ink paired with a wash; falls back to plain ink. */

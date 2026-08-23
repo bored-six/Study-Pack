@@ -620,14 +620,20 @@ export async function listQuestionIdsBySubject(): Promise<Map<string, string[]>>
   return map;
 }
 
-/** Saves the look the student chose for a subject. */
-export async function customizeDeck(
+/**
+ * Saves everything the student can change about a subject: its name and
+ * its look. Schedules and attempts read the name back off this row, so a
+ * rename shows up everywhere the subject is mentioned.
+ */
+export async function updateSubject(
   deckId: string,
+  name: string,
   color: string | null,
   icon: string | null
 ): Promise<void> {
   await getDb().runAsync(
-    'UPDATE decks SET color = ?, icon = ? WHERE id = ?',
+    'UPDATE decks SET name = ?, color = ?, icon = ? WHERE id = ?',
+    name,
     color,
     icon,
     deckId

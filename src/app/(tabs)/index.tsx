@@ -4,11 +4,12 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/Icon';
+import { PromptModal } from '@/components/PromptModal';
 import { SubjectSheet } from '@/components/SubjectSheet';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import type { Deck } from '@/lib/types';
-import { customizeDeck } from '@/lib/db';
+import { updateSubject } from '@/lib/db';
 import { colors, derpRadius, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
 import { formatClock, joinDeckNames } from '@/lib/schedule';
 import { usePlannerStore } from '@/store/planner';
@@ -35,6 +36,7 @@ export default function HomeScreen() {
     subjects: noteDecks,
     refresh: refreshNotes,
     remove: removeNoteDeck,
+    addSubject,
   } = useNotesStore();
 
   // Prefetch the catalog so the Trivia screen opens with data ready.
@@ -56,14 +58,27 @@ export default function HomeScreen() {
   );
 
   const [editing, setEditing] = useState<Deck | null>(null);
+  const [naming, setNaming] = useState(false);
 
-  const handleSaveLook = useCallback(
-    async (deckId: string, color: string | null, icon: string | null) => {
-      await customizeDeck(deckId, color, icon);
+  // Subjects are made here, in the section that holds them — the notes
+  // flow only ever assigns notes to one that already exists.
+  const handleCreateSubject = useCallback(
+    (name: string) => {
+      setNaming(false);
+      void addSubject(name);
+    },
+    [addSubject]
+  );
+
+  const handleSaveSubject = useCallback(
+    async (deckId: string, name: string, color: string | null, icon: string | null) => {
+      await updateSubject(deckId, name, color, icon);
       setEditing(null);
       void refreshNotes();
+      // Plans label themselves with the subject name, so a rename shows there too.
+      void refreshPlanner();
     },
-    [refreshNotes]
+    [refreshNotes, refreshPlanner]
   );
 
   const handleDeleteSubject = useCallback(
@@ -124,7 +139,7 @@ export default function HomeScreen() {
         </Pressable>
       ) : null}
 
-      {noteDecks.length > 0 ? <SectionHeading icon="book" label="MY SUBJECTS" /> : null}
+      <SectionHeading icon="book" label="MY SUBJECTS" />
 
       {noteDecks.map((deck) => (
         <Pressable
@@ -165,6 +180,22 @@ export default function HomeScreen() {
           <Icon name="play" size={16} color={colors.accentDeep} />
         </Pressable>
       ))}
+
+      <Pressable
+        onPress={() => setNaming(true)}
+        style={({ pressed }) => [styles.newSubjectCard, pressed && styles.pressed]}>
+        <View style={styles.newSubjectBadge}>
+          <Icon name="plus" size={20} color={colors.accentDeep} strokeWidth={2.6} />
+        </View>
+        <View style={styles.cardText}>
+          <Text style={styles.newSubjectTitle}>New subject</Text>
+          <Text style={styles.cardBody}>
+            {noteDecks.length > 0
+              ? 'Start another one to keep your notes apart'
+              : 'Biology, History, whatever you\'re studying'}
+          </Text>
+        </View>
+      </Pressable>
 
       <SectionHeading icon="note" label="ADD NOTES" />
 
@@ -208,11 +239,21 @@ export default function HomeScreen() {
       </Pressable>
       </ScrollView>
 
+      <PromptModal
+        visible={naming}
+        title="New subject"
+        message="What are you studying?"
+        placeholder="Biology"
+        confirmLabel="Create"
+        onCancel={() => setNaming(false)}
+        onConfirm={handleCreateSubject}
+      />
+
       <SubjectSheet
         visible={editing != null}
         subject={editing}
         onClose={() => setEditing(null)}
-        onSave={(deckId, color, icon) => void handleSaveLook(deckId, color, icon)}
+        onSave={(deckId, name, color, icon) => void handleSaveSubject(deckId, name, color, icon)}
         onDelete={handleDeleteSubject}
       />
     </View>
@@ -327,6 +368,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '-3deg' }],
+  },
+  newSubjectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: colors.edge,
+    borderRadius: radius.card,
+    padding: 13,
+    marginBottom: 2,
+  },
+  newSubjectBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: colors.accentWash,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newSubjectTitle: {
+    fontFamily: font.heading,
+    fontSize: 16.5,
+    lineHeight: 21,
+    color: colors.accentDeep,
   },
   notesCard: {
     flexDirection: 'row',
