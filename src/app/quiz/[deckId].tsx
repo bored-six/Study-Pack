@@ -7,7 +7,7 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useQuizStore } from '@/store/quiz';
-import { colors, font, radius, shadow } from '@/theme/tokens';
+import { candy, colors, font, outline, radius, shadow } from '@/theme/tokens';
 
 export default function QuizScreen() {
   const insets = useSafeAreaInsets();
@@ -45,7 +45,7 @@ export default function QuizScreen() {
       <View style={[styles.screen, styles.center, { padding: 24 }]}>
         <View style={styles.errorCard}>
           <View style={styles.errorBadge}>
-            <Icon name="alert" size={26} color={colors.coral} />
+            <Icon name="alert" size={26} color={colors.ink} fill={colors.coralWash} />
           </View>
           <Text style={styles.errorTitle}>Can't start this quiz</Text>
           <Text style={styles.errorBody}>{error}</Text>
@@ -99,11 +99,12 @@ export default function QuizScreen() {
         <Text style={styles.prompt}>{question.prompt}</Text>
 
         <View style={styles.answers}>
-          {question.answers.map((answer) => {
+          {question.answers.map((answer, i) => {
             const isCorrect = answer === question.correctAnswer;
             const isSelected = answer === selected;
             const showCorrect = revealed && isCorrect;
             const showWrong = revealed && isSelected && !isCorrect;
+            const tone = candy[i % candy.length];
             return (
               <Pressable
                 key={answer}
@@ -116,6 +117,11 @@ export default function QuizScreen() {
                   revealed && !showCorrect && !showWrong && styles.answerFaded,
                   pressed && !revealed && styles.answerPressed,
                 ]}>
+                <View style={[styles.letterChip, { backgroundColor: tone.wash }]}>
+                  <Text style={styles.letterChipText}>
+                    {String.fromCharCode(65 + i)}
+                  </Text>
+                </View>
                 <Text
                   style={[
                     styles.answerText,
@@ -125,10 +131,10 @@ export default function QuizScreen() {
                   {answer}
                 </Text>
                 {showCorrect ? (
-                  <Icon name="check" size={17} color={colors.leaf} strokeWidth={2.6} />
+                  <Icon name="check" size={17} color={colors.leaf} strokeWidth={2.8} />
                 ) : null}
                 {showWrong ? (
-                  <Icon name="cross" size={15} color={colors.coral} strokeWidth={2.6} />
+                  <Icon name="cross" size={15} color={colors.coral} strokeWidth={2.8} />
                 ) : null}
               </Pressable>
             );
@@ -176,8 +182,8 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
-    borderColor: colors.line,
     borderWidth: 1.5,
+    borderColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -189,11 +195,11 @@ const styles = StyleSheet.create({
   },
   track: {
     flex: 1,
-    height: 12,
+    height: 14,
     borderRadius: radius.pill,
     backgroundColor: colors.track,
-    borderColor: colors.lineSoft,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     overflow: 'hidden',
   },
   fill: {
@@ -230,33 +236,43 @@ const styles = StyleSheet.create({
   answer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    gap: 11,
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 1.5,
+    ...outline,
     borderRadius: radius.control,
-    paddingHorizontal: 15,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     ...shadow.card,
   },
   answerPressed: {
     backgroundColor: colors.accentWash,
-    borderColor: colors.accentEdge,
   },
   answerCorrect: {
     backgroundColor: colors.leafWash,
-    borderColor: 'rgba(59, 117, 39, 0.4)',
   },
   answerWrong: {
     backgroundColor: colors.coralWash,
-    borderColor: 'rgba(194, 78, 56, 0.4)',
   },
   answerFaded: {
     opacity: 0.45,
   },
+  letterChip: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
+  },
+  letterChipText: {
+    fontFamily: font.hero,
+    fontSize: 15,
+    color: colors.ink,
+  },
   answerText: {
-    flexShrink: 1,
+    flex: 1,
     fontFamily: font.bodyBold,
     fontSize: 15,
     lineHeight: 20,
@@ -291,8 +307,7 @@ const styles = StyleSheet.create({
   },
   errorCard: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 1.5,
+    ...outline,
     borderRadius: radius.card,
     padding: 22,
     alignItems: 'center',
@@ -305,9 +320,12 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 18,
     backgroundColor: colors.surface2,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+    transform: [{ rotate: '-3deg' }],
   },
   errorTitle: {
     fontFamily: font.heading,

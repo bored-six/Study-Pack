@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Icon } from '@/components/Icon';
-import { colors, font, shadow } from '@/theme/tokens';
+import { colors, font, outline, shadow, textPop } from '@/theme/tokens';
 
 interface Props {
   onDone: () => void;
@@ -131,7 +131,7 @@ export function IntroOverlay({ onDone }: Props) {
           <Animated.Text style={[styles.wordmark, wordStyle]}>StudyPack</Animated.Text>
           <Animated.View style={[styles.taglineRow, tagStyle]}>
             <Text style={styles.tagline}>Play · learn · streak</Text>
-            <Icon name="flame" size={15} color={colors.gold} strokeWidth={2.2} />
+            <Icon name="flame" size={15} color={colors.ink} fill={colors.gold} strokeWidth={2.2} />
           </Animated.View>
         </View>
       </Pressable>
@@ -162,18 +162,18 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 30,
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 2,
+    ...outline,
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.pop,
   },
   wordmark: {
-    fontFamily: font.display,
-    fontSize: 38,
-    lineHeight: 48,
+    fontFamily: font.hero,
+    fontSize: 42,
+    lineHeight: 54,
     color: colors.text,
     marginTop: 18,
+    ...textPop(colors.accent, 4),
   },
   taglineRow: {
     flexDirection: 'row',

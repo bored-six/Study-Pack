@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { type AttemptWithDeck } from '@/lib/db';
 import { useProgressStore } from '@/store/progress';
-import { colors, font, radius, shadow } from '@/theme/tokens';
+import { colors, font, outline, radius, shadow, tabClearance, textPop } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -80,7 +80,12 @@ export default function ProgressScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Text style={styles.kicker}>STUDYPACK</Text>
-      <Text style={styles.title}>Your progress</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Your</Text>
+        <View style={styles.titleSticker}>
+          <Text style={styles.titleStickerText}>progress</Text>
+        </View>
+      </View>
       <Text style={styles.sub}>
         {totalAttempts > 0
           ? `${totalAttempts} ${totalAttempts === 1 ? 'quiz' : 'quizzes'} · saved on this device`
@@ -94,7 +99,7 @@ export default function ProgressScreen() {
       ) : empty ? (
         <View style={styles.empty}>
           <View style={styles.emptyBadge}>
-            <Icon name="sprout" size={26} color={colors.accentDeep} />
+            <Icon name="sprout" size={26} color={colors.ink} fill={colors.accentWash} />
           </View>
           <Text style={styles.emptyTitle}>No quizzes yet</Text>
           <Text style={styles.emptyBody}>
@@ -106,12 +111,12 @@ export default function ProgressScreen() {
         <>
           <View style={styles.stats}>
             <View style={[styles.stat, styles.statStreak]}>
-              <Icon name="flame" size={22} color={colors.gold} />
+              <Icon name="flame" size={24} color={colors.ink} fill={colors.gold} />
               <Text style={[styles.statNum, { color: colors.gold }]}>{currentStreak}</Text>
               <Text style={styles.statLabel}>day streak</Text>
             </View>
             <View style={styles.stat}>
-              <Icon name="trophy" size={22} color={colors.accentDeep} />
+              <Icon name="trophy" size={24} color={colors.ink} fill={colors.accent} />
               <Text style={[styles.statNum, { color: colors.accentDeep }]}>
                 {bestPct != null ? `${bestPct}%` : '—'}
               </Text>
@@ -130,7 +135,7 @@ export default function ProgressScreen() {
           />
 
           <View style={styles.longestPill}>
-            <Icon name="bolt" size={13} color={colors.gold} strokeWidth={2.2} />
+            <Icon name="bolt" size={13} color={colors.ink} fill={colors.gold} strokeWidth={2.2} />
             <Text style={styles.longestText}>Longest streak: {longestStreak}{' '}
               {longestStreak === 1 ? 'day' : 'days'}
             </Text>
@@ -153,11 +158,32 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.accentDeep,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
   title: {
-    fontFamily: font.display,
-    fontSize: 30,
-    lineHeight: 38,
+    fontFamily: font.hero,
+    fontSize: 32,
+    lineHeight: 42,
     color: colors.text,
+    ...textPop(colors.accent, 3),
+  },
+  titleSticker: {
+    backgroundColor: colors.goldWash,
+    ...outline,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    transform: [{ rotate: '-2.5deg' }],
+    ...shadow.card,
+  },
+  titleStickerText: {
+    fontFamily: font.hero,
+    fontSize: 24,
+    lineHeight: 32,
+    color: colors.ink,
   },
   sub: {
     fontFamily: font.bodySemibold,
@@ -178,8 +204,7 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 1.5,
+    ...outline,
     borderRadius: radius.card,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -187,13 +212,13 @@ const styles = StyleSheet.create({
   },
   statStreak: {
     backgroundColor: colors.goldWash,
-    borderColor: 'rgba(172, 118, 28, 0.25)',
+    transform: [{ rotate: '-1deg' }],
   },
   statNum: {
     marginTop: 4,
-    fontFamily: font.display,
-    fontSize: 30,
-    lineHeight: 36,
+    fontFamily: font.hero,
+    fontSize: 32,
+    lineHeight: 38,
     fontVariant: ['tabular-nums'],
   },
   statLabel: {
@@ -203,8 +228,7 @@ const styles = StyleSheet.create({
   },
   listCard: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 1.5,
+    ...outline,
     borderRadius: radius.card,
     marginTop: 14,
     flexGrow: 0,
@@ -256,11 +280,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: colors.goldWash,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     borderRadius: radius.pill,
     paddingHorizontal: 13,
     paddingVertical: 7,
     marginTop: 12,
-    marginBottom: 16,
+    marginBottom: tabClearance,
   },
   longestText: {
     fontFamily: font.bodyHeavy,
@@ -269,8 +295,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 1.5,
+    ...outline,
     borderRadius: radius.card,
     padding: 22,
     alignItems: 'center',
@@ -283,9 +308,12 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 18,
     backgroundColor: colors.surface2,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
+    transform: [{ rotate: '-3deg' }],
   },
   emptyTitle: {
     fontFamily: font.heading,

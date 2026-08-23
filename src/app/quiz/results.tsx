@@ -6,7 +6,7 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon, type IconName } from '@/components/Icon';
 import { DIFFICULTY_LABEL } from '@/lib/types';
 import { useQuizStore } from '@/store/quiz';
-import { colors, font, radius, shadow } from '@/theme/tokens';
+import { colors, font, outline, radius, shadow, textPop } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -41,7 +41,7 @@ export default function ResultsScreen() {
       ]}>
       <View style={styles.card}>
         <View style={[styles.toneBadge, { backgroundColor: tone.wash }]}>
-          <Icon name={tone.icon} size={30} color={tone.color} />
+          <Icon name={tone.icon} size={32} color={colors.ink} fill={colors.surface} />
         </View>
         <View style={[styles.badge, { backgroundColor: tone.wash }]}>
           <Text style={[styles.badgeText, { color: tone.color }]}>{tone.label}</Text>
@@ -89,8 +89,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 1.5,
+    ...outline,
     borderRadius: radius.card,
     padding: 28,
     alignItems: 'center',
@@ -99,14 +98,19 @@ const styles = StyleSheet.create({
     ...shadow.pop,
   },
   toneBadge: {
-    width: 62,
-    height: 62,
-    borderRadius: 21,
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
+    transform: [{ rotate: '-4deg' }],
   },
   badge: {
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -117,11 +121,12 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
   },
   score: {
-    fontFamily: font.display,
-    fontSize: 56,
-    lineHeight: 64,
+    fontFamily: font.hero,
+    fontSize: 60,
+    lineHeight: 70,
     color: colors.text,
     fontVariant: ['tabular-nums'],
+    ...textPop(colors.accent, 4),
   },
   pct: {
     fontFamily: font.bodyHeavy,

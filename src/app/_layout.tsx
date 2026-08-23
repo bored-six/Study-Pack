@@ -3,6 +3,7 @@ import {
   Baloo2_700Bold,
   Baloo2_800ExtraBold,
 } from '@expo-google-fonts/baloo-2';
+import { LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
 import {
   Nunito_500Medium,
   Nunito_600SemiBold,
@@ -26,6 +27,7 @@ type DbState = 'pending' | 'ready' | 'error';
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
+    LilitaOne_400Regular,
     Baloo2_600SemiBold,
     Baloo2_700Bold,
     Baloo2_800ExtraBold,

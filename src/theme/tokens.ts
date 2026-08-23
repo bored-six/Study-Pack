@@ -1,8 +1,8 @@
 /**
- * StudyPack design tokens — "sticker book" casual.
- * Warm paper ground, white cards outlined in forest ink with hard offset
- * shadows, chunky press-down buttons, and a small set of candy washes that
- * rotate across deck cards. Green stays the hero; gold is reserved for
+ * StudyPack design tokens — playful neubrutalism.
+ * Warm paper ground; every surface is a "sticker": confident 2px forest-ink
+ * outlines, solid ink offset shadows, candy washes, tilted accents, and a
+ * chunky hero font with dimensional hard-shadow type. Gold is reserved for
  * streaks and the offline banner. Single light theme by design.
  */
 export const colors = {
@@ -10,9 +10,10 @@ export const colors = {
   bg: '#FAF3E1',
   surface: '#FFFFFF',
   surface2: '#F4EDDA',
+  ink: '#27362B',
   line: 'rgba(39, 54, 43, 0.14)',
   lineSoft: 'rgba(39, 54, 43, 0.09)',
-  // ink
+  // ink text
   text: '#27362B',
   textDim: '#5D6F5C',
   textFaint: '#82927F',
@@ -50,17 +51,36 @@ export const radius = {
   pill: 999,
 } as const;
 
-/** Hard offset shadows — the sticker look. Requires RN >= 0.76 (new arch). */
+/** Solid ink offset shadows — the sticker look. Requires RN >= 0.76. */
 export const shadow = {
-  card: { boxShadow: '0 3px 0 rgba(39, 54, 43, 0.10)' },
-  pop: { boxShadow: '0 4px 0 rgba(39, 54, 43, 0.16)' },
+  card: { boxShadow: `0 3px 0 ${colors.ink}` },
+  pop: { boxShadow: `0 5px 0 ${colors.ink}` },
 } as const;
+
+/** The standard sticker outline. Spread onto any card/badge/control. */
+export const outline = {
+  borderWidth: 2,
+  borderColor: colors.ink,
+} as const;
+
+/** Hard offset text shadow for dimensional display type. */
+export const textPop = (color: string, drop = 3) =>
+  ({
+    textShadowColor: color,
+    textShadowOffset: { width: 0, height: drop },
+    textShadowRadius: 0,
+  }) as const;
 
 /** Depth of the pressable button "edge" in px. */
 export const buttonEdge = 4;
 
+/** Bottom content clearance for the floating pill tab bar. */
+export const tabClearance = 92;
+
 export const font = {
-  // Baloo 2 — rounded display for titles, numbers, and buttons
+  // Lilita One — chunky hero font for big titles and big numbers
+  hero: 'LilitaOne_400Regular',
+  // Baloo 2 — rounded display for section titles and buttons
   display: 'Baloo2_800ExtraBold',
   heading: 'Baloo2_700Bold',
   headingSnug: 'Baloo2_600SemiBold',

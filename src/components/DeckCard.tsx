@@ -3,10 +3,12 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon, type IconName } from '@/components/Icon';
 import { DIFFICULTY_LABEL, type Deck } from '@/lib/types';
-import { candy, colors, font, radius, shadow } from '@/theme/tokens';
+import { candy, colors, font, outline, radius, shadow } from '@/theme/tokens';
 
 interface Props {
   deck: Deck;
+  /** Alternate per row for the loose sticker-sheet look. */
+  tilt?: 'left' | 'right';
   downloading?: boolean;
   onDownload?: (deck: Deck) => void;
   onRemove?: (deck: Deck) => void;
@@ -55,15 +57,25 @@ function deckCandy(id: string) {
   return candy[hash % candy.length];
 }
 
-export function DeckCard({ deck, downloading, onDownload, onRemove, onStartQuiz }: Props) {
+export function DeckCard({ deck, tilt, downloading, onDownload, onRemove, onStartQuiz }: Props) {
   const downloaded = deck.downloadedAt != null;
   const tone = deckCandy(deck.id);
 
   return (
-    <View style={styles.card}>
+    <View
+      style={[
+        styles.card,
+        tilt ? { transform: [{ rotate: tilt === 'left' ? '-0.6deg' : '0.6deg' }] } : null,
+      ]}>
       <View style={styles.top}>
         <View style={[styles.badge, { backgroundColor: tone.wash }]}>
-          <Icon name={deckIcon(deck.name)} size={24} color={tone.ink} strokeWidth={1.9} />
+          <Icon
+            name={deckIcon(deck.name)}
+            size={26}
+            color={colors.ink}
+            fill={colors.surface}
+            strokeWidth={1.9}
+          />
         </View>
         <View style={styles.titleWrap}>
           <Text style={styles.name}>{deck.name}</Text>
@@ -113,8 +125,7 @@ export function DeckCard({ deck, downloading, onDownload, onRemove, onStartQuiz 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 1.5,
+    ...outline,
     borderRadius: radius.card,
     padding: 14,
     gap: 12,
@@ -126,11 +137,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   badge: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
   },
   titleWrap: {
     flex: 1,
@@ -175,6 +189,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: colors.accentWash,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     borderRadius: radius.pill,
     paddingHorizontal: 12,
     paddingVertical: 6,

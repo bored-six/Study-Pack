@@ -17,7 +17,7 @@ import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useOnline } from '@/hooks/useOnline';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
-import { colors, font, radius, shadow } from '@/theme/tokens';
+import { colors, font, outline, radius, shadow, tabClearance, textPop } from '@/theme/tokens';
 import { useDecksStore } from '@/store/decks';
 
 export default function DecksScreen() {
@@ -73,7 +73,12 @@ export default function DecksScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Text style={styles.kicker}>STUDYPACK</Text>
-      <Text style={styles.title}>Pick a deck</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Pick a</Text>
+        <View style={styles.titleSticker}>
+          <Text style={styles.titleStickerText}>deck!</Text>
+        </View>
+      </View>
       <Text style={styles.sub}>
         {decks.length > 0
           ? `${downloadedCount} of ${decks.length} saved for offline`
@@ -115,9 +120,10 @@ export default function DecksScreen() {
       <FlatList
         data={visible}
         keyExtractor={(deck) => deck.id}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <DeckCard
             deck={item}
+            tilt={index % 2 === 0 ? 'left' : 'right'}
             downloading={downloading[item.id] === true}
             onDownload={handleDownload}
             onRemove={handleRemove}
@@ -138,7 +144,7 @@ export default function DecksScreen() {
           status === 'error' ? (
             <View style={styles.empty}>
               <View style={styles.emptyBadge}>
-                <Icon name="alert" size={26} color={colors.coral} />
+                <Icon name="alert" size={26} color={colors.ink} fill={colors.coralWash} />
               </View>
               <Text style={styles.emptyTitle}>Couldn't load decks</Text>
               <Text style={styles.emptyBody}>{error}</Text>
@@ -147,7 +153,7 @@ export default function DecksScreen() {
           ) : status === 'ready' ? (
             <View style={styles.empty}>
               <View style={styles.emptyBadge}>
-                <Icon name="sprout" size={26} color={colors.accentDeep} />
+                <Icon name="sprout" size={26} color={colors.ink} fill={colors.accentWash} />
               </View>
               <Text style={styles.emptyTitle}>No decks here yet</Text>
               <Text style={styles.emptyBody}>Pull down to refresh the catalog.</Text>
@@ -171,11 +177,32 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.accentDeep,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
   title: {
-    fontFamily: font.display,
-    fontSize: 30,
-    lineHeight: 38,
+    fontFamily: font.hero,
+    fontSize: 32,
+    lineHeight: 42,
     color: colors.text,
+    ...textPop(colors.accent, 3),
+  },
+  titleSticker: {
+    backgroundColor: colors.accent,
+    ...outline,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    transform: [{ rotate: '-2.5deg' }],
+    ...shadow.card,
+  },
+  titleStickerText: {
+    fontFamily: font.hero,
+    fontSize: 24,
+    lineHeight: 32,
+    color: colors.ink,
   },
   sub: {
     fontFamily: font.bodySemibold,
@@ -203,8 +230,8 @@ const styles = StyleSheet.create({
   },
   chip: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
     borderWidth: 1.5,
+    borderColor: colors.ink,
     borderRadius: radius.pill,
     paddingHorizontal: 15,
     paddingVertical: 7,
@@ -214,8 +241,7 @@ const styles = StyleSheet.create({
   },
   chipActive: {
     backgroundColor: colors.accent,
-    borderColor: colors.accentEdge,
-    ...shadow.pop,
+    ...shadow.card,
   },
   chipText: {
     fontFamily: font.bodyHeavy,
@@ -223,16 +249,16 @@ const styles = StyleSheet.create({
     color: colors.textDim,
   },
   chipTextActive: {
-    color: colors.onAccent,
+    color: colors.ink,
   },
   list: {
-    gap: 12,
-    paddingBottom: 24,
+    gap: 13,
+    paddingTop: 3,
+    paddingBottom: tabClearance,
   },
   empty: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderWidth: 1.5,
+    ...outline,
     borderRadius: radius.card,
     padding: 22,
     alignItems: 'center',
@@ -245,9 +271,12 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 18,
     backgroundColor: colors.surface2,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
+    transform: [{ rotate: '-3deg' }],
   },
   emptyTitle: {
     fontFamily: font.heading,
