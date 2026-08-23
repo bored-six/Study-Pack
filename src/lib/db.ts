@@ -14,7 +14,7 @@ import type {
 } from './types';
 
 const DB_NAME = 'studypack.db';
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 let instance: SQLiteDatabase | null = null;
 
@@ -123,15 +123,21 @@ export async function initDb(): Promise<void> {
     `);
   }
 
-  if (version < 6) {
-    // Notes saved before the exam work — or before the save path forwarded
-    // these columns — are all labelled trivia, which offers multiple choice
-    // and nothing else. Their prompts still say how they were built, so
-    // repair them in place rather than making anyone paste their notes again.
-    await repairNoteQuestions(db);
+  if (version < 7) {
+    // A subject the student dressed themselves is one they come back to.
+    await db.execAsync(`
+      ALTER TABLE decks ADD COLUMN color TEXT;
+      ALTER TABLE decks ADD COLUMN icon TEXT;
+    `);
   }
 
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+
+  // Deliberately not version-gated. This repairs *data*, not schema, and a
+  // version gate already failed once: a database bumped past the gate by an
+  // unrelated migration could never be repaired. The query below finds
+  // nothing once everything is labelled, so running it every launch is free.
+  await repairNoteQuestions(db);
 }
 
 /**
@@ -169,6 +175,8 @@ interface DeckRow {
   difficulty: string;
   question_count: number;
   source: string | null;
+  color: string | null;
+  icon: string | null;
   downloaded_at: number | null;
 }
 
@@ -180,6 +188,8 @@ function toDeck(row: DeckRow): Deck {
     difficulty: row.difficulty as Difficulty,
     questionCount: row.question_count,
     source: (row.source as DeckSource) ?? 'trivia',
+    color: row.color,
+    icon: row.icon,
     downloadedAt: row.downloaded_at,
   };
 }
@@ -202,7 +212,7 @@ export async function listDecks(source: DeckSource = 'trivia'): Promise<Deck[]> 
  * so a catalog refresh can't corrupt an existing download.
  */
 export async function upsertCatalog(
-  decks: Omit<Deck, 'downloadedAt' | 'source'>[]
+  decks: Omit<Deck, 'downloadedAt' | 'source' | 'color' | 'icon'>[]
 ): Promise<void> {
   const db = getDb();
   await db.withTransactionAsync(async () => {
@@ -589,4 +599,18 @@ export async function listQuestionIdsBySubject(): Promise<Map<string, string[]>>
     else map.set(row.deck_id, [row.id]);
   }
   return map;
+}
+
+/** Saves the look the student chose for a subject. */
+export async function customizeDeck(
+  deckId: string,
+  color: string | null,
+  icon: string | null
+): Promise<void> {
+  await getDb().runAsync(
+    'UPDATE decks SET color = ?, icon = ? WHERE id = ?',
+    color,
+    icon,
+    deckId
+  );
 }
