@@ -12,12 +12,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DeckCard } from '@/components/DeckCard';
+import { OfflineBanner } from '@/components/OfflineBanner';
+import { useOnline } from '@/hooks/useOnline';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
 import { useDecksStore } from '@/store/decks';
 import { colors, font, radius } from '@/theme/tokens';
 
 export default function DecksScreen() {
   const insets = useSafeAreaInsets();
+  const online = useOnline();
   const { decks, status, error, fromCache, refresh, downloading, downloadDeck, removeDownload } =
     useDecksStore();
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
@@ -74,9 +77,15 @@ export default function DecksScreen() {
           : 'Quiz decks from Open Trivia DB'}
       </Text>
 
-      {fromCache ? (
+      <OfflineBanner
+        message="✈ Offline — showing your saved catalog"
+        style={styles.cacheNote}
+      />
+      {fromCache && online ? (
         <View style={styles.cacheNote}>
-          <Text style={styles.cacheNoteText}>✈ Offline — showing your saved catalog</Text>
+          <Text style={styles.cacheNoteText}>
+            Couldn't reach Open Trivia DB — showing your saved catalog
+          </Text>
         </View>
       ) : null}
 
@@ -159,11 +168,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   cacheNote: {
+    marginTop: 10,
     backgroundColor: colors.goldWash,
     borderRadius: radius.control,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginTop: 10,
   },
   cacheNoteText: {
     fontFamily: font.semibold,

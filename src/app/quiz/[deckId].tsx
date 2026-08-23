@@ -3,6 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { useQuizStore } from '@/store/quiz';
 import { colors, font, radius } from '@/theme/tokens';
 
@@ -73,6 +74,11 @@ export default function QuizScreen() {
           <View style={[styles.fill, { width: `${progress * 100}%` }]} />
         </View>
       </View>
+
+      <OfflineBanner
+        message="✈ Offline — running from device storage"
+        style={styles.offline}
+      />
 
       <Text style={styles.deckName}>{deck?.name}</Text>
 
@@ -176,6 +182,9 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: radius.pill,
     backgroundColor: colors.accentDeep,
+  },
+  offline: {
+    marginTop: 12,
   },
   deckName: {
     fontFamily: font.semibold,
