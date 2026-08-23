@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { getDeckById, listQuestions, saveAttempt } from '@/lib/db';
+import { retireSessionForDeck } from '@/lib/notifications';
 import type { Deck, Question } from '@/lib/types';
 
 type QuizStatus = 'idle' | 'loading' | 'active' | 'finished' | 'error';
@@ -87,6 +88,9 @@ export const useQuizStore = create<QuizState>((set, get) => ({
         durationMs,
         completedAt,
       });
+      // Stop any reminder still pending for the sitting this deck was
+      // planned in — finishing early must not earn you a nag.
+      await retireSessionForDeck(deck.id, completedAt);
     }
     return 'finished';
   },

@@ -117,7 +117,7 @@ export async function armReminders(
           title,
           body,
           data: {
-            deckId: reminder.session.occurrences[0]?.deckId ?? null,
+            deckIds: [...new Set(reminder.session.occurrences.map((o) => o.deckId))],
             sessionAt: reminder.session.at,
           },
         },
@@ -149,5 +149,41 @@ export async function cancelSession(sessionAt: number): Promise<void> {
     if (notification.content.data?.sessionAt === sessionAt) {
       await Notifications.cancelScheduledNotificationAsync(notification.identifier);
     }
+  }
+}
+
+/** A sitting is "current" if it is within this much of now, either way. */
+const SESSION_REACH_MS = 2 * 60 * 60_000;
+
+/**
+ * Retires the reminders for the sitting a just-finished deck belongs to.
+ * Starting early is normal — the advance warning does its job and then the
+ * start alert is still pending — and being buzzed for a quiz you already
+ * took is exactly the nagging this feature exists to avoid.
+ *
+ * The whole sitting is retired, not just this deck: the student is in the
+ * app right now, so any remaining decks are offered on screen instead.
+ */
+export async function retireSessionForDeck(deckId: string, now = Date.now()): Promise<void> {
+  if (!SUPPORTED) return;
+  try {
+    const pending = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of pending) {
+      const data = notification.content.data as
+        | { deckIds?: unknown; sessionAt?: unknown }
+        | undefined;
+      const deckIds = Array.isArray(data?.deckIds) ? (data.deckIds as string[]) : [];
+      const sessionAt = typeof data?.sessionAt === 'number' ? data.sessionAt : null;
+      if (
+        sessionAt != null &&
+        Math.abs(sessionAt - now) <= SESSION_REACH_MS &&
+        deckIds.includes(deckId)
+      ) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
+  } catch (e) {
+    // Never let reminder bookkeeping break finishing a quiz.
+    console.warn('Could not retire session reminders', e);
   }
 }
