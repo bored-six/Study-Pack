@@ -1,6 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { Icon, type IconName } from '@/components/Icon';
 import { DIFFICULTY_LABEL, type Deck } from '@/lib/types';
 import { candy, colors, font, radius, shadow } from '@/theme/tokens';
 
@@ -12,37 +13,37 @@ interface Props {
   onStartQuiz?: (deck: Deck) => void;
 }
 
-const EMOJI_BY_KEYWORD: [string, string][] = [
-  ['science', '🔬'],
-  ['nature', '🌿'],
-  ['computer', '💻'],
-  ['math', '➗'],
-  ['history', '🏛️'],
-  ['geograph', '🗺️'],
-  ['sport', '🏆'],
-  ['music', '🎵'],
-  ['film', '🎬'],
-  ['television', '📺'],
-  ['video game', '🎮'],
-  ['game', '🎲'],
-  ['book', '📚'],
-  ['art', '🎨'],
-  ['animal', '🐾'],
-  ['mytholog', '⚡'],
-  ['celebrit', '⭐'],
-  ['politic', '🗳️'],
-  ['vehicle', '🚗'],
-  ['anime', '🌸'],
-  ['comic', '💥'],
-  ['gadget', '📱'],
+const ICON_BY_KEYWORD: [string, IconName][] = [
+  ['science', 'flask'],
+  ['nature', 'leaf'],
+  ['computer', 'monitor'],
+  ['math', 'calculator'],
+  ['history', 'museum'],
+  ['geograph', 'globe'],
+  ['sport', 'trophy'],
+  ['music', 'note'],
+  ['film', 'clapper'],
+  ['television', 'tv'],
+  ['video game', 'gamepad'],
+  ['game', 'dice'],
+  ['book', 'book'],
+  ['art', 'palette'],
+  ['animal', 'paw'],
+  ['mytholog', 'bolt'],
+  ['celebrit', 'star'],
+  ['politic', 'flag'],
+  ['vehicle', 'car'],
+  ['anime', 'flower'],
+  ['comic', 'burst'],
+  ['gadget', 'smartphone'],
 ];
 
-function deckEmoji(name: string): string {
+function deckIcon(name: string): IconName {
   const lower = name.toLowerCase();
-  for (const [keyword, emoji] of EMOJI_BY_KEYWORD) {
-    if (lower.includes(keyword)) return emoji;
+  for (const [keyword, icon] of ICON_BY_KEYWORD) {
+    if (lower.includes(keyword)) return icon;
   }
-  return '🧠';
+  return 'bulb';
 }
 
 /** Stable candy wash per deck so cards keep their color while filtering. */
@@ -62,7 +63,7 @@ export function DeckCard({ deck, downloading, onDownload, onRemove, onStartQuiz 
     <View style={styles.card}>
       <View style={styles.top}>
         <View style={[styles.badge, { backgroundColor: tone.wash }]}>
-          <Text style={styles.badgeEmoji}>{deckEmoji(deck.name)}</Text>
+          <Icon name={deckIcon(deck.name)} size={24} color={tone.ink} strokeWidth={1.9} />
         </View>
         <View style={styles.titleWrap}>
           <Text style={styles.name}>{deck.name}</Text>
@@ -77,9 +78,15 @@ export function DeckCard({ deck, downloading, onDownload, onRemove, onStartQuiz 
             <Pressable
               onPress={() => onRemove?.(deck)}
               style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
-              <Text style={styles.pillText}>✓ Saved</Text>
+              <Icon name="check" size={13} color={colors.accentDeep} strokeWidth={2.6} />
+              <Text style={styles.pillText}>Saved</Text>
             </Pressable>
-            <ChunkyButton label="Play →" size="sm" onPress={() => onStartQuiz?.(deck)} />
+            <ChunkyButton
+              label="Play"
+              icon="play"
+              size="sm"
+              onPress={() => onStartQuiz?.(deck)}
+            />
           </>
         ) : downloading ? (
           <View style={styles.downloadingRow}>
@@ -90,7 +97,8 @@ export function DeckCard({ deck, downloading, onDownload, onRemove, onStartQuiz 
           <>
             <Text style={styles.hint}>Save it to play offline</Text>
             <ChunkyButton
-              label="↓ Download"
+              label="Download"
+              icon="download"
               variant="soft"
               size="sm"
               onPress={() => onDownload?.(deck)}
@@ -123,9 +131,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  badgeEmoji: {
-    fontSize: 22,
   },
   titleWrap: {
     flex: 1,
@@ -166,6 +171,9 @@ const styles = StyleSheet.create({
     color: colors.accentDeep,
   },
   pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: colors.accentWash,
     borderRadius: radius.pill,
     paddingHorizontal: 12,

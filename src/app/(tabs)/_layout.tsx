@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
+import { Icon } from '@/components/Icon';
 import { colors, font } from '@/theme/tokens';
 
 export default function TabsLayout() {
@@ -23,7 +23,7 @@ export default function TabsLayout() {
         options={{
           title: 'Decks',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'albums' : 'albums-outline'} color={color} size={size} />
+            <Icon name={focused ? 'cardsFilled' : 'cards'} color={color} size={size} />
           ),
         }}
       />
@@ -32,10 +32,11 @@ export default function TabsLayout() {
         options={{
           title: 'Progress',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'stats-chart' : 'stats-chart-outline'}
+            <Icon
+              name={focused ? 'chartFilled' : 'chart'}
               color={color}
               size={size}
+              strokeWidth={2.5}
             />
           ),
         }}

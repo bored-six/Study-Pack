@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { Icon, type IconName } from '@/components/Icon';
 import { buttonEdge, colors, font, radius } from '@/theme/tokens';
 
 type Variant = 'primary' | 'soft' | 'paper';
@@ -14,6 +15,7 @@ type Size = 'sm' | 'md' | 'lg';
 
 interface Props {
   label: string;
+  icon?: IconName;
   onPress?: () => void;
   variant?: Variant;
   size?: Size;
@@ -27,12 +29,14 @@ interface Props {
  */
 export function ChunkyButton({
   label,
+  icon,
   onPress,
   variant = 'primary',
   size = 'md',
   disabled,
   style,
 }: Props) {
+  const contentColor = disabled ? colors.disabledText : labelStyles[variant].color;
   return (
     <Pressable onPress={onPress} disabled={disabled} style={style}>
       {({ pressed }) => (
@@ -45,6 +49,14 @@ export function ChunkyButton({
               pressed && !disabled ? styles.facePressed : styles.faceRaised,
               disabled && styles.faceDisabled,
             ]}>
+            {icon ? (
+              <Icon
+                name={icon}
+                size={iconSizes[size]}
+                color={contentColor}
+                strokeWidth={2.4}
+              />
+            ) : null}
             <Text
               style={[
                 styles.label,
@@ -70,8 +82,10 @@ const styles = StyleSheet.create({
   },
   face: {
     borderRadius: radius.control,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
   faceRaised: {
     marginBottom: buttonEdge,
@@ -124,3 +138,9 @@ const labelSizes = {
   md: { fontSize: 15, lineHeight: 20 },
   lg: { fontSize: 17, lineHeight: 22 },
 } as const;
+
+const iconSizes: Record<Size, number> = {
+  sm: 15,
+  md: 17,
+  lg: 19,
+};

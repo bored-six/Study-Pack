@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/Icon';
 import { type AttemptWithDeck } from '@/lib/db';
 import { useProgressStore } from '@/store/progress';
 import { colors, font, radius, shadow } from '@/theme/tokens';
@@ -79,7 +80,7 @@ export default function ProgressScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Text style={styles.kicker}>STUDYPACK</Text>
-      <Text style={styles.title}>Your progress 📈</Text>
+      <Text style={styles.title}>Your progress</Text>
       <Text style={styles.sub}>
         {totalAttempts > 0
           ? `${totalAttempts} ${totalAttempts === 1 ? 'quiz' : 'quizzes'} · saved on this device`
@@ -92,7 +93,9 @@ export default function ProgressScreen() {
         </View>
       ) : empty ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyEmoji}>🌱</Text>
+          <View style={styles.emptyBadge}>
+            <Icon name="sprout" size={26} color={colors.accentDeep} />
+          </View>
           <Text style={styles.emptyTitle}>No quizzes yet</Text>
           <Text style={styles.emptyBody}>
             Download a deck and take your first quiz — your scores and streak will live
@@ -103,12 +106,12 @@ export default function ProgressScreen() {
         <>
           <View style={styles.stats}>
             <View style={[styles.stat, styles.statStreak]}>
-              <Text style={styles.statEmoji}>🔥</Text>
+              <Icon name="flame" size={22} color={colors.gold} />
               <Text style={[styles.statNum, { color: colors.gold }]}>{currentStreak}</Text>
               <Text style={styles.statLabel}>day streak</Text>
             </View>
             <View style={styles.stat}>
-              <Text style={styles.statEmoji}>🏆</Text>
+              <Icon name="trophy" size={22} color={colors.accentDeep} />
               <Text style={[styles.statNum, { color: colors.accentDeep }]}>
                 {bestPct != null ? `${bestPct}%` : '—'}
               </Text>
@@ -127,7 +130,8 @@ export default function ProgressScreen() {
           />
 
           <View style={styles.longestPill}>
-            <Text style={styles.longestText}>⚡ Longest streak: {longestStreak}{' '}
+            <Icon name="bolt" size={13} color={colors.gold} strokeWidth={2.2} />
+            <Text style={styles.longestText}>Longest streak: {longestStreak}{' '}
               {longestStreak === 1 ? 'day' : 'days'}
             </Text>
           </View>
@@ -185,11 +189,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.goldWash,
     borderColor: 'rgba(172, 118, 28, 0.25)',
   },
-  statEmoji: {
-    fontSize: 20,
-    marginBottom: 2,
-  },
   statNum: {
+    marginTop: 4,
     fontFamily: font.display,
     fontSize: 30,
     lineHeight: 36,
@@ -251,6 +252,9 @@ const styles = StyleSheet.create({
   },
   longestPill: {
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: colors.goldWash,
     borderRadius: radius.pill,
     paddingHorizontal: 13,
@@ -274,9 +278,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
     ...shadow.card,
   },
-  emptyEmoji: {
-    fontSize: 30,
-    marginBottom: 4,
+  emptyBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
   },
   emptyTitle: {
     fontFamily: font.heading,

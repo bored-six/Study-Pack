@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useQuizStore } from '@/store/quiz';
 import { colors, font, radius, shadow } from '@/theme/tokens';
@@ -43,7 +44,9 @@ export default function QuizScreen() {
     return (
       <View style={[styles.screen, styles.center, { padding: 24 }]}>
         <View style={styles.errorCard}>
-          <Text style={styles.errorEmoji}>🙈</Text>
+          <View style={styles.errorBadge}>
+            <Icon name="alert" size={26} color={colors.coral} />
+          </View>
           <Text style={styles.errorTitle}>Can't start this quiz</Text>
           <Text style={styles.errorBody}>{error}</Text>
           <ChunkyButton
@@ -72,7 +75,7 @@ export default function QuizScreen() {
           onPress={handleQuit}
           hitSlop={12}
           style={({ pressed }) => [styles.quitBtn, pressed && styles.pressed]}>
-          <Text style={styles.quitText}>✕</Text>
+          <Icon name="cross" size={15} color={colors.textDim} strokeWidth={2.4} />
         </Pressable>
         <Text style={styles.counter}>
           {index + 1} / {questions.length}
@@ -83,7 +86,7 @@ export default function QuizScreen() {
       </View>
 
       <OfflineBanner
-        message="✈ Offline — running from device storage"
+        message="Offline — running from device storage"
         style={styles.offline}
       />
 
@@ -121,8 +124,12 @@ export default function QuizScreen() {
                   ]}>
                   {answer}
                 </Text>
-                {showCorrect ? <Text style={styles.markCorrect}>✓</Text> : null}
-                {showWrong ? <Text style={styles.markWrong}>✕</Text> : null}
+                {showCorrect ? (
+                  <Icon name="check" size={17} color={colors.leaf} strokeWidth={2.6} />
+                ) : null}
+                {showWrong ? (
+                  <Icon name="cross" size={15} color={colors.coral} strokeWidth={2.6} />
+                ) : null}
               </Pressable>
             );
           })}
@@ -133,7 +140,7 @@ export default function QuizScreen() {
         {revealed ? (
           <>
             <Text style={[styles.feedback, gotItRight ? styles.feedbackRight : styles.feedbackWrong]}>
-              {gotItRight ? 'Nice one! 🎉' : 'Not quite 😅'}
+              {gotItRight ? 'Nice one!' : 'Not quite'}
             </Text>
             <ChunkyButton
               label={isLast ? 'See results' : 'Next question'}
@@ -142,7 +149,7 @@ export default function QuizScreen() {
             />
           </>
         ) : (
-          <Text style={styles.hint}>Tap an answer 👆</Text>
+          <Text style={styles.hint}>Tap an answer</Text>
         )}
       </View>
     </View>
@@ -173,11 +180,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  quitText: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 14,
-    color: colors.textDim,
   },
   counter: {
     fontFamily: font.heading,
@@ -268,16 +270,6 @@ const styles = StyleSheet.create({
     fontFamily: font.bodyHeavy,
     color: colors.coral,
   },
-  markCorrect: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 15,
-    color: colors.leaf,
-  },
-  markWrong: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 15,
-    color: colors.coral,
-  },
   feedback: {
     fontFamily: font.heading,
     fontSize: 15,
@@ -308,8 +300,14 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     ...shadow.card,
   },
-  errorEmoji: {
-    fontSize: 30,
+  errorBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
   },
   errorTitle: {
     fontFamily: font.heading,

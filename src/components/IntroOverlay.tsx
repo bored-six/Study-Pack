@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { Icon } from '@/components/Icon';
 import { colors, font, shadow } from '@/theme/tokens';
 
 interface Props {
@@ -125,12 +126,13 @@ export function IntroOverlay({ onDone }: Props) {
             <Dot key={`${dot.x},${dot.y}`} {...dot} reduced={reduced} />
           ))}
           <Animated.View style={[styles.sticker, cardStyle]}>
-            <Text style={styles.stickerEmoji}>🃏</Text>
+            <Icon name="cardsFilled" size={52} color={colors.accent} strokeWidth={1.6} />
           </Animated.View>
           <Animated.Text style={[styles.wordmark, wordStyle]}>StudyPack</Animated.Text>
-          <Animated.Text style={[styles.tagline, tagStyle]}>
-            Play · learn · streak 🔥
-          </Animated.Text>
+          <Animated.View style={[styles.taglineRow, tagStyle]}>
+            <Text style={styles.tagline}>Play · learn · streak</Text>
+            <Icon name="flame" size={15} color={colors.gold} strokeWidth={2.2} />
+          </Animated.View>
         </View>
       </Pressable>
     </Animated.View>
@@ -166,9 +168,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadow.pop,
   },
-  stickerEmoji: {
-    fontSize: 46,
-  },
   wordmark: {
     fontFamily: font.display,
     fontSize: 38,
@@ -176,10 +175,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: 18,
   },
+  taglineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
   tagline: {
     fontFamily: font.bodyBold,
     fontSize: 14,
     color: colors.textDim,
-    marginTop: 2,
   },
 });

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { DeckCard } from '@/components/DeckCard';
+import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useOnline } from '@/hooks/useOnline';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
@@ -72,7 +73,7 @@ export default function DecksScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <Text style={styles.kicker}>STUDYPACK</Text>
-      <Text style={styles.title}>Pick a deck 🃏</Text>
+      <Text style={styles.title}>Pick a deck</Text>
       <Text style={styles.sub}>
         {decks.length > 0
           ? `${downloadedCount} of ${decks.length} saved for offline`
@@ -80,7 +81,7 @@ export default function DecksScreen() {
       </Text>
 
       <OfflineBanner
-        message="✈ Offline — showing your saved catalog"
+        message="Offline — showing your saved catalog"
         style={styles.cacheNote}
       />
       {fromCache && online ? (
@@ -136,14 +137,18 @@ export default function DecksScreen() {
         ListEmptyComponent={
           status === 'error' ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>🙈</Text>
+              <View style={styles.emptyBadge}>
+                <Icon name="alert" size={26} color={colors.coral} />
+              </View>
               <Text style={styles.emptyTitle}>Couldn't load decks</Text>
               <Text style={styles.emptyBody}>{error}</Text>
               <ChunkyButton label="Try again" size="md" onPress={refresh} style={styles.retry} />
             </View>
           ) : status === 'ready' ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>🍃</Text>
+              <View style={styles.emptyBadge}>
+                <Icon name="sprout" size={26} color={colors.accentDeep} />
+              </View>
               <Text style={styles.emptyTitle}>No decks here yet</Text>
               <Text style={styles.emptyBody}>Pull down to refresh the catalog.</Text>
             </View>
@@ -235,9 +240,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     ...shadow.card,
   },
-  emptyEmoji: {
-    fontSize: 30,
-    marginBottom: 4,
+  emptyBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
   },
   emptyTitle: {
     fontFamily: font.heading,

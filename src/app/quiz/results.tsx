@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { Icon, type IconName } from '@/components/Icon';
 import { DIFFICULTY_LABEL } from '@/lib/types';
 import { useQuizStore } from '@/store/quiz';
 import { colors, font, radius, shadow } from '@/theme/tokens';
@@ -27,10 +28,10 @@ export default function ResultsScreen() {
   const pct = Math.round((score / total) * 100);
   const tone =
     pct >= 80
-      ? { color: colors.leaf, wash: colors.leafWash, label: 'You crushed it!', emoji: '🎉' }
+      ? { color: colors.leaf, wash: colors.leafWash, label: 'You crushed it!', icon: 'trophy' as IconName }
       : pct >= 50
-        ? { color: colors.gold, wash: colors.goldWash, label: 'Solid effort', emoji: '💪' }
-        : { color: colors.coral, wash: colors.coralWash, label: 'Keep at it', emoji: '🌱' };
+        ? { color: colors.gold, wash: colors.goldWash, label: 'Solid effort', icon: 'star' as IconName }
+        : { color: colors.coral, wash: colors.coralWash, label: 'Keep at it', icon: 'sprout' as IconName };
 
   return (
     <View
@@ -39,7 +40,9 @@ export default function ResultsScreen() {
         { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 },
       ]}>
       <View style={styles.card}>
-        <Text style={styles.emoji}>{tone.emoji}</Text>
+        <View style={[styles.toneBadge, { backgroundColor: tone.wash }]}>
+          <Icon name={tone.icon} size={30} color={tone.color} />
+        </View>
         <View style={[styles.badge, { backgroundColor: tone.wash }]}>
           <Text style={[styles.badgeText, { color: tone.color }]}>{tone.label}</Text>
         </View>
@@ -56,7 +59,10 @@ export default function ResultsScreen() {
           <Text style={styles.metaText}>{formatDuration(durationMs)}</Text>
         </View>
 
-        <Text style={styles.saved}>✓ Saved to Progress on this device</Text>
+        <View style={styles.savedRow}>
+          <Icon name="check" size={13} color={colors.accentDeep} strokeWidth={2.6} />
+          <Text style={styles.saved}>Saved to Progress on this device</Text>
+        </View>
       </View>
 
       <View style={styles.actions}>
@@ -92,9 +98,13 @@ const styles = StyleSheet.create({
     marginTop: 24,
     ...shadow.pop,
   },
-  emoji: {
-    fontSize: 44,
-    marginBottom: 2,
+  toneBadge: {
+    width: 62,
+    height: 62,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
   },
   badge: {
     borderRadius: radius.pill,
@@ -134,11 +144,16 @@ const styles = StyleSheet.create({
   metaDot: {
     color: colors.textFaint,
   },
+  savedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 14,
+  },
   saved: {
     fontFamily: font.bodyBold,
     fontSize: 12.5,
     color: colors.accentDeep,
-    marginTop: 14,
   },
   actions: {
     gap: 12,
