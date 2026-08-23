@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { IntroOverlay } from '@/components/IntroOverlay';
 import { initDb } from '@/lib/db';
 import { colors, font } from '@/theme/tokens';
 
@@ -34,6 +35,7 @@ export default function RootLayout() {
     Nunito_800ExtraBold,
   });
   const [dbState, setDbState] = useState<DbState>('pending');
+  const [introDone, setIntroDone] = useState(false);
 
   useEffect(() => {
     initDb()
@@ -77,6 +79,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.bg },
         }}
       />
+      {!introDone ? <IntroOverlay onDone={() => setIntroDone(true)} /> : null}
     </>
   );
 }
