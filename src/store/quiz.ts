@@ -8,6 +8,7 @@ import {
   type AnswerInput,
 } from '@/lib/db';
 import { retireSessionForDeck } from '@/lib/notifications';
+import { useMomentsStore } from '@/store/moments';
 import type { Deck, Question } from '@/lib/types';
 
 type QuizStatus = 'idle' | 'loading' | 'active' | 'finished' | 'error';
@@ -109,6 +110,18 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       // Which questions were missed is what mastery and weak spots read;
       // the score alone could never tell them apart.
       await saveAnswers(attemptId, deck.id, answers);
+
+      // Work out whether anything about this session was worth saying out
+      // loud. Usually the answer is no, and that is what keeps the times
+      // it says something worth reading.
+      await useMomentsStore.getState().recordForAttempt({
+        deckId: deck.id,
+        deckName: deck.name,
+        score,
+        total: questions.length,
+        completedAt,
+        answers,
+      });
       // Stop any reminder still pending for the sitting this deck was
       // planned in — finishing early must not earn you a nag.
       await retireSessionForDeck(deck.id, completedAt);

@@ -6,6 +6,7 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon, type IconName } from '@/components/Icon';
 import { RuledPaper, Tape } from '@/components/notebook';
 import { DIFFICULTY_LABEL } from '@/lib/types';
+import { useMomentsStore } from '@/store/moments';
 import { useQuizStore } from '@/store/quiz';
 import { colors, font, outline, radius, shadow, textPop } from '@/theme/tokens';
 
@@ -19,6 +20,7 @@ function formatDuration(ms: number): string {
 export default function ResultsScreen() {
   const insets = useSafeAreaInsets();
   const { deck, questions, score, durationMs } = useQuizStore();
+  const moment = useMomentsStore((s) => s.latest);
 
   // Only reachable by finishing a quiz; a cold deep link goes home.
   if (!deck || questions.length === 0) {
@@ -67,6 +69,16 @@ export default function ResultsScreen() {
           <Text style={styles.saved}>Saved to Progress on this device</Text>
         </View>
       </View>
+
+      {moment ? (
+        <View style={styles.moment}>
+          <Icon name={moment.icon} size={22} color={colors.ink} fill={colors.goldWash} />
+          <View style={styles.momentText}>
+            <Text style={styles.momentTitle}>{moment.title}</Text>
+            <Text style={styles.momentBody}>{moment.body}</Text>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.actions}>
         <ChunkyButton
@@ -165,6 +177,32 @@ const styles = StyleSheet.create({
     fontFamily: font.bodyBold,
     fontSize: 12.5,
     color: colors.accentDeep,
+  },
+  moment: {
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.gold,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginTop: 18,
+  },
+  momentText: { flex: 1 },
+  momentTitle: {
+    fontFamily: font.hero,
+    fontSize: 20,
+    lineHeight: 26,
+    color: colors.text,
+  },
+  momentBody: {
+    fontFamily: font.body,
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: colors.textDim,
+    marginTop: 3,
   },
   actions: {
     gap: 12,

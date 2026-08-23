@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle } from '@/components/notebook';
 import { type AttemptWithDeck } from '@/lib/db';
+import { daysToNextTier, fireFor } from '@/lib/fire';
 import { masteryLabel, type SubjectMastery } from '@/lib/mastery';
+import { useMomentsStore } from '@/store/moments';
 import { useProgressStore } from '@/store/progress';
 import { colors, font, radius, tabClearance } from '@/theme/tokens';
 
@@ -94,11 +96,13 @@ export default function ProgressScreen() {
     status,
     refresh,
   } = useProgressStore();
+  const { log: moments, refresh: refreshMoments } = useMomentsStore();
 
   useFocusEffect(
     useCallback(() => {
       void refresh();
-    }, [refresh])
+      void refreshMoments();
+    }, [refresh, refreshMoments])
   );
 
   if (status !== 'ready') {
@@ -110,6 +114,8 @@ export default function ProgressScreen() {
   }
 
   const nothingYet = totalAttempts === 0 && subjects.length === 0;
+  const fire = fireFor(currentStreak);
+  const toNextFire = currentStreak > 0 ? daysToNextTier(currentStreak) : null;
 
   return (
     <View style={styles.screen}>
@@ -134,12 +140,18 @@ export default function ProgressScreen() {
           <>
             <View style={styles.streak}>
               <View style={styles.streakRow}>
-                <Icon name="flame" size={26} color={colors.ink} fill={colors.gold} />
+                <Icon name={fire.icon} size={30} color={colors.ink} fill={fire.color} />
                 <Text style={styles.streakNum}>{currentStreak}</Text>
+                <Text style={[styles.fireName, { color: fire.color }]}>{fire.name}</Text>
               </View>
               <Text style={styles.streakLabel}>
                 day streak{longestStreak > currentStreak ? ` · best ${longestStreak}` : ''}
               </Text>
+              {toNextFire != null ? (
+                <Text style={styles.fireNext}>
+                  {toNextFire} more {toNextFire === 1 ? 'day' : 'days'} and the fire grows.
+                </Text>
+              ) : null}
             </View>
 
             {subjects.length > 0 ? (
@@ -158,6 +170,27 @@ export default function ProgressScreen() {
                   question{weakCount === 1 ? '' : 's'} keep tripping you up
                 </Text>
               </View>
+            ) : null}
+
+            {moments.length > 0 ? (
+              <>
+                <Text style={styles.section}>MOMENTS</Text>
+                {moments.slice(0, 12).map((moment) => (
+                  <View key={`${moment.id}:${moment.at}`} style={styles.moment}>
+                    <Icon
+                      name={moment.icon}
+                      size={18}
+                      color={colors.ink}
+                      fill={colors.goldWash}
+                    />
+                    <View style={styles.momentText}>
+                      <Text style={styles.momentTitle}>{moment.title}</Text>
+                      <Text style={styles.momentBody}>{moment.body}</Text>
+                      <Text style={styles.momentWhen}>{formatWhen(moment.at)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </>
             ) : null}
 
             {attempts.length > 0 ? (
@@ -205,6 +238,44 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
 
+  fireName: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 13,
+    letterSpacing: 0.3,
+  },
+  fireNext: {
+    fontFamily: font.body,
+    fontSize: 12.5,
+    color: colors.textFaint,
+    marginTop: 4,
+  },
+  moment: {
+    flexDirection: 'row',
+    gap: 11,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: colors.lineSoft,
+  },
+  momentText: { flex: 1 },
+  momentTitle: {
+    fontFamily: font.hero,
+    fontSize: 17,
+    lineHeight: 23,
+    color: colors.text,
+  },
+  momentBody: {
+    fontFamily: font.body,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textDim,
+    marginTop: 2,
+  },
+  momentWhen: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
+    color: colors.textFaint,
+    marginTop: 5,
+  },
   section: {
     fontFamily: font.bodyHeavy,
     fontSize: 11,
