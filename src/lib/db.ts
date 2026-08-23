@@ -199,3 +199,56 @@ export async function saveAttempt(attempt: Omit<Attempt, 'id'>): Promise<void> {
     attempt.completedAt
   );
 }
+
+export interface AttemptWithDeck extends Attempt {
+  deckName: string;
+  difficulty: Difficulty | null;
+}
+
+interface AttemptRow {
+  id: number;
+  deck_id: string;
+  score: number;
+  total: number;
+  duration_ms: number;
+  completed_at: number;
+  deck_name: string | null;
+  difficulty: string | null;
+}
+
+export async function listAttempts(limit = 50): Promise<AttemptWithDeck[]> {
+  const rows = await getDb().getAllAsync<AttemptRow>(
+    `SELECT a.id, a.deck_id, a.score, a.total, a.duration_ms, a.completed_at,
+            d.name AS deck_name, d.difficulty AS difficulty
+     FROM attempts a
+     LEFT JOIN decks d ON d.id = a.deck_id
+     ORDER BY a.completed_at DESC
+     LIMIT ?`,
+    limit
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    deckId: row.deck_id,
+    score: row.score,
+    total: row.total,
+    durationMs: row.duration_ms,
+    completedAt: row.completed_at,
+    deckName: row.deck_name ?? 'Removed deck',
+    difficulty: (row.difficulty as Difficulty) ?? null,
+  }));
+}
+
+/** All attempt timestamps — the streak input. Integers only, cheap to load. */
+export async function listAttemptTimestamps(): Promise<number[]> {
+  const rows = await getDb().getAllAsync<{ completed_at: number }>(
+    'SELECT completed_at FROM attempts'
+  );
+  return rows.map((row) => row.completed_at);
+}
+
+export async function getBestScoreRatio(): Promise<number | null> {
+  const row = await getDb().getFirstAsync<{ best: number | null }>(
+    'SELECT MAX(CAST(score AS REAL) / total) AS best FROM attempts'
+  );
+  return row?.best ?? null;
+}
