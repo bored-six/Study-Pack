@@ -1,7 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,8 +13,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
-import { PromptModal } from '@/components/PromptModal';
 import { LIMITS } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
@@ -29,10 +28,10 @@ const SCAN_MS = 900;
 
 export default function NewNotesScreen() {
   const insets = useSafeAreaInsets();
-  const { subjects, targetId, refresh, setTarget, addSubject, parse } = useNotesStore();
+  const { refresh, parse } = useNotesStore();
   const [body, setBody] = useState('');
   const [scan, setScan] = useState<{ lines: number; found: number } | null>(null);
-  const [newSubject, setNewSubject] = useState(false);
+  const [nothing, setNothing] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -40,7 +39,6 @@ export default function NewNotesScreen() {
     }, [refresh])
   );
 
-  const target = subjects.find((s) => s.id === targetId) ?? null;
   const over = body.length > LIMITS.maxInputChars;
   const ready = body.trim().length > 0 && !over;
 
@@ -49,25 +47,13 @@ export default function NewNotesScreen() {
     [body.length]
   );
 
-  const handleCreateSubject = useCallback(
-    (name: string) => {
-      setNewSubject(false);
-      void addSubject(name);
-    },
-    [addSubject]
-  );
-
-  const runParse = useCallback(async () => {
-    let subjectId = targetId;
-    if (!subjectId) {
-      subjectId = await addSubject('My notes');
-    }
-
+  // Which subject these end up in is decided on the review screen, once
+  // the student can see what the notes actually turned into.
+  const runParse = useCallback(() => {
     const result = parse(body);
     if (result.questions.length === 0) {
       const noOptions = result.stats.skipped.filter((s) => s.reason === 'no_options').length;
-      Alert.alert(
-        'No questions yet',
+      setNothing(
         noOptions > 0
           ? "We found some facts but couldn't build believable wrong answers. Paste a few more lines on the same topic and try again."
           : 'Try notes written as "Term: meaning" or short factual sentences — that gives us something to quiz.'
@@ -81,7 +67,7 @@ export default function NewNotesScreen() {
       setScan(null);
       router.push('/notes/review');
     }, SCAN_MS);
-  }, [addSubject, body, parse, targetId]);
+  }, [body, parse]);
 
   useEffect(() => () => setScan(null), []);
 
@@ -119,42 +105,6 @@ export default function NewNotesScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.label}>Adding to</Text>
-          <View style={styles.subjectRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.subjectChips}>
-              {subjects.map((subject) => {
-                const active = subject.id === targetId;
-                return (
-                  <Pressable
-                    key={subject.id}
-                    onPress={() => setTarget(subject.id)}
-                    style={({ pressed }) => [
-                      styles.chip,
-                      active && styles.chipActive,
-                      pressed && !active && styles.pressed,
-                    ]}>
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {subject.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              <Pressable
-                onPress={() => setNewSubject(true)}
-                style={({ pressed }) => [styles.chipNew, pressed && styles.pressed]}>
-                <Text style={styles.chipNewText}>+ New subject</Text>
-              </Pressable>
-            </ScrollView>
-          </View>
-          {subjects.length === 0 ? (
-            <Text style={styles.subjectHint}>
-              No subjects yet — we'll start one called "My notes".
-            </Text>
-          ) : null}
-
           <View style={styles.tip}>
             <Icon name="bulb" size={17} color={colors.gold} strokeWidth={2.2} />
             <Text style={styles.tipText}>
@@ -185,11 +135,11 @@ export default function NewNotesScreen() {
           ) : null}
 
           <ChunkyButton
-            label={target ? `Make questions for ${target.name}` : 'Make questions'}
+            label="Make questions"
             icon="bolt"
             size="lg"
             disabled={!ready}
-            onPress={() => void runParse()}
+            onPress={runParse}
             style={styles.cta}
           />
           <Text style={styles.footnote}>
@@ -197,14 +147,12 @@ export default function NewNotesScreen() {
           </Text>
         </ScrollView>
 
-        <PromptModal
-          visible={newSubject}
-          title="New subject"
-          message="What are you studying?"
-          placeholder="Biology"
-          confirmLabel="Create"
-          onCancel={() => setNewSubject(false)}
-          onConfirm={handleCreateSubject}
+        <ConfirmModal
+          visible={nothing != null}
+          title="No questions yet"
+          message={nothing ?? undefined}
+          confirmLabel="Got it"
+          onCancel={() => setNothing(null)}
         />
       </View>
     </KeyboardAvoidingView>
@@ -284,52 +232,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.6,
     color: colors.textDim,
-    marginTop: 6,
-  },
-  subjectRow: {
-    marginTop: 2,
-  },
-  subjectChips: {
-    gap: 8,
-    paddingRight: 8,
-  },
-  chip: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.ink,
-    borderRadius: radius.pill,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-  },
-  chipActive: {
-    backgroundColor: colors.accent,
-    ...shadow.card,
-  },
-  chipText: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 13,
-    color: colors.textDim,
-  },
-  chipTextActive: {
-    color: colors.ink,
-  },
-  chipNew: {
-    backgroundColor: colors.accentWash,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    borderRadius: radius.pill,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-  },
-  chipNewText: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 13,
-    color: colors.accentDeep,
-  },
-  subjectHint: {
-    fontFamily: font.body,
-    fontSize: 12,
-    color: colors.textFaint,
     marginTop: 6,
   },
   tip: {

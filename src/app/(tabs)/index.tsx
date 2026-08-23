@@ -192,7 +192,7 @@ export default function HomeScreen() {
           <Text style={styles.cardBody}>
             {noteDecks.length > 0
               ? 'Start another one to keep your notes apart'
-              : 'Biology, History, whatever you\'re studying'}
+              : "Biology, History, whatever you're studying"}
           </Text>
         </View>
       </Pressable>

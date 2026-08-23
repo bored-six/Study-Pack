@@ -1,7 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { SKIP_LABEL, type ParsedQuestion, type SkippedLine } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
@@ -151,32 +151,46 @@ function SkippedPanel({ skipped }: { skipped: SkippedLine[] }) {
 
 export default function ReviewNotesScreen() {
   const insets = useSafeAreaInsets();
-  const { draft, stats, subjects, targetId, reviseDraftQuestion, removeDraftQuestion, saveDraft, clearDraft } =
-    useNotesStore();
+  const {
+    draft,
+    stats,
+    subjects,
+    targetId,
+    setTarget,
+    addSubject,
+    reviseDraftQuestion,
+    removeDraftQuestion,
+    saveDraft,
+    clearDraft,
+  } = useNotesStore();
   const [saving, setSaving] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [failure, setFailure] = useState<string | null>(null);
+  const [discarding, setDiscarding] = useState(false);
+
+  // With nothing to assign to yet, the student names their first subject
+  // here rather than being sent back to make one before they can save.
+  const naming = subjects.length === 0;
+  const picked = subjects.find((s) => s.id === targetId) ?? null;
+  const subjectName = naming ? firstName.trim() : (picked?.name ?? '');
 
   const handleSave = useCallback(() => {
     setSaving(true);
-    saveDraft()
-      .then(() => router.dismissAll())
-      .catch((e: unknown) => {
-        setSaving(false);
-        Alert.alert('Could not save', e instanceof Error ? e.message : 'Please try again.');
-      });
-  }, [saveDraft]);
+    const run = async () => {
+      if (naming) await addSubject(firstName);
+      await saveDraft();
+      router.dismissAll();
+    };
+    run().catch((e: unknown) => {
+      setSaving(false);
+      setFailure(e instanceof Error ? e.message : 'Please try again.');
+    });
+  }, [addSubject, firstName, naming, saveDraft]);
 
   const handleDiscard = useCallback(() => {
-    Alert.alert('Discard these questions?', 'Your notes will not be saved.', [
-      { text: 'Keep editing', style: 'cancel' },
-      {
-        text: 'Discard',
-        style: 'destructive',
-        onPress: () => {
-          clearDraft();
-          router.dismissAll();
-        },
-      },
-    ]);
+    clearDraft();
+    setDiscarding(false);
+    router.dismissAll();
   }, [clearDraft]);
 
   // Only reachable straight after a parse.
@@ -184,14 +198,21 @@ export default function ReviewNotesScreen() {
     return <Redirect href="/" />;
   }
 
-  const subjectName = subjects.find((s) => s.id === targetId)?.name ?? 'your notes';
   const empty = draft.length === 0;
+  const ready = !empty && subjectName.length > 0 && !saving;
+  const saveLabel = empty
+    ? 'Nothing to save'
+    : subjectName.length > 0
+      ? `Save to ${subjectName}`
+      : naming
+        ? 'Name your subject'
+        : 'Pick a subject';
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
       <View style={styles.navRow}>
         <Pressable
-          onPress={handleDiscard}
+          onPress={() => setDiscarding(true)}
           hitSlop={10}
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
           <Text style={styles.backArrow}>←</Text>
@@ -201,7 +222,7 @@ export default function ReviewNotesScreen() {
             {draft.length} question{draft.length === 1 ? '' : 's'}
           </Text>
           <Text style={styles.sub} numberOfLines={1}>
-            for {subjectName}
+            {subjectName.length > 0 ? `for ${subjectName}` : 'from your notes'}
           </Text>
         </View>
       </View>
@@ -218,10 +239,52 @@ export default function ReviewNotesScreen() {
           />
         )}
         ListHeaderComponent={
-          <View style={styles.note}>
-            <Text style={styles.noteText}>
-              Read these before saving. Revise anything that came out wrong, or remove it.
-            </Text>
+          <View style={styles.header}>
+            <View style={styles.saveTo}>
+              <Text style={styles.saveToLabel}>SAVING TO</Text>
+              {naming ? (
+                <>
+                  <Text style={styles.saveToHint}>
+                    No subjects yet — name the one these belong to.
+                  </Text>
+                  <TextInput
+                    value={firstName}
+                    onChangeText={setFirstName}
+                    placeholder="Biology"
+                    placeholderTextColor={colors.textFaint}
+                    style={styles.nameInput}
+                    maxLength={40}
+                    returnKeyType="done"
+                  />
+                </>
+              ) : (
+                <View style={styles.chips}>
+                  {subjects.map((subject) => {
+                    const active = subject.id === targetId;
+                    return (
+                      <Pressable
+                        key={subject.id}
+                        onPress={() => setTarget(subject.id)}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          active && styles.chipActive,
+                          pressed && !active && styles.pressed,
+                        ]}>
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {subject.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            <View style={styles.note}>
+              <Text style={styles.noteText}>
+                Read these before saving. Revise anything that came out wrong, or remove it.
+              </Text>
+            </View>
           </View>
         }
         ListFooterComponent={<SkippedPanel skipped={stats.skipped} />}
@@ -240,13 +303,31 @@ export default function ReviewNotesScreen() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <ChunkyButton
-          label={empty ? 'Nothing to save' : `Save to ${subjectName}`}
+          label={saveLabel}
           icon="check"
           size="lg"
-          disabled={empty || saving}
+          disabled={!ready}
           onPress={handleSave}
         />
       </View>
+
+      <ConfirmModal
+        visible={discarding}
+        title="Discard these questions?"
+        message="Your notes will not be saved."
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        destructive
+        onCancel={() => setDiscarding(false)}
+        onConfirm={handleDiscard}
+      />
+      <ConfirmModal
+        visible={failure != null}
+        title="Could not save"
+        message={failure ?? undefined}
+        confirmLabel="Got it"
+        onCancel={() => setFailure(null)}
+      />
     </View>
   );
 }
@@ -292,6 +373,59 @@ const styles = StyleSheet.create({
     fontFamily: font.bodySemibold,
     fontSize: 12.5,
     color: colors.textFaint,
+  },
+  header: {
+    gap: 12,
+  },
+  saveTo: {
+    gap: 8,
+  },
+  saveToLabel: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    color: colors.textDim,
+  },
+  saveToHint: {
+    fontFamily: font.body,
+    fontSize: 12.5,
+    color: colors.textFaint,
+    marginTop: -2,
+  },
+  nameInput: {
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.control,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    fontFamily: font.heading,
+    fontSize: 15.5,
+    color: colors.text,
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    borderRadius: radius.pill,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+  },
+  chipActive: {
+    backgroundColor: colors.accent,
+    ...shadow.card,
+  },
+  chipText: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 13,
+    color: colors.textDim,
+  },
+  chipTextActive: {
+    color: colors.ink,
   },
   note: {
     backgroundColor: colors.goldWash,

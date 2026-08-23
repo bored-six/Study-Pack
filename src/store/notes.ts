@@ -7,7 +7,11 @@ import type { Deck } from '@/lib/types';
 interface NotesState {
   /** Subjects are notes decks: Biology, History, … */
   subjects: Deck[];
-  /** Subject the next paste will be added to. */
+  /**
+   * Subject the reviewed draft will be saved to. Chosen on the review
+   * screen, never on the paste screen — you assign notes once you can see
+   * what came out of them.
+   */
   targetId: string | null;
   /** Questions awaiting review after a parse; edited in place before saving. */
   draft: ParsedQuestion[];
@@ -35,10 +39,9 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     const subjects = await listDecks('notes');
     const { targetId } = get();
     const stillExists = subjects.some((s) => s.id === targetId);
-    set({
-      subjects,
-      targetId: stillExists ? targetId : (subjects[0]?.id ?? null),
-    });
+    // No falling back to the first subject: an unpicked draft must stay
+    // unpicked, or notes quietly land somewhere the student never chose.
+    set({ subjects, targetId: stillExists ? targetId : null });
   },
 
   setTarget: (deckId) => set({ targetId: deckId }),
@@ -51,7 +54,9 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
   parse: (raw) => {
     const result = parseNotes(raw);
-    set({ draft: result.questions, stats: result.stats });
+    // Every scan arrives at review unassigned — the subject is a decision
+    // made about *these* questions, not one inherited from last time.
+    set({ draft: result.questions, stats: result.stats, targetId: null });
     return result;
   },
 
