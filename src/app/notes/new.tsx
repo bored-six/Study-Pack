@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
+import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { LIMITS } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
@@ -75,6 +76,7 @@ export default function NewNotesScreen() {
     return (
       <View style={[styles.screen, styles.scanScreen]}>
         <View style={styles.scanBadge}>
+          <Tape />
           <Icon name="bolt" size={34} color={colors.ink} fill={colors.accent} strokeWidth={1.9} />
         </View>
         <Text style={styles.scanTitle}>Reading {scan.lines} lines…</Text>
@@ -90,6 +92,7 @@ export default function NewNotesScreen() {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+        <RuledPaper />
         <View style={styles.navRow}>
           <Pressable
             onPress={() => router.back()}
@@ -97,7 +100,15 @@ export default function NewNotesScreen() {
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
             <Text style={styles.backArrow}>←</Text>
           </Pressable>
-          <Text style={styles.title}>Add notes</Text>
+          <View>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Add</Text>
+              <View style={styles.titleSticker}>
+                <Text style={styles.titleStickerText}>notes!</Text>
+              </View>
+            </View>
+            <Squiggle width={84} style={styles.squiggle} />
+          </View>
         </View>
 
         <ScrollView
@@ -106,7 +117,8 @@ export default function NewNotesScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.tip}>
-            <Icon name="bulb" size={17} color={colors.gold} strokeWidth={2.2} />
+            <Tape rotate="3deg" />
+            <Icon name="bulb" size={18} color={colors.ink} fill={colors.goldWash} strokeWidth={1.9} />
             <Text style={styles.tipText}>
               Notes written as <Text style={styles.tipStrong}>Term: meaning</Text> or short
               factual sentences make the best questions.
@@ -117,16 +129,22 @@ export default function NewNotesScreen() {
             <Text style={styles.label}>Paste your notes</Text>
             <Text style={[styles.counter, over && styles.counterOver]}>{counter}</Text>
           </View>
-          <TextInput
-            value={body}
-            onChangeText={setBody}
-            placeholder={PLACEHOLDER}
-            placeholderTextColor={colors.textFaint}
-            style={styles.bodyInput}
-            multiline
-            textAlignVertical="top"
-            scrollEnabled={false}
-          />
+          <View style={styles.page}>
+            {Array.from({ length: 14 }, (_, i) => (
+              <View key={i} style={[styles.pageRule, { top: PAGE_PAD + LINE_H * (i + 1) - 5 }]} />
+            ))}
+            <View style={styles.pageMargin} />
+            <TextInput
+              value={body}
+              onChangeText={setBody}
+              placeholder={PLACEHOLDER}
+              placeholderTextColor={colors.textFaint}
+              style={styles.bodyInput}
+              multiline
+              textAlignVertical="top"
+              scrollEnabled={false}
+            />
+          </View>
 
           {over ? (
             <Text style={styles.overText}>
@@ -158,6 +176,10 @@ export default function NewNotesScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+/** The paste box writes on real rule lines, so these must agree. */
+const LINE_H = 26;
+const PAGE_PAD = 14;
 
 const styles = StyleSheet.create({
   flex: {
@@ -218,11 +240,35 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: colors.ink,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   title: {
     fontFamily: font.hero,
     fontSize: 26,
     lineHeight: 34,
     color: colors.text,
+  },
+  titleSticker: {
+    backgroundColor: colors.accentWash,
+    ...outline,
+    borderRadius: 11,
+    paddingHorizontal: 9,
+    paddingVertical: 1,
+    transform: [{ rotate: '-2.5deg' }],
+    ...shadow.card,
+  },
+  titleStickerText: {
+    fontFamily: font.hero,
+    fontSize: 20,
+    lineHeight: 27,
+    color: colors.ink,
+  },
+  squiggle: {
+    marginTop: 1,
+    marginLeft: 2,
   },
   content: {
     gap: 8,
@@ -236,19 +282,21 @@ const styles = StyleSheet.create({
   },
   tip: {
     flexDirection: 'row',
-    gap: 9,
+    gap: 10,
     alignItems: 'flex-start',
-    backgroundColor: colors.goldWash,
+    backgroundColor: colors.surface,
+    ...outline,
     borderRadius: radius.control,
-    padding: 12,
-    marginTop: 14,
+    padding: 13,
+    marginTop: 16,
+    ...shadow.card,
   },
   tipText: {
     flex: 1,
     fontFamily: font.bodySemibold,
     fontSize: 12.5,
     lineHeight: 17,
-    color: colors.gold,
+    color: colors.textDim,
   },
   tipStrong: {
     fontFamily: font.bodyHeavy,
@@ -268,17 +316,38 @@ const styles = StyleSheet.create({
     color: colors.coral,
     fontFamily: font.bodyHeavy,
   },
-  bodyInput: {
+  page: {
     backgroundColor: colors.surface,
     ...outline,
     borderRadius: radius.card,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontFamily: font.body,
-    fontSize: 14.5,
-    lineHeight: 21,
+    overflow: 'hidden',
+    minHeight: PAGE_PAD * 2 + LINE_H * 8,
+    ...shadow.card,
+  },
+  pageRule: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(46, 111, 163, 0.10)',
+  },
+  pageMargin: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 30,
+    width: 1.5,
+    backgroundColor: 'rgba(194, 78, 56, 0.15)',
+  },
+  bodyInput: {
+    paddingLeft: 42,
+    paddingRight: 14,
+    paddingVertical: PAGE_PAD,
+    fontFamily: font.hero,
+    fontSize: 16,
+    lineHeight: LINE_H,
     color: colors.text,
-    minHeight: 200,
+    minHeight: PAGE_PAD * 2 + LINE_H * 8,
   },
   overText: {
     fontFamily: font.bodySemibold,

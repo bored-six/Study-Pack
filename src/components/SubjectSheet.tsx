@@ -13,6 +13,7 @@ import {
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { Tape } from '@/components/notebook';
 import { Icon, type IconName } from '@/components/Icon';
 import type { Deck } from '@/lib/types';
 import { colors, font, outline, radius, subjectPalette } from '@/theme/tokens';
@@ -117,6 +118,7 @@ export function SubjectSheet({ visible, subject, onClose, onSave, onDelete }: Pr
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.lift}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <Tape style={styles.sheetTape} />
             <View style={styles.grabber} />
 
             <View style={styles.header}>
@@ -246,6 +248,10 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     maxHeight: '86%',
   },
+  sheetTape: {
+    top: -9,
+    zIndex: 1,
+  },
   grabber: {
     alignSelf: 'center',
     width: 40,
@@ -302,11 +308,15 @@ const styles = StyleSheet.create({
   swatch: {
     width: 38,
     height: 38,
-    borderRadius: 13,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 11,
+    borderBottomLeftRadius: 14,
     borderWidth: 1.5,
     borderColor: colors.edge,
     alignItems: 'center',
     justifyContent: 'center',
+    transform: [{ rotate: '-2deg' }],
   },
   swatchActive: {
     borderWidth: 2,
@@ -346,7 +356,10 @@ const styles = StyleSheet.create({
   iconCell: {
     width: 44,
     height: 44,
-    borderRadius: radius.control,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 17,
+    borderBottomRightRadius: 13,
+    borderBottomLeftRadius: 16,
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.edge,

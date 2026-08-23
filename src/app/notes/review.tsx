@@ -13,9 +13,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
+import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { SKIP_LABEL, type ParsedQuestion, type SkippedLine } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { candy, colors, font, outline, radius, shadow, subjectInkFor } from '@/theme/tokens';
 
 function QuestionCard({
   question,
@@ -37,12 +38,18 @@ function QuestionCard({
     onRevise(index, { answers, correctAnswer });
   };
 
+  const definition = question.kind === 'definition';
+
   return (
-    <View style={styles.card}>
+    <View
+      style={[
+        styles.card,
+        { transform: [{ rotate: index % 2 === 0 ? '-0.4deg' : '0.4deg' }] },
+      ]}>
       <View style={styles.cardTop}>
-        <View style={styles.kindPill}>
-          <Text style={styles.kindText}>
-            {question.kind === 'definition' ? 'DEFINITION' : 'FILL THE BLANK'}
+        <View style={[styles.kindPill, definition ? styles.kindDef : styles.kindBlank]}>
+          <Text style={[styles.kindText, definition ? styles.kindTextDef : styles.kindTextBlank]}>
+            {definition ? 'DEFINITION' : 'FILL THE BLANK'}
           </Text>
         </View>
         <View style={styles.cardActions}>
@@ -77,8 +84,9 @@ function QuestionCard({
       )}
 
       <View style={styles.options}>
-        {question.answers.map((answer) => {
+        {question.answers.map((answer, i) => {
           const correct = answer === question.correctAnswer;
+          const tone = candy[i % candy.length];
           return editing ? (
             <View key={answer} style={styles.optionEditRow}>
               <Pressable
@@ -97,6 +105,9 @@ function QuestionCard({
             </View>
           ) : (
             <View key={answer} style={[styles.option, correct && styles.optionCorrect]}>
+              <View style={[styles.letterChip, { backgroundColor: tone.wash }]}>
+                <Text style={styles.letterChipText}>{String.fromCharCode(65 + i)}</Text>
+              </View>
               <Text style={[styles.optionText, correct && styles.optionTextCorrect]}>
                 {answer}
               </Text>
@@ -210,6 +221,7 @@ export default function ReviewNotesScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+      <RuledPaper />
       <View style={styles.navRow}>
         <Pressable
           onPress={() => setDiscarding(true)}
@@ -224,6 +236,7 @@ export default function ReviewNotesScreen() {
           <Text style={styles.sub} numberOfLines={1}>
             {subjectName.length > 0 ? `for ${subjectName}` : 'from your notes'}
           </Text>
+          <Squiggle width={84} style={styles.squiggle} />
         </View>
       </View>
 
@@ -241,6 +254,7 @@ export default function ReviewNotesScreen() {
         ListHeaderComponent={
           <View style={styles.header}>
             <View style={styles.saveTo}>
+              <Tape />
               <Text style={styles.saveToLabel}>SAVING TO</Text>
               {naming ? (
                 <>
@@ -261,16 +275,29 @@ export default function ReviewNotesScreen() {
                 <View style={styles.chips}>
                   {subjects.map((subject) => {
                     const active = subject.id === targetId;
+                    const wash = subject.color ?? colors.accentWash;
                     return (
                       <Pressable
                         key={subject.id}
                         onPress={() => setTarget(subject.id)}
                         style={({ pressed }) => [
                           styles.chip,
-                          active && styles.chipActive,
+                          active && { backgroundColor: wash, ...shadow.card },
                           pressed && !active && styles.pressed,
                         ]}>
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {active ? (
+                          <Icon
+                            name="check"
+                            size={13}
+                            color={subjectInkFor(subject.color)}
+                            strokeWidth={2.8}
+                          />
+                        ) : null}
+                        <Text
+                          style={[
+                            styles.chipText,
+                            active && { color: subjectInkFor(subject.color) },
+                          ]}>
                           {subject.name}
                         </Text>
                       </Pressable>
@@ -290,6 +317,9 @@ export default function ReviewNotesScreen() {
         ListFooterComponent={<SkippedPanel skipped={stats.skipped} />}
         ListEmptyComponent={
           <View style={styles.empty}>
+            <View style={styles.emptyBadge}>
+              <Icon name="sprout" size={26} color={colors.ink} fill={colors.accentWash} />
+            </View>
             <Text style={styles.emptyTitle}>Nothing left</Text>
             <Text style={styles.emptyBody}>
               You removed every question. Go back and paste different notes.
@@ -374,11 +404,20 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: colors.textFaint,
   },
+  squiggle: {
+    marginTop: 2,
+  },
   header: {
     gap: 12,
   },
   saveTo: {
     gap: 8,
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.card,
+    padding: 14,
+    marginTop: 8,
+    ...shadow.card,
   },
   saveToLabel: {
     fontFamily: font.bodyHeavy,
@@ -408,24 +447,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface2,
     borderWidth: 1.5,
-    borderColor: colors.ink,
+    borderColor: colors.edge,
     borderRadius: radius.pill,
     paddingHorizontal: 15,
     paddingVertical: 8,
-  },
-  chipActive: {
-    backgroundColor: colors.accent,
-    ...shadow.card,
   },
   chipText: {
     fontFamily: font.bodyHeavy,
     fontSize: 13,
     color: colors.textDim,
-  },
-  chipTextActive: {
-    color: colors.ink,
   },
   note: {
     backgroundColor: colors.goldWash,
@@ -462,16 +497,29 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   kindPill: {
-    backgroundColor: colors.surface2,
     borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
     paddingHorizontal: 10,
     paddingVertical: 3,
+    transform: [{ rotate: '-1.5deg' }],
+  },
+  kindDef: {
+    backgroundColor: '#DBEEFB',
+  },
+  kindBlank: {
+    backgroundColor: '#EAE2FA',
   },
   kindText: {
     fontFamily: font.bodyHeavy,
     fontSize: 9.5,
     letterSpacing: 1,
-    color: colors.textDim,
+  },
+  kindTextDef: {
+    color: '#2E6FA3',
+  },
+  kindTextBlank: {
+    color: '#6C51A8',
   },
   iconBtn: {
     backgroundColor: colors.accentWash,
@@ -517,12 +565,29 @@ const styles = StyleSheet.create({
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+    gap: 9,
     backgroundColor: colors.surface2,
     borderRadius: 11,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  letterChip: {
+    width: 24,
+    height: 24,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 7,
+    borderBottomLeftRadius: 9,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
+  },
+  letterChipText: {
+    fontFamily: font.hero,
+    fontSize: 13,
+    color: colors.ink,
   },
   optionCorrect: {
     backgroundColor: colors.leafWash,
@@ -631,6 +696,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     ...shadow.card,
+  },
+  emptyBadge: {
+    width: 52,
+    height: 52,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 15,
+    borderBottomLeftRadius: 19,
+    backgroundColor: colors.surface2,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+    transform: [{ rotate: '-3deg' }],
   },
   emptyTitle: {
     fontFamily: font.heading,

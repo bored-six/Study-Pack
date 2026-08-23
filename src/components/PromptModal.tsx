@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { Squiggle, Tape } from '@/components/notebook';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
 
 interface Props {
@@ -64,7 +65,9 @@ export function PromptModal({
           style={styles.centering}>
           {/* Swallow taps inside the card so they don't dismiss it. */}
           <Pressable style={styles.card} onPress={() => {}}>
+            <Tape />
             <Text style={styles.title}>{title}</Text>
+            <Squiggle width={92} style={styles.squiggle} />
             {message ? <Text style={styles.message}>{message}</Text> : null}
 
             <TextInput
@@ -115,10 +118,17 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     ...outline,
-    borderRadius: radius.card,
+    borderTopLeftRadius: radius.card,
+    borderTopRightRadius: radius.card + 4,
+    borderBottomRightRadius: radius.card - 3,
+    borderBottomLeftRadius: radius.card + 2,
     padding: 20,
+    paddingTop: 24,
     gap: 10,
     ...shadow.pop,
+  },
+  squiggle: {
+    marginTop: -6,
   },
   title: {
     fontFamily: font.hero,
