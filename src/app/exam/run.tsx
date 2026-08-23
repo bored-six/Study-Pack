@@ -1,8 +1,8 @@
 import { Redirect, router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -12,71 +12,133 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-
 import { ChunkyButton } from '@/components/ChunkyButton';
-import { ComboMeter } from '@/components/ComboMeter';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL } from '@/lib/exam';
+import { MODES, questionSeconds, SURVIVAL_STRIKES } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
 
+function clock(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** Lives left, as hearts that go out one at a time. */
+function Hearts({ strikes }: { strikes: number }) {
+  return (
+    <View style={styles.hearts}>
+      {Array.from({ length: SURVIVAL_STRIKES }, (_, i) => {
+        const alive = i < SURVIVAL_STRIKES - strikes;
+        return (
+          <Icon
+            key={i}
+            name="heart"
+            size={17}
+            color={alive ? colors.coral : colors.disabledText}
+            fill={alive ? colors.coralWash : 'none'}
+            strokeWidth={2}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 export default function ExamRunScreen() {
   const insets = useSafeAreaInsets();
-  const { status, deck, items, index, briefed, markBriefed, submit } = useExamStore();
+  const store = useExamStore();
+  const {
+    status,
+    deck,
+    mode,
+    items,
+    index,
+    queue,
+    retired,
+    strikes,
+    visits,
+    drafts,
+    flagged,
+    briefed,
+    results,
+    paperDeadline,
+  } = store;
+
+  const spec = MODES[mode];
+  const item = store.current();
+
   const [showHelp, setShowHelp] = useState(false);
-  const [combo, setCombo] = useState(0);
-  const glow = useSharedValue(0);
+  const [confirmQuit, setConfirmQuit] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
-  // A soft frame around the screen once a run gets hot.
+  // One ticking clock drives both timers; half-second steps keep the
+  // countdown honest without repainting the paper sixty times a second.
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (combo >= 10) {
-      glow.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 900 }),
-          withTiming(0.4, { duration: 900 })
-        ),
-        -1,
-        false
-      );
-    } else {
-      glow.value = withTiming(0, { duration: 300 });
+    if (spec.clock === 'none') return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [spec.clock]);
+
+  // Reading how a format works is not part of your time, so the countdown
+  // holds until the briefing card is out of the way. Opening help later is
+  // on the clock — otherwise "?" would be a free pause button.
+  const waitingOnBriefing = !!item && !briefed.includes(item.format);
+
+  // A per-question clock restarts on every item, including a mastery repeat.
+  const [itemDeadline, setItemDeadline] = useState<number | null>(null);
+  useEffect(() => {
+    if (spec.clock !== 'per_question' || !item || waitingOnBriefing) {
+      setItemDeadline(null);
+      return;
     }
-  }, [combo, glow]);
+    setItemDeadline(Date.now() + questionSeconds(item.format) * 1000);
+  }, [spec.clock, item, visits, waitingOnBriefing]);
 
-  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.55 }));
-
-  const handleQuit = useCallback(() => {
-    Alert.alert('Leave this exam?', "Your answers so far won't be saved.", [
-      { text: 'Keep going', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: () => router.back() },
-    ]);
+  const finished = useCallback((next: 'next' | 'finished') => {
+    if (next === 'finished') router.replace('/exam/results');
   }, []);
 
   const handleDone = useCallback(
     (correct: boolean) => {
-      setCombo((c) => (correct ? c + 1 : 0));
-      void submit(correct).then((next) => {
-        if (next === 'finished') router.replace('/exam/results');
-      });
+      void store.answer(correct).then(finished);
     },
-    [submit]
+    [store, finished]
   );
 
-  if (status !== 'active') {
+  // Fire a timeout once per deadline, never twice for the same question.
+  const timedOutAt = useRef<number | null>(null);
+  useEffect(() => {
+    if (spec.clock !== 'per_question' || itemDeadline == null) return;
+    if (now < itemDeadline || timedOutAt.current === itemDeadline) return;
+    timedOutAt.current = itemDeadline;
+    void store.answer(false, true).then(finished);
+  }, [now, itemDeadline, spec.clock, store, finished]);
+
+  const submitting = useRef(false);
+  const submitPaper = useCallback(() => {
+    if (submitting.current) return;
+    submitting.current = true;
+    void store.submitPaper().then(() => router.replace('/exam/results'));
+  }, [store]);
+
+  useEffect(() => {
+    if (spec.clock !== 'whole' || paperDeadline == null) return;
+    if (now >= paperDeadline) submitPaper();
+  }, [now, paperDeadline, spec.clock, submitPaper]);
+
+  if (status !== 'active' || !item) {
     return <Redirect href="/" />;
   }
 
-  const item = items[index];
-  if (!item) return null;
-
-  const needsBriefing = !briefed.includes(item.format);
-  const progress = index / items.length;
-
   // Introduce each format the first time it comes up in this sitting.
-  if (needsBriefing || showHelp) {
+  if (waitingOnBriefing || showHelp) {
     return (
       <View style={[styles.screen, styles.center, { paddingTop: insets.top + 10 }]}>
         <View style={styles.briefCard}>
@@ -85,11 +147,16 @@ export default function ExamRunScreen() {
           </View>
           <Text style={styles.briefKicker}>{FORMAT_LABEL[item.format].toUpperCase()}</Text>
           <Text style={styles.briefBody}>{FORMAT_HOWTO[item.format]}</Text>
+          {spec.feedback === 'deferred' ? (
+            <Text style={styles.briefNote}>
+              You won’t be told if you’re right until the whole paper is submitted.
+            </Text>
+          ) : null}
           <ChunkyButton
             label="Got it"
             size="lg"
             onPress={() => {
-              markBriefed(item.format);
+              store.markBriefed(item.format);
               setShowHelp(false);
             }}
             style={styles.briefBtn}
@@ -99,6 +166,28 @@ export default function ExamRunScreen() {
     );
   }
 
+  const answeredCount = items.filter((i) => hasAnswer(i, drafts[i.id] ?? null)).length;
+  const progress =
+    spec.repetition === 'until_retired'
+      ? retired / Math.max(1, retired + queue.length)
+      : spec.repetition === 'until_out'
+        ? 0
+        : index / items.length;
+
+  const counterText =
+    spec.repetition === 'until_retired'
+      ? `${queue.length} left in the pile`
+      : spec.repetition === 'until_out'
+        ? `${results.length} answered`
+        : `${index + 1} / ${items.length}`;
+
+  const questionLeft = itemDeadline == null ? null : itemDeadline - now;
+  const questionShare =
+    questionLeft == null ? 0 : Math.max(0, questionLeft) / (questionSeconds(item.format) * 1000);
+  const paperLeft = paperDeadline == null ? null : paperDeadline - now;
+  const isFlagged = flagged.includes(item.id);
+  const lastItem = index + 1 >= items.length;
+
   return (
     <KeyboardAvoidingView
       style={styles.fill}
@@ -106,17 +195,47 @@ export default function ExamRunScreen() {
       <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
         <View style={styles.header}>
           <Pressable
-            onPress={handleQuit}
+            onPress={() => setConfirmQuit(true)}
             hitSlop={12}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
             <Icon name="cross" size={14} color={colors.textDim} strokeWidth={2.6} />
           </Pressable>
-          <Text style={styles.counter}>
-            {index + 1} / {items.length}
-          </Text>
-          <View style={styles.track}>
-            <View style={[styles.fill2, { width: `${progress * 100}%` }]} />
-          </View>
+
+          {spec.repetition === 'until_out' ? (
+            <Hearts strikes={strikes} />
+          ) : (
+            <View style={styles.track}>
+              <View style={[styles.fill2, { width: `${progress * 100}%` }]} />
+            </View>
+          )}
+
+          <Text style={styles.counter}>{counterText}</Text>
+
+          {paperLeft != null ? (
+            <Text style={[styles.timer, paperLeft < 60_000 && styles.timerLow]}>
+              {clock(paperLeft)}
+            </Text>
+          ) : null}
+
+          {spec.feedback === 'deferred' ? (
+            <Pressable
+              onPress={() => store.toggleFlag(item.id)}
+              hitSlop={12}
+              style={({ pressed }) => [
+                styles.iconBtn,
+                isFlagged && styles.iconBtnOn,
+                pressed && styles.pressed,
+              ]}>
+              <Icon
+                name="flag"
+                size={14}
+                color={isFlagged ? colors.gold : colors.textDim}
+                fill={isFlagged ? colors.goldWash : 'none'}
+                strokeWidth={2.2}
+              />
+            </Pressable>
+          ) : null}
+
           <Pressable
             onPress={() => setShowHelp(true)}
             hitSlop={12}
@@ -125,13 +244,26 @@ export default function ExamRunScreen() {
           </Pressable>
         </View>
 
+        {spec.clock === 'per_question' ? (
+          <View style={styles.fuse}>
+            <View
+              style={[
+                styles.fuseFill,
+                {
+                  width: `${questionShare * 100}%`,
+                  backgroundColor: questionShare < 0.25 ? colors.coral : colors.gold,
+                },
+              ]}
+            />
+          </View>
+        ) : null}
+
         <OfflineBanner message="Offline — running from device storage" style={styles.offline} />
 
         <View style={styles.formatRow}>
           <Text style={styles.formatLabel}>{FORMAT_LABEL[item.format]}</Text>
-          <ComboMeter combo={combo} />
           <Text style={styles.deckName} numberOfLines={1}>
-            {deck?.name}
+            {spec.name} · {deck?.name}
           </Text>
         </View>
 
@@ -140,25 +272,143 @@ export default function ExamRunScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <Animated.View key={index} entering={FadeInDown.springify().damping(16)}>
-            <ExamItemView item={item} onDone={handleDone} />
-          </Animated.View>
+          <ExamItemView
+            key={`${item.id}:${visits}`}
+            item={item}
+            value={spec.feedback === 'deferred' ? (drafts[item.id] ?? emptyDraft(item)) : undefined}
+            onChange={
+              spec.feedback === 'deferred'
+                ? (value) => store.setDraft(item.id, value)
+                : undefined
+            }
+            reveal={spec.feedback === 'instant'}
+            onDone={handleDone}
+          />
         </ScrollView>
 
-        <Animated.View pointerEvents="none" style={[styles.glowFrame, glowStyle]} />
+        {spec.feedback === 'deferred' ? (
+          <View style={[styles.paperNav, { paddingBottom: insets.bottom + 10 }]}>
+            <ChunkyButton
+              label="Back"
+              variant="paper"
+              size="md"
+              disabled={index === 0}
+              onPress={() => store.goTo(index - 1)}
+              style={styles.navBtn}
+            />
+            <ChunkyButton
+              label="Review"
+              variant="soft"
+              size="md"
+              onPress={() => setReviewing(true)}
+              style={styles.navBtn}
+            />
+            <ChunkyButton
+              label={lastItem ? 'Finish' : 'Next'}
+              icon="play"
+              size="md"
+              onPress={() => (lastItem ? setReviewing(true) : store.goTo(index + 1))}
+              style={styles.navBtn}
+            />
+          </View>
+        ) : null}
       </View>
+
+      <Modal
+        visible={reviewing}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setReviewing(false)}>
+        <View style={styles.sheetBackdrop}>
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + 14 }]}>
+            <Text style={styles.sheetTitle}>Your paper</Text>
+            <Text style={styles.sheetSub}>
+              {answeredCount} of {items.length} answered
+              {flagged.length > 0 ? ` · ${flagged.length} flagged` : ''}
+            </Text>
+
+            <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+              <View style={styles.grid}>
+                {items.map((paperItem, i) => {
+                  const done = hasAnswer(paperItem, drafts[paperItem.id] ?? null);
+                  const flag = flagged.includes(paperItem.id);
+                  return (
+                    <Pressable
+                      key={paperItem.id}
+                      onPress={() => {
+                        store.goTo(i);
+                        setReviewing(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.gridCell,
+                        done && styles.gridCellDone,
+                        flag && styles.gridCellFlag,
+                        i === index && styles.gridCellHere,
+                        pressed && styles.pressed,
+                      ]}>
+                      <Text style={[styles.gridNum, done && styles.gridNumDone]}>{i + 1}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <View style={styles.sheetActions}>
+              <ChunkyButton
+                label="Keep working"
+                variant="paper"
+                size="lg"
+                onPress={() => setReviewing(false)}
+              />
+              <ChunkyButton
+                label="Submit paper"
+                size="lg"
+                onPress={() => {
+                  setReviewing(false);
+                  setConfirmSubmit(true);
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <ConfirmModal
+        visible={confirmSubmit}
+        title="Submit the paper?"
+        message={
+          answeredCount < items.length
+            ? `${items.length - answeredCount} question${items.length - answeredCount === 1 ? '' : 's'} still blank. Blanks are marked wrong.`
+            : 'Everything is answered. You get the whole paper back marked.'
+        }
+        confirmLabel="Submit"
+        cancelLabel="Not yet"
+        onCancel={() => setConfirmSubmit(false)}
+        onConfirm={() => {
+          setConfirmSubmit(false);
+          submitPaper();
+        }}
+      />
+
+      <ConfirmModal
+        visible={confirmQuit}
+        title="Leave this exam?"
+        message="Your answers so far won't be saved."
+        confirmLabel="Leave"
+        cancelLabel="Keep going"
+        destructive
+        onCancel={() => setConfirmQuit(false)}
+        onConfirm={() => {
+          setConfirmQuit(false);
+          router.back();
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  glowFrame: {
-    ...StyleSheet.absoluteFillObject,
-    borderWidth: 3.5,
-    borderColor: '#C24E38',
-    borderRadius: 26,
-    margin: 4,
-  },
   fill: {
     flex: 1,
   },
@@ -174,7 +424,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   iconBtn: {
     width: 32,
@@ -184,6 +434,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconBtnOn: {
+    backgroundColor: colors.goldWash,
+  },
   helpText: {
     fontFamily: font.heading,
     fontSize: 15,
@@ -191,9 +444,23 @@ const styles = StyleSheet.create({
   },
   counter: {
     fontFamily: font.bodyHeavy,
-    fontSize: 12.5,
+    fontSize: 12,
     color: colors.textDim,
     fontVariant: ['tabular-nums'],
+  },
+  timer: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 13.5,
+    color: colors.accentDeep,
+    fontVariant: ['tabular-nums'],
+  },
+  timerLow: {
+    color: colors.coral,
+  },
+  hearts: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
   },
   track: {
     flex: 1,
@@ -206,6 +473,18 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: radius.pill,
     backgroundColor: colors.accentDeep,
+  },
+  /** The per-question countdown, burning down across the whole screen. */
+  fuse: {
+    height: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.track,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  fuseFill: {
+    height: '100%',
+    borderRadius: radius.pill,
   },
   offline: {
     marginTop: 10,
@@ -232,6 +511,14 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: 8,
+  },
+  paperNav: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 8,
+  },
+  navBtn: {
+    flex: 1,
   },
   briefCard: {
     alignSelf: 'stretch',
@@ -268,9 +555,85 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     textAlign: 'center',
   },
+  briefNote: {
+    fontFamily: font.bodyBold,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: colors.gold,
+    textAlign: 'center',
+    marginTop: 4,
+  },
   briefBtn: {
     alignSelf: 'stretch',
     marginTop: 12,
+  },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(39, 54, 43, 0.35)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    ...outline,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    maxHeight: '82%',
+    gap: 4,
+  },
+  sheetTitle: {
+    fontFamily: font.hero,
+    fontSize: 26,
+    color: colors.text,
+  },
+  sheetSub: {
+    fontFamily: font.bodySemibold,
+    fontSize: 13,
+    color: colors.textDim,
+  },
+  sheetScroll: {
+    marginTop: 14,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingBottom: 8,
+  },
+  gridCell: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: colors.surface,
+    ...outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridCellDone: {
+    backgroundColor: colors.accentWash,
+    borderColor: colors.accentEdge,
+  },
+  gridCellFlag: {
+    backgroundColor: colors.goldWash,
+    borderColor: colors.gold,
+  },
+  gridCellHere: {
+    borderWidth: 3,
+    borderColor: colors.accentDeep,
+  },
+  gridNum: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 14,
+    color: colors.textFaint,
+    fontVariant: ['tabular-nums'],
+  },
+  gridNumDone: {
+    color: colors.accentDeep,
+  },
+  sheetActions: {
+    gap: 9,
+    paddingTop: 14,
   },
   pressed: {
     opacity: 0.7,

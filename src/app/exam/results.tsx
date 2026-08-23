@@ -4,7 +4,10 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { Icon } from '@/components/Icon';
+import { correctText, draftText, itemPrompt } from '@/lib/draft';
 import { FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
+import { MODES } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
 
@@ -15,7 +18,8 @@ function formatDuration(ms: number): string {
 
 export default function ExamResultsScreen() {
   const insets = useSafeAreaInsets();
-  const { status, deck, results, durationMs, reset } = useExamStore();
+  const { status, deck, mode, items, drafts, retired, results, durationMs, reset } =
+    useExamStore();
 
   const byFormat = useMemo(() => {
     const map = new Map<ExamFormat, { right: number; total: number }>();
@@ -32,15 +36,38 @@ export default function ExamResultsScreen() {
     return <Redirect href="/" />;
   }
 
+  const spec = MODES[mode];
   const score = results.filter((r) => r.correct).length;
   const total = results.length;
   const pct = total === 0 ? 0 : Math.round((score / total) * 100);
+
+  // The number that mattered depends on what you were playing. Survival is
+  // about how long you lasted; mastery is about how much of the pile is
+  // gone. Only a straight sitting is really about the score.
+  const hero =
+    spec.repetition === 'until_out'
+      ? { big: String(total), small: `question${total === 1 ? '' : 's'} survived` }
+      : spec.repetition === 'until_retired'
+        ? { big: `${retired}/${items.length}`, small: 'retired from the pile' }
+        : { big: `${score}/${total}`, small: `${pct}% correct` };
+
+  const cleared = retired >= items.length;
   const tone =
-    pct >= 80
-      ? { color: colors.leaf, wash: colors.leafWash, label: 'You crushed it!' }
-      : pct >= 50
-        ? { color: colors.gold, wash: colors.goldWash, label: 'Solid effort' }
-        : { color: colors.coral, wash: colors.coralWash, label: 'Keep at it' };
+    spec.repetition === 'until_out'
+      ? total >= 25
+        ? { color: colors.leaf, wash: colors.leafWash, label: 'Untouchable' }
+        : total >= 12
+          ? { color: colors.gold, wash: colors.goldWash, label: 'Good run' }
+          : { color: colors.coral, wash: colors.coralWash, label: 'Short one' }
+      : spec.repetition === 'until_retired'
+        ? cleared
+          ? { color: colors.leaf, wash: colors.leafWash, label: 'Pile cleared' }
+          : { color: colors.gold, wash: colors.goldWash, label: 'Some left over' }
+        : pct >= 80
+          ? { color: colors.leaf, wash: colors.leafWash, label: 'You crushed it!' }
+          : pct >= 50
+            ? { color: colors.gold, wash: colors.goldWash, label: 'Solid effort' }
+            : { color: colors.coral, wash: colors.coralWash, label: 'Keep at it' };
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 20 }]}>
@@ -49,15 +76,49 @@ export default function ExamResultsScreen() {
           <View style={[styles.badge, { backgroundColor: tone.wash }]}>
             <Text style={[styles.badgeText, { color: tone.color }]}>{tone.label}</Text>
           </View>
-          <Text style={styles.score}>
-            {score}/{total}
-          </Text>
-          <Text style={styles.pct}>{pct}% correct</Text>
+          <Text style={styles.score}>{hero.big}</Text>
+          <Text style={styles.pct}>{hero.small}</Text>
           <Text style={styles.meta}>
-            {deck.name} · {formatDuration(durationMs)}
+            {spec.name} · {deck.name} · {formatDuration(durationMs)}
           </Text>
           <Text style={styles.saved}>Saved to Progress on this device</Text>
         </View>
+
+        {spec.feedback === 'deferred' ? (
+          <>
+            <Text style={styles.breakdownLabel}>YOUR PAPER, MARKED</Text>
+            <View style={styles.paper}>
+              {items.map((item, i) => {
+                const ok = results.find((r) => r.itemId === item.id)?.correct ?? false;
+                return (
+                  <View key={item.id} style={styles.paperRow}>
+                    <View style={[styles.paperMark, ok ? styles.markGood : styles.markBad]}>
+                      <Icon
+                        name={ok ? 'check' : 'cross'}
+                        size={11}
+                        color={ok ? colors.leaf : colors.coral}
+                        strokeWidth={3}
+                      />
+                    </View>
+                    <View style={styles.paperText}>
+                      <Text style={styles.paperPrompt} numberOfLines={3}>
+                        {i + 1}. {itemPrompt(item)}
+                      </Text>
+                      <Text style={styles.paperYours} numberOfLines={2}>
+                        You put: {draftText(item, drafts[item.id] ?? null)}
+                      </Text>
+                      {ok ? null : (
+                        <Text style={styles.paperRight} numberOfLines={3}>
+                          Answer: {correctText(item)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
 
         <Text style={styles.breakdownLabel}>BY QUESTION TYPE</Text>
         <View style={styles.breakdown}>
@@ -164,6 +225,55 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     marginTop: 24,
     marginBottom: 10,
+  },
+  paper: {
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.card,
+    padding: 14,
+    gap: 14,
+    ...shadow.card,
+  },
+  paperRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  paperMark: {
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  markGood: {
+    backgroundColor: colors.leafWash,
+  },
+  markBad: {
+    backgroundColor: colors.coralWash,
+  },
+  paperText: {
+    flex: 1,
+    gap: 2,
+  },
+  paperPrompt: {
+    fontFamily: font.bodySemibold,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.text,
+  },
+  paperYours: {
+    fontFamily: font.body,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.textDim,
+  },
+  paperRight: {
+    fontFamily: font.bodyBold,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.leaf,
   },
   breakdown: {
     backgroundColor: colors.surface,

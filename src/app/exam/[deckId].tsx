@@ -16,6 +16,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon } from '@/components/Icon';
 import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
+import {
+  MODE_ORDER,
+  MODES,
+  WEAK_SPOT_LIMIT,
+  type ExamMode,
+  type ModeSpec,
+} from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
 
@@ -92,14 +99,71 @@ function FormatRow({
   );
 }
 
+/** One way of sitting the exam, as a sticker card. */
+function ModeCard({
+  spec,
+  detail,
+  onPress,
+}: {
+  spec: ModeSpec;
+  detail?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.modeCard, pressed && styles.pressed]}>
+      <View style={[styles.modeBadge, { backgroundColor: spec.wash }]}>
+        <Icon name={spec.icon} size={24} color={spec.ink} fill={spec.wash} strokeWidth={1.9} />
+      </View>
+      <View style={styles.rowText}>
+        <Text style={styles.modeName}>{spec.name}</Text>
+        <Text style={styles.rowHow}>{spec.tagline}</Text>
+        {detail ? <Text style={[styles.modeDetail, { color: spec.ink }]}>{detail}</Text> : null}
+      </View>
+      <Text style={styles.modeArrow}>›</Text>
+    </Pressable>
+  );
+}
+
 export default function ExamSetupScreen() {
   const insets = useSafeAreaInsets();
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
-  const { status, deck, available, counts, error, load, setCount, total, start } = useExamStore();
+  const {
+    status,
+    deck,
+    questions,
+    available,
+    counts,
+    mode,
+    error,
+    load,
+    setMode,
+    setCount,
+    total,
+    start,
+  } = useExamStore();
+
+  /** Mode first, then the format counts — only the modes that need them. */
+  const [step, setStep] = useState<'mode' | 'counts'>('mode');
 
   useEffect(() => {
-    if (deckId) void load(deckId);
+    if (deckId) {
+      setStep('mode');
+      void load(deckId);
+    }
   }, [deckId, load]);
+
+  const begin = () => {
+    start();
+    if (useExamStore.getState().status === 'active') router.push('/exam/run');
+  };
+
+  const chooseMode = (id: ExamMode) => {
+    setMode(id);
+    if (MODES[id].autoBuild) begin();
+    else setStep('counts');
+  };
 
   if (status === 'loading' || status === 'idle') {
     return (
@@ -121,6 +185,55 @@ export default function ExamSetupScreen() {
     );
   }
 
+  if (step === 'mode') {
+    const drilling = Math.min(WEAK_SPOT_LIMIT, questions.length);
+    const detail: Partial<Record<ExamMode, string>> = {
+      mastery: 'Ends when the pile is empty',
+      weak_spots: `${drilling} question${drilling === 1 ? '' : 's'}, worst first`,
+      rapid: 'Seconds per question',
+      simulation: 'Flag, revisit, submit',
+      survival: 'Endless · three lives',
+    };
+
+    return (
+      <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.navRow}>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={10}
+            style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
+            <Text style={styles.backArrow}>←</Text>
+          </Pressable>
+          <View style={styles.headText}>
+            <Text style={styles.title}>How do you want to sit it?</Text>
+            <Text style={styles.sub} numberOfLines={1}>
+              {deck?.name} · {deck?.questionCount} questions
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {MODE_ORDER.map((id) => (
+            <ModeCard
+              key={id}
+              spec={MODES[id]}
+              detail={detail[id]}
+              onPress={() => chooseMode(id)}
+            />
+          ))}
+
+          <View style={styles.note}>
+            <Icon name="bulb" size={16} color={colors.gold} strokeWidth={2.2} />
+            <Text style={styles.noteText}>
+              The mode sets the clock, whether you’re told you’re right straight away, and
+              whether a question can come back. The questions themselves are the same.
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   const picked = total();
   // Roughly half a minute per question — enough to set expectations.
   const minutes = Math.round(picked * 0.5);
@@ -130,7 +243,7 @@ export default function ExamSetupScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
       <View style={styles.navRow}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => setStep('mode')}
           hitSlop={10}
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
           <Text style={styles.backArrow}>←</Text>
@@ -138,7 +251,7 @@ export default function ExamSetupScreen() {
         <View style={styles.headText}>
           <Text style={styles.title}>Build your exam</Text>
           <Text style={styles.sub} numberOfLines={1}>
-            {deck?.name} · {deck?.questionCount} questions
+            {MODES[mode].name} · {deck?.name}
           </Text>
         </View>
       </View>
@@ -179,10 +292,7 @@ export default function ExamSetupScreen() {
           icon="play"
           size="lg"
           disabled={picked === 0}
-          onPress={() => {
-            start();
-            router.push('/exam/run');
-          }}
+          onPress={begin}
         />
       </View>
     </View>
@@ -248,6 +358,43 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     padding: 13,
     ...shadow.card,
+  },
+  modeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.card,
+    padding: 13,
+    ...shadow.card,
+  },
+  modeBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
+  },
+  modeName: {
+    fontFamily: font.heading,
+    fontSize: 16.5,
+    color: colors.text,
+  },
+  modeDetail: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    marginTop: 3,
+  },
+  modeArrow: {
+    fontFamily: font.heading,
+    fontSize: 22,
+    color: colors.textFaint,
+    paddingRight: 4,
   },
   rowOff: {
     backgroundColor: colors.surface2,

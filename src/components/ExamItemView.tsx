@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon } from '@/components/Icon';
+import { emptyDraft, type DraftValue } from '@/lib/draft';
 import type {
   ChoiceItem,
   EnumerationItem,
@@ -17,6 +18,29 @@ import { colors, font, outline, radius, shadow } from '@/theme/tokens';
 
 interface Props {
   item: ExamItem;
+  /**
+   * The answer so far. Omit and the component keeps its own — which is what
+   * instant-feedback modes want. Exam simulation supplies it, because there
+   * the answer has to survive leaving the question and coming back.
+   */
+  value?: DraftValue;
+  onChange?: (value: DraftValue) => void;
+  /**
+   * Show right or wrong the moment the answer is committed. False defers
+   * everything to the end of the paper: no colours, no verdict, no Check.
+   */
+  reveal?: boolean;
+  /** Instant modes only — the student pressed Next after seeing the verdict. */
+  onDone: (correct: boolean) => void;
+}
+
+type Draft<K extends DraftValue['kind']> = Extract<DraftValue, { kind: K }>;
+
+interface Field<I extends ExamItem, K extends DraftValue['kind']> {
+  item: I;
+  draft: Draft<K>;
+  setDraft: (value: DraftValue) => void;
+  reveal: boolean;
   onDone: (correct: boolean) => void;
 }
 
@@ -52,11 +76,21 @@ function Prompt({ text }: { text: string }) {
   return <Text style={styles.prompt}>{text}</Text>;
 }
 
+/** Standing in for the verdict while answers are being withheld. */
+function Recorded({ answered }: { answered: boolean }) {
+  return (
+    <Text style={styles.hint}>
+      {answered ? 'Answer saved — you can change it before you submit.' : 'Nothing down yet'}
+    </Text>
+  );
+}
+
 // --- multiple choice ----------------------------------------------------
 
-function Choice({ item, onDone }: { item: ChoiceItem; onDone: (c: boolean) => void }) {
-  const [picked, setPicked] = useState<string | null>(null);
-  const revealed = picked != null;
+function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'choice'>) {
+  const picked = draft.picked;
+  const revealed = reveal && picked != null;
+  const correct = picked === item.correctAnswer;
 
   return (
     <View style={styles.body}>
@@ -70,9 +104,10 @@ function Choice({ item, onDone }: { item: ChoiceItem; onDone: (c: boolean) => vo
             <Pressable
               key={option}
               disabled={revealed}
-              onPress={() => setPicked(option)}
+              onPress={() => setDraft({ kind: 'choice', picked: option })}
               style={({ pressed }) => [
                 styles.option,
+                !reveal && picked === option && styles.optionPicked,
                 showGood && styles.optionGood,
                 showBad && styles.optionBad,
                 revealed && !showGood && !showBad && styles.optionFade,
@@ -93,12 +128,11 @@ function Choice({ item, onDone }: { item: ChoiceItem; onDone: (c: boolean) => vo
         })}
       </View>
       {revealed ? (
-        <Verdict
-          correct={picked === item.correctAnswer}
-          onNext={() => onDone(picked === item.correctAnswer)}
-        />
-      ) : (
+        <Verdict correct={correct} onNext={() => onDone(correct)} />
+      ) : reveal ? (
         <Text style={styles.hint}>Pick an answer</Text>
+      ) : (
+        <Recorded answered={picked != null} />
       )}
     </View>
   );
@@ -106,9 +140,9 @@ function Choice({ item, onDone }: { item: ChoiceItem; onDone: (c: boolean) => vo
 
 // --- true / false -------------------------------------------------------
 
-function TrueFalse({ item, onDone }: { item: TrueFalseItem; onDone: (c: boolean) => void }) {
-  const [picked, setPicked] = useState<boolean | null>(null);
-  const revealed = picked != null;
+function TrueFalse({ item, draft, setDraft, reveal, onDone }: Field<TrueFalseItem, 'tf'>) {
+  const picked = draft.picked;
+  const revealed = reveal && picked != null;
   const correct = picked === item.isTrue;
 
   return (
@@ -122,9 +156,10 @@ function TrueFalse({ item, onDone }: { item: TrueFalseItem; onDone: (c: boolean)
             <Pressable
               key={String(value)}
               disabled={revealed}
-              onPress={() => setPicked(value)}
+              onPress={() => setDraft({ kind: 'tf', picked: value })}
               style={({ pressed }) => [
                 styles.tfBtn,
+                !reveal && chosen && styles.optionPicked,
                 revealed && isAnswer && styles.optionGood,
                 revealed && chosen && !isAnswer && styles.optionBad,
                 revealed && !isAnswer && !chosen && styles.optionFade,
@@ -141,7 +176,9 @@ function TrueFalse({ item, onDone }: { item: TrueFalseItem; onDone: (c: boolean)
           detail={item.isTrue ? 'That one was true' : 'That one was false'}
           onNext={() => onDone(correct)}
         />
-      ) : null}
+      ) : reveal ? null : (
+        <Recorded answered={picked != null} />
+      )}
     </View>
   );
 }
@@ -150,24 +187,24 @@ function TrueFalse({ item, onDone }: { item: TrueFalseItem; onDone: (c: boolean)
 
 function ModifiedTrueFalse({
   item,
+  draft,
+  setDraft,
+  reveal,
   onDone,
-}: {
-  item: ModifiedTrueFalseItem;
-  onDone: (c: boolean) => void;
-}) {
-  const [saidTrue, setSaidTrue] = useState<boolean | null>(null);
-  const [wordIndex, setWordIndex] = useState<number | null>(null);
-  const [typed, setTyped] = useState('');
-  const [done, setDone] = useState(false);
+}: Field<ModifiedTrueFalseItem, 'mtf'>) {
+  const { saidTrue, wordIndex, typed, done } = draft;
 
-  // Calling a false statement true (or vice versa) ends it immediately.
+  // Calling a false statement true (or vice versa) ends it immediately —
+  // but only when verdicts are on. Withholding them means saying "false"
+  // always leads to the correction step, or the branch itself is the answer.
   const wrongCall = saidTrue != null && saidTrue !== item.isTrue;
   const correctWordPicked = wordIndex === item.falseWordIndex;
-  const correctFix = checkAnswer(typed, item.correctWord).correct;
-  const nearFix = checkAnswer(typed, item.correctWord).nearMiss;
+  const graded = checkAnswer(typed, item.correctWord);
   const finalCorrect = item.isTrue
     ? saidTrue === true
-    : saidTrue === false && correctWordPicked && correctFix;
+    : saidTrue === false && correctWordPicked && graded.correct;
+
+  const patch = (next: Partial<Draft<'mtf'>>) => setDraft({ ...draft, ...next });
 
   if (saidTrue == null) {
     return (
@@ -177,21 +214,26 @@ function ModifiedTrueFalse({
           {[true, false].map((value) => (
             <Pressable
               key={String(value)}
-              onPress={() => {
-                setSaidTrue(value);
-                if (value !== item.isTrue || item.isTrue) setDone(true);
-              }}
+              onPress={() =>
+                patch({
+                  saidTrue: value,
+                  // Saying "false" opens the correction step; saying "true"
+                  // is the whole answer either way.
+                  done: reveal ? value !== item.isTrue || item.isTrue : value === true,
+                })
+              }
               style={({ pressed }) => [styles.tfBtn, pressed && styles.pressed]}>
               <Text style={styles.tfText}>{value ? 'True' : 'False'}</Text>
             </Pressable>
           ))}
         </View>
+        {reveal ? null : <Recorded answered={false} />}
       </View>
     );
   }
 
-  // Said false on a false statement: now find and fix the word.
-  if (!wrongCall && !item.isTrue && !done) {
+  // Said false: now find and fix the word.
+  if (!done) {
     return (
       <View style={styles.body}>
         <Text style={styles.stepLabel}>
@@ -203,12 +245,14 @@ function ModifiedTrueFalse({
             return (
               <Pressable
                 key={`${i}-${word}`}
-                disabled={wordIndex != null}
-                onPress={() => setWordIndex(i)}
+                // Locked in once picked, unless answers are being withheld —
+                // then changing your mind is part of sitting the paper.
+                disabled={reveal && wordIndex != null}
+                onPress={() => patch({ wordIndex: i })}
                 style={({ pressed }) => [
                   styles.word,
                   chosen && styles.wordChosen,
-                  pressed && wordIndex == null && styles.pressed,
+                  pressed && !(reveal && wordIndex != null) && styles.pressed,
                 ]}>
                 <Text style={[styles.wordText, chosen && styles.wordTextChosen]}>{word}</Text>
               </Pressable>
@@ -220,23 +264,43 @@ function ModifiedTrueFalse({
           <>
             <TextInput
               value={typed}
-              onChangeText={setTyped}
+              onChangeText={(text) => patch({ typed: text })}
               placeholder="Type the correct word"
               placeholderTextColor={colors.textFaint}
               style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
-              onSubmitEditing={() => setDone(true)}
+              onSubmitEditing={() => reveal && patch({ done: true })}
             />
-            <ChunkyButton
-              label="Check"
-              size="lg"
-              disabled={typed.trim().length === 0}
-              onPress={() => setDone(true)}
-            />
+            {reveal ? (
+              <ChunkyButton
+                label="Check"
+                size="lg"
+                disabled={typed.trim().length === 0}
+                onPress={() => patch({ done: true })}
+              />
+            ) : null}
           </>
         ) : null}
+
+        {reveal ? null : (
+          <Pressable onPress={() => patch({ saidTrue: null, wordIndex: null, typed: '' })}>
+            <Text style={styles.undo}>Start this one over</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+
+  if (!reveal) {
+    return (
+      <View style={styles.body}>
+        <Text style={styles.statement}>{item.words.join(' ')}</Text>
+        <Recorded answered />
+        <Pressable onPress={() => patch({ saidTrue: null, wordIndex: null, typed: '', done: false })}>
+          <Text style={styles.undo}>Start this one over</Text>
+        </Pressable>
       </View>
     );
   }
@@ -247,7 +311,7 @@ function ModifiedTrueFalse({
       : 'That statement was false'
     : !correctWordPicked
       ? `The wrong word was "${item.words[item.falseWordIndex]}"`
-      : nearFix
+      : graded.nearMiss
         ? `Close — you typed "${typed.trim()}", the answer was "${item.correctWord}"`
         : `The answer was "${item.correctWord}"`;
 
@@ -261,46 +325,50 @@ function ModifiedTrueFalse({
 
 // --- typed answers ------------------------------------------------------
 
-function Typed({ item, onDone }: { item: TypedItem; onDone: (c: boolean) => void }) {
-  const [typed, setTyped] = useState('');
-  const [checked, setChecked] = useState(false);
-  const result = checkAnswer(typed, item.correctAnswer);
+function Typed({ item, draft, setDraft, reveal, onDone }: Field<TypedItem, 'typed'>) {
+  const checked = reveal && draft.checked;
+  const result = checkAnswer(draft.text, item.correctAnswer);
 
   return (
     <View style={styles.body}>
       <Prompt text={item.prompt} />
       <TextInput
-        value={typed}
-        onChangeText={setTyped}
+        value={draft.text}
+        onChangeText={(text) => setDraft({ kind: 'typed', text, checked: draft.checked })}
         editable={!checked}
         placeholder="Type your answer"
         placeholderTextColor={colors.textFaint}
         style={[
           styles.input,
           checked && (result.correct ? styles.inputGood : styles.inputBad),
+          !reveal && draft.text.trim().length > 0 && styles.inputFilled,
         ]}
         autoCapitalize="none"
         autoCorrect={false}
         autoFocus
-        onSubmitEditing={() => typed.trim() && setChecked(true)}
+        onSubmitEditing={() =>
+          reveal && draft.text.trim() && setDraft({ ...draft, checked: true })
+        }
       />
       {checked ? (
         <Verdict
           correct={result.correct}
           detail={
             result.nearMiss
-              ? `Close — you typed "${typed.trim()}", the answer was "${item.correctAnswer}"`
+              ? `Close — you typed "${draft.text.trim()}", the answer was "${item.correctAnswer}"`
               : `The answer was "${item.correctAnswer}"`
           }
           onNext={() => onDone(result.correct)}
         />
-      ) : (
+      ) : reveal ? (
         <ChunkyButton
           label="Check"
           size="lg"
-          disabled={typed.trim().length === 0}
-          onPress={() => setChecked(true)}
+          disabled={draft.text.trim().length === 0}
+          onPress={() => setDraft({ ...draft, checked: true })}
         />
+      ) : (
+        <Recorded answered={draft.text.trim().length > 0} />
       )}
     </View>
   );
@@ -308,10 +376,9 @@ function Typed({ item, onDone }: { item: TypedItem; onDone: (c: boolean) => void
 
 // --- matching -----------------------------------------------------------
 
-function Matching({ item, onDone }: { item: MatchingItem; onDone: (c: boolean) => void }) {
-  const [pairs, setPairs] = useState<Record<number, number>>({});
-  const [activeTerm, setActiveTerm] = useState<number | null>(null);
-  const [checked, setChecked] = useState(false);
+function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem, 'matching'>) {
+  const { pairs, activeTerm } = draft;
+  const checked = reveal && draft.checked;
 
   const allPaired = Object.keys(pairs).length === item.terms.length;
   const correct = item.terms.every((_, i) => pairs[i] === item.correctIndexFor[i]);
@@ -320,15 +387,12 @@ function Matching({ item, onDone }: { item: MatchingItem; onDone: (c: boolean) =
   /** Tapping a paired term releases it, so a mistap is never a dead end. */
   const tapTerm = (i: number) => {
     if (pairs[i] != null) {
-      setPairs((p) => {
-        const next = { ...p };
-        delete next[i];
-        return next;
-      });
-      setActiveTerm(i);
+      const next = { ...pairs };
+      delete next[i];
+      setDraft({ ...draft, pairs: next, activeTerm: i });
       return;
     }
-    setActiveTerm(activeTerm === i ? null : i);
+    setDraft({ ...draft, activeTerm: activeTerm === i ? null : i });
   };
 
   return (
@@ -374,8 +438,11 @@ function Matching({ item, onDone }: { item: MatchingItem; onDone: (c: boolean) =
               disabled={checked || activeTerm == null || takenMeanings.has(j)}
               onPress={() => {
                 if (activeTerm == null) return;
-                setPairs((p) => ({ ...p, [activeTerm]: j }));
-                setActiveTerm(null);
+                setDraft({
+                  ...draft,
+                  pairs: { ...pairs, [activeTerm]: j },
+                  activeTerm: null,
+                });
               }}
               style={({ pressed }) => [
                 styles.matchChip,
@@ -393,18 +460,16 @@ function Matching({ item, onDone }: { item: MatchingItem; onDone: (c: boolean) =
       </View>
 
       {checked ? (
-        <Verdict
-          correct={correct}
-          detail="Some pairs were wrong"
-          onNext={() => onDone(correct)}
-        />
-      ) : (
+        <Verdict correct={correct} detail="Some pairs were wrong" onNext={() => onDone(correct)} />
+      ) : reveal ? (
         <ChunkyButton
           label="Check"
           size="lg"
           disabled={!allPaired}
-          onPress={() => setChecked(true)}
+          onPress={() => setDraft({ ...draft, checked: true })}
         />
+      ) : (
+        <Recorded answered={allPaired} />
       )}
     </View>
   );
@@ -412,10 +477,9 @@ function Matching({ item, onDone }: { item: MatchingItem; onDone: (c: boolean) =
 
 // --- enumeration --------------------------------------------------------
 
-function Enumeration({ item, onDone }: { item: EnumerationItem; onDone: (c: boolean) => void }) {
-  const [entries, setEntries] = useState<string[]>(() => item.items.map(() => ''));
-  const [checked, setChecked] = useState(false);
-  const result = checkEnumeration(entries, item.items, item.ordered);
+function Enumeration({ item, draft, setDraft, reveal, onDone }: Field<EnumerationItem, 'enum'>) {
+  const checked = reveal && draft.checked;
+  const result = checkEnumeration(draft.entries, item.items, item.ordered);
 
   return (
     <View style={styles.body}>
@@ -429,9 +493,12 @@ function Enumeration({ item, onDone }: { item: EnumerationItem; onDone: (c: bool
             <View key={i} style={styles.enumRow}>
               <Text style={styles.enumNum}>{i + 1}</Text>
               <TextInput
-                value={entries[i]}
+                value={draft.entries[i] ?? ''}
                 onChangeText={(text) =>
-                  setEntries((prev) => prev.map((e, k) => (k === i ? text : e)))
+                  setDraft({
+                    ...draft,
+                    entries: draft.entries.map((entry, k) => (k === i ? text : entry)),
+                  })
                 }
                 editable={!checked}
                 placeholder={checked ? item.items[i] : '…'}
@@ -441,6 +508,7 @@ function Enumeration({ item, onDone }: { item: EnumerationItem; onDone: (c: bool
                   styles.enumInput,
                   outcome?.matched != null && styles.inputGood,
                   checked && outcome?.matched == null && styles.inputBad,
+                  !reveal && (draft.entries[i] ?? '').trim().length > 0 && styles.inputFilled,
                 ]}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -456,35 +524,62 @@ function Enumeration({ item, onDone }: { item: EnumerationItem; onDone: (c: bool
           detail={`You got ${result.matchedCount} of ${item.items.length}`}
           onNext={() => onDone(result.correct)}
         />
-      ) : (
+      ) : reveal ? (
         <ChunkyButton
           label="Check"
           size="lg"
-          disabled={entries.every((e) => e.trim().length === 0)}
-          onPress={() => setChecked(true)}
+          disabled={draft.entries.every((e) => e.trim().length === 0)}
+          onPress={() => setDraft({ ...draft, checked: true })}
         />
+      ) : (
+        <Recorded answered={draft.entries.some((e) => e.trim().length > 0)} />
       )}
     </View>
   );
 }
 
-// --- dispatcher ---------------------------------------------------------
+/** A draft that has drifted out of step with its item is simply started over. */
+function coerce<K extends DraftValue['kind']>(
+  item: ExamItem,
+  draft: DraftValue,
+  kind: K
+): Draft<K> {
+  return (draft.kind === kind ? draft : emptyDraft(item)) as Draft<K>;
+}
 
-export function ExamItemView({ item, onDone }: Props) {
+export function ExamItemView({ item, value, onChange, reveal = true, onDone }: Props) {
+  // Only used when the parent doesn't hold the answer itself. Keyed on the
+  // item so advancing to the next question starts clean even if this
+  // component is reused rather than remounted.
+  const [own, setOwn] = useState(() => ({ id: item.id, value: emptyDraft(item) }));
+  if (own.id !== item.id) setOwn({ id: item.id, value: emptyDraft(item) });
+
+  const draft = value !== undefined ? value : own.value;
+  const setDraft =
+    onChange !== undefined ? onChange : (next: DraftValue) => setOwn({ id: item.id, value: next });
+
+  const shared = { setDraft, reveal, onDone };
+
   switch (item.format) {
     case 'multiple_choice':
-      return <Choice key={item.id} item={item} onDone={onDone} />;
+      return <Choice key={item.id} item={item} draft={coerce(item, draft, 'choice')} {...shared} />;
     case 'true_false':
-      return <TrueFalse key={item.id} item={item} onDone={onDone} />;
+      return <TrueFalse key={item.id} item={item} draft={coerce(item, draft, 'tf')} {...shared} />;
     case 'modified_true_false':
-      return <ModifiedTrueFalse key={item.id} item={item} onDone={onDone} />;
+      return (
+        <ModifiedTrueFalse key={item.id} item={item} draft={coerce(item, draft, 'mtf')} {...shared} />
+      );
     case 'identification':
     case 'fill_blank':
-      return <Typed key={item.id} item={item} onDone={onDone} />;
+      return <Typed key={item.id} item={item} draft={coerce(item, draft, 'typed')} {...shared} />;
     case 'matching':
-      return <Matching key={item.id} item={item} onDone={onDone} />;
+      return (
+        <Matching key={item.id} item={item} draft={coerce(item, draft, 'matching')} {...shared} />
+      );
     case 'enumeration':
-      return <Enumeration key={item.id} item={item} onDone={onDone} />;
+      return (
+        <Enumeration key={item.id} item={item} draft={coerce(item, draft, 'enum')} {...shared} />
+      );
   }
 }
 
@@ -515,6 +610,13 @@ const styles = StyleSheet.create({
     color: colors.textFaint,
     textAlign: 'center',
   },
+  undo: {
+    fontFamily: font.bodyBold,
+    fontSize: 12.5,
+    color: colors.accentDeep,
+    textAlign: 'center',
+    paddingVertical: 6,
+  },
   options: {
     gap: 9,
   },
@@ -529,6 +631,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 13,
     ...shadow.card,
+  },
+  /** Chosen, but not yet judged — exam simulation withholds the verdict. */
+  optionPicked: {
+    backgroundColor: colors.accentWash,
+    borderColor: colors.accentEdge,
   },
   optionGood: {
     backgroundColor: colors.leafWash,
@@ -608,6 +715,10 @@ const styles = StyleSheet.create({
     fontFamily: font.bodyBold,
     fontSize: 16,
     color: colors.text,
+  },
+  /** Something is written here — the only signal a withheld paper gives. */
+  inputFilled: {
+    borderColor: colors.accentEdge,
   },
   inputGood: {
     backgroundColor: colors.leafWash,

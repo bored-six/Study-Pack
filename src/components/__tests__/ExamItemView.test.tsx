@@ -1,22 +1,24 @@
+import { useState, type ReactElement } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { Text, TextInput } from 'react-native';
 
 import { ExamItemView } from '../ExamItemView';
+import { emptyDraft, type DraftValue } from '@/lib/draft';
 import type {
   ChoiceItem,
   EnumerationItem,
+  ExamItem,
   MatchingItem,
   ModifiedTrueFalseItem,
   TrueFalseItem,
   TypedItem,
 } from '@/lib/exam';
 
-/** Renders the item and returns helpers for driving it like a student would. */
-function drive(item: Parameters<typeof ExamItemView>[0]['item']) {
-  const onDone = jest.fn();
+/** Renders anything and returns helpers for driving it like a student would. */
+function mount(element: ReactElement) {
   let tree!: ReactTestRenderer;
   act(() => {
-    tree = create(<ExamItemView item={item} onDone={onDone} />);
+    tree = create(element);
   });
 
   const texts = () =>
@@ -62,7 +64,38 @@ function drive(item: Parameters<typeof ExamItemView>[0]['item']) {
   const inputCount = () =>
     tree.root.findAllByType(TextInput).filter((i) => i.props.editable !== false).length;
 
-  return { onDone, texts, press, type, inputCount, tree };
+  return { texts, press, type, inputCount, tree };
+}
+
+/** Instant feedback: the component keeps the answer itself. */
+function drive(item: ExamItem) {
+  const onDone = jest.fn();
+  return { onDone, ...mount(<ExamItemView item={item} onDone={onDone} />) };
+}
+
+/**
+ * Exam simulation: the answer lives outside the component and nothing is
+ * marked. `answer()` reads back whatever the paper is currently holding.
+ */
+function driveDeferred(item: ExamItem) {
+  const onDone = jest.fn();
+  let latest: DraftValue = emptyDraft(item);
+
+  function Paper() {
+    const [value, setValue] = useState<DraftValue>(() => emptyDraft(item));
+    latest = value;
+    return (
+      <ExamItemView
+        item={item}
+        value={value}
+        onChange={setValue}
+        reveal={false}
+        onDone={onDone}
+      />
+    );
+  }
+
+  return { onDone, answer: () => latest, ...mount(<Paper />) };
 }
 
 const CHOICE: ChoiceItem = {
@@ -299,5 +332,88 @@ describe('matching', () => {
     press('Osmosis');
     press('movement of water');
     expect(() => press('Check')).toThrow();
+  });
+});
+
+describe('withheld answers (exam simulation)', () => {
+  const TYPED_ITEM: TypedItem = {
+    id: 'q4:id',
+    format: 'identification',
+    questionId: 'q4',
+    prompt: 'Which term means: the green pigment that absorbs light?',
+    correctAnswer: 'Chlorophyll',
+  };
+
+  const LIST_ITEM: EnumerationItem = {
+    id: 'q5:enum',
+    format: 'enumeration',
+    questionId: 'q5',
+    prompt: 'List the 3: types of rock',
+    items: ['Igneous', 'Sedimentary', 'Metamorphic'],
+    ordered: false,
+  };
+
+  const MATCH_ITEM: MatchingItem = {
+    id: 'match:1',
+    format: 'matching',
+    questionId: 'q6',
+    terms: ['Osmosis', 'Mitosis', 'Glycolysis'],
+    meanings: ['breakdown of glucose', 'movement of water', 'cell division'],
+    correctIndexFor: [1, 2, 0],
+  };
+
+  it('takes a pick without saying a word about it', () => {
+    const { press, texts, onDone, answer } = driveDeferred(CHOICE);
+    press('Chlorophyll');
+    const said = texts().join(' ');
+    expect(said).not.toContain('Correct');
+    expect(said).not.toContain('Not quite');
+    expect(onDone).not.toHaveBeenCalled();
+    expect(answer()).toEqual({ kind: 'choice', picked: 'Chlorophyll' });
+  });
+
+  it('lets a pick be changed, because the paper is not submitted yet', () => {
+    const { press, answer } = driveDeferred(CHOICE);
+    press('Chlorophyll');
+    press('Osmosis');
+    expect(answer()).toEqual({ kind: 'choice', picked: 'Osmosis' });
+  });
+
+  it('offers no Check button to press', () => {
+    expect(() => driveDeferred(TYPED_ITEM).press('Check')).toThrow();
+    expect(() => driveDeferred(LIST_ITEM).press('Check')).toThrow();
+  });
+
+  it('keeps typing without marking it', () => {
+    const { type, texts, answer } = driveDeferred(TYPED_ITEM);
+    type('chlorophyl');
+    expect(texts().join(' ')).not.toContain('Chlorophyll');
+    expect(answer()).toEqual({ kind: 'typed', text: 'chlorophyl', checked: false });
+  });
+
+  it('does not leak the answer by ending a wrongly-called statement early', () => {
+    // Instant mode says "that statement was true" here. A withheld paper
+    // must send them to the correction step exactly as if they were right.
+    const TRUE_MTF: ModifiedTrueFalseItem = {
+      id: 'q7:mtf',
+      format: 'modified_true_false',
+      questionId: 'q7',
+      words: ['Mitochondria', 'produce', '36', 'ATP'],
+      isTrue: true,
+      falseWordIndex: -1,
+      correctWord: '36',
+    };
+    const { press, texts } = driveDeferred(TRUE_MTF);
+    press('False');
+    const said = texts().join(' ');
+    expect(said).toContain('Which word is wrong');
+    expect(said).not.toContain('was true');
+  });
+
+  it('records a matching grid as it is built', () => {
+    const { press, answer } = driveDeferred(MATCH_ITEM);
+    press('Osmosis');
+    press('movement of water');
+    expect(answer()).toMatchObject({ kind: 'matching', pairs: { 0: 1 } });
   });
 });
