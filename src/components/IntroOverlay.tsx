@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     lineHeight: 54,
     color: colors.text,
     marginTop: 18,
-    ...textPop(colors.accent, 4),
+    ...textPop(colors.accentWash, 4),
   },
   taglineRow: {
     flexDirection: 'row',

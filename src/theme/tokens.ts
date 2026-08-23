@@ -1,9 +1,10 @@
 /**
- * StudyPack design tokens — playful neubrutalism.
- * Warm paper ground; every surface is a "sticker": confident 2px forest-ink
- * outlines, solid ink offset shadows, candy washes, tilted accents, and a
- * chunky hero font with dimensional hard-shadow type. Gold is reserved for
- * streaks and the offline banner. Single light theme by design.
+ * StudyPack design tokens — soft sticker book.
+ * Warm paper ground; surfaces are gentle "stickers": soft warm-ink edges,
+ * lightly tinted offset shadows, candy washes, small tilts, duotone icons,
+ * and a chunky hero font. Deliberately calm — no harsh outlines or solid
+ * black shadows. Gold is reserved for streaks and the offline banner.
+ * Single light theme by design.
  */
 export const colors = {
   // ground
@@ -11,6 +12,7 @@ export const colors = {
   surface: '#FFFFFF',
   surface2: '#F4EDDA',
   ink: '#27362B',
+  edge: 'rgba(39, 54, 43, 0.22)',
   line: 'rgba(39, 54, 43, 0.14)',
   lineSoft: 'rgba(39, 54, 43, 0.09)',
   // ink text
@@ -51,16 +53,16 @@ export const radius = {
   pill: 999,
 } as const;
 
-/** Solid ink offset shadows — the sticker look. Requires RN >= 0.76. */
+/** Soft tinted offset shadows — sticker depth without harshness. */
 export const shadow = {
-  card: { boxShadow: `0 3px 0 ${colors.ink}` },
-  pop: { boxShadow: `0 5px 0 ${colors.ink}` },
+  card: { boxShadow: '0 2px 0 rgba(39, 54, 43, 0.08)' },
+  pop: { boxShadow: '0 3px 0 rgba(39, 54, 43, 0.11)' },
 } as const;
 
-/** The standard sticker outline. Spread onto any card/badge/control. */
+/** The standard soft sticker outline. Spread onto any card/badge/control. */
 export const outline = {
-  borderWidth: 2,
-  borderColor: colors.ink,
+  borderWidth: 1.5,
+  borderColor: colors.edge,
 } as const;
 
 /** Hard offset text shadow for dimensional display type. */

@@ -106,9 +106,9 @@ const styles = StyleSheet.create({
 });
 
 const shellStyles: Record<Variant, ViewStyle> = {
-  primary: { backgroundColor: colors.ink },
-  soft: { backgroundColor: colors.ink },
-  paper: { backgroundColor: colors.ink },
+  primary: { backgroundColor: colors.accentEdge },
+  soft: { backgroundColor: '#BCDDB9' },
+  paper: { backgroundColor: '#DCD5C0' },
 };
 
 const faceStyles: Record<Variant, ViewStyle> = {

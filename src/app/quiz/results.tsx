@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: colors.ink,
+    borderColor: colors.edge,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     borderWidth: 1.5,
-    borderColor: colors.ink,
+    borderColor: colors.edge,
     borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     lineHeight: 70,
     color: colors.text,
     fontVariant: ['tabular-nums'],
-    ...textPop(colors.accent, 4),
+    ...textPop(colors.accentWash, 4),
   },
   pct: {
     fontFamily: font.bodyHeavy,

@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { type AttemptWithDeck } from '@/lib/db';
 import { useProgressStore } from '@/store/progress';
-import { colors, font, outline, radius, shadow, tabClearance, textPop } from '@/theme/tokens';
+import { colors, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -168,7 +168,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     lineHeight: 42,
     color: colors.text,
-    ...textPop(colors.accent, 3),
   },
   titleSticker: {
     backgroundColor: colors.goldWash,
@@ -281,7 +280,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: colors.goldWash,
     borderWidth: 1.5,
-    borderColor: colors.ink,
+    borderColor: colors.edge,
     borderRadius: radius.pill,
     paddingHorizontal: 13,
     paddingVertical: 7,
@@ -309,7 +308,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: colors.surface2,
     borderWidth: 1.5,
-    borderColor: colors.ink,
+    borderColor: colors.edge,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
