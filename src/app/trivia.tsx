@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { DeckCard } from '@/components/DeckCard';
 import { Icon } from '@/components/Icon';
+import { RuledPaper } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useOnline } from '@/hooks/useOnline';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
@@ -126,6 +127,7 @@ export default function TriviaScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+      <RuledPaper />
       <View style={styles.navRow}>
         <Pressable
           onPress={() => router.back()}

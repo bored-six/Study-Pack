@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon, type IconName } from '@/components/Icon';
 import { DIFFICULTY_LABEL, type Deck } from '@/lib/types';
-import { candy, colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { candy, colors, derpRadius, font, outline, radius, shadow } from '@/theme/tokens';
 
 interface Props {
   deck: Deck;
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   badge: {
     width: 48,
     height: 48,
-    borderRadius: 16,
+    ...derpRadius,
     borderWidth: 1.5,
     borderColor: colors.edge,
     alignItems: 'center',

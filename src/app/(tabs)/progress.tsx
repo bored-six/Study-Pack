@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
+import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { type AttemptWithDeck } from '@/lib/db';
 import { useProgressStore } from '@/store/progress';
 import { colors, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
@@ -79,6 +80,7 @@ export default function ProgressScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
+      <RuledPaper />
       <Text style={styles.kicker}>FLIPP</Text>
       <View style={styles.titleRow}>
         <Text style={styles.title}>Your</Text>
@@ -86,6 +88,7 @@ export default function ProgressScreen() {
           <Text style={styles.titleStickerText}>progress</Text>
         </View>
       </View>
+      <Squiggle color={colors.gold} style={styles.squiggle} />
       <Text style={styles.sub}>
         {totalAttempts > 0
           ? `${totalAttempts} ${totalAttempts === 1 ? 'quiz' : 'quizzes'} · saved on this device`
@@ -111,11 +114,13 @@ export default function ProgressScreen() {
         <>
           <View style={styles.stats}>
             <View style={[styles.stat, styles.statStreak]}>
+              <Tape />
               <Icon name="flame" size={24} color={colors.ink} fill={colors.gold} />
               <Text style={[styles.statNum, { color: colors.gold }]}>{currentStreak}</Text>
               <Text style={styles.statLabel}>day streak</Text>
             </View>
-            <View style={styles.stat}>
+            <View style={[styles.stat, styles.statBest]}>
+              <Tape rotate="4deg" />
               <Icon name="trophy" size={24} color={colors.ink} fill={colors.accent} />
               <Text style={[styles.statNum, { color: colors.accentDeep }]}>
                 {bestPct != null ? `${bestPct}%` : '—'}
@@ -211,7 +216,14 @@ const styles = StyleSheet.create({
   },
   statStreak: {
     backgroundColor: colors.goldWash,
-    transform: [{ rotate: '-1deg' }],
+    transform: [{ rotate: '-1.2deg' }],
+  },
+  statBest: {
+    transform: [{ rotate: '0.8deg' }],
+  },
+  squiggle: {
+    marginTop: 2,
+    marginLeft: 2,
   },
   statNum: {
     marginTop: 4,

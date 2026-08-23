@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon, type IconName } from '@/components/Icon';
+import { RuledPaper, Tape } from '@/components/notebook';
 import { DIFFICULTY_LABEL } from '@/lib/types';
 import { useQuizStore } from '@/store/quiz';
 import { colors, font, outline, radius, shadow, textPop } from '@/theme/tokens';
@@ -39,7 +40,9 @@ export default function ResultsScreen() {
         styles.screen,
         { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 },
       ]}>
+      <RuledPaper />
       <View style={styles.card}>
+        <Tape />
         <View style={[styles.toneBadge, { backgroundColor: tone.wash }]}>
           <Icon name={tone.icon} size={32} color={colors.ink} fill={colors.surface} />
         </View>
@@ -100,7 +103,10 @@ const styles = StyleSheet.create({
   toneBadge: {
     width: 64,
     height: 64,
-    borderRadius: 22,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 19,
+    borderBottomLeftRadius: 23,
     borderWidth: 1.5,
     borderColor: colors.edge,
     alignItems: 'center',

@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Icon } from '@/components/Icon';
+import { Squiggle, Tape } from '@/components/notebook';
 import { colors, font, outline, shadow, textPop } from '@/theme/tokens';
 
 interface Props {
@@ -126,11 +127,15 @@ export function IntroOverlay({ onDone }: Props) {
             <Dot key={`${dot.x},${dot.y}`} {...dot} reduced={reduced} />
           ))}
           <Animated.View style={[styles.sticker, cardStyle]}>
+            <Tape />
             <Icon name="cardsFilled" size={52} color={colors.accent} strokeWidth={1.6} />
           </Animated.View>
           <Animated.Text style={[styles.wordmark, wordStyle]}>Flipp</Animated.Text>
           <Animated.View style={[styles.taglineRow, tagStyle]}>
-            <Text style={styles.tagline}>Play · learn · streak</Text>
+            <Squiggle width={72} style={styles.taglineSquiggle} />
+          </Animated.View>
+          <Animated.View style={[styles.taglineRow, tagStyle]}>
+            <Text style={styles.tagline}>Flip it till you know it</Text>
             <Icon name="flame" size={15} color={colors.ink} fill={colors.gold} strokeWidth={2.2} />
           </Animated.View>
         </View>
@@ -180,6 +185,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     marginTop: 2,
+  },
+  taglineSquiggle: {
+    marginTop: -4,
   },
   tagline: {
     fontFamily: font.bodyBold,

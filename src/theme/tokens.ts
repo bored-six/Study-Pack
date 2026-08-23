@@ -79,9 +79,17 @@ export const buttonEdge = 4;
 /** Bottom content clearance for the floating pill tab bar. */
 export const tabClearance = 92;
 
+/** Slightly uneven corners — hand-cut sticker, not machine-rounded. */
+export const derpRadius = {
+  borderTopLeftRadius: 16,
+  borderTopRightRadius: 20,
+  borderBottomRightRadius: 15,
+  borderBottomLeftRadius: 19,
+} as const;
+
 export const font = {
-  // Lilita One — chunky hero font for big titles and big numbers
-  hero: 'LilitaOne_400Regular',
+  // Patrick Hand — the notebook handwriting for titles and big numbers
+  hero: 'PatrickHand_400Regular',
   // Baloo 2 — rounded display for section titles and buttons
   display: 'Baloo2_800ExtraBold',
   heading: 'Baloo2_700Bold',

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon } from '@/components/Icon';
+import { RuledPaper } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useQuizStore } from '@/store/quiz';
 import { candy, colors, font, outline, radius, shadow } from '@/theme/tokens';
@@ -70,6 +71,7 @@ export default function QuizScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
+      <RuledPaper />
       <View style={styles.header}>
         <Pressable
           onPress={handleQuit}
@@ -259,7 +261,10 @@ const styles = StyleSheet.create({
   letterChip: {
     width: 30,
     height: 30,
-    borderRadius: 10,
+    borderTopLeftRadius: 9,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 8,
+    borderBottomLeftRadius: 11,
     borderWidth: 1.5,
     borderColor: colors.edge,
     alignItems: 'center',
@@ -268,7 +273,7 @@ const styles = StyleSheet.create({
   },
   letterChipText: {
     fontFamily: font.hero,
-    fontSize: 15,
+    fontSize: 17,
     color: colors.ink,
   },
   answerText: {
@@ -287,8 +292,8 @@ const styles = StyleSheet.create({
     color: colors.coral,
   },
   feedback: {
-    fontFamily: font.heading,
-    fontSize: 15,
+    fontFamily: font.hero,
+    fontSize: 18,
     textAlign: 'center',
     marginBottom: 10,
   },

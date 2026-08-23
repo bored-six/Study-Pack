@@ -4,8 +4,9 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/Icon';
+import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
-import { colors, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
+import { colors, derpRadius, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
 import { useDecksStore } from '@/store/decks';
 
 function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
@@ -23,11 +24,19 @@ function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { decks, refresh } = useDecksStore();
+  const { decks: noteDecks, refresh: refreshNotes, remove: removeNoteDeck } = useNotesStore();
 
   // Prefetch the catalog so the Trivia screen opens with data ready.
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Notes change while you're away on the add flow, so re-read on focus.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshNotes();
+    }, [refreshNotes])
+  );
 
   const downloadedCount = useMemo(
     () => decks.filter((deck) => deck.downloadedAt != null).length,
@@ -43,10 +52,12 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
-      showsVerticalScrollIndicator={false}>
+    <View style={styles.screen}>
+      <RuledPaper />
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+        showsVerticalScrollIndicator={false}>
       <Text style={styles.kicker}>FLIPP</Text>
       <View style={styles.titleRow}>
         <Text style={styles.title}>Let's</Text>
@@ -54,6 +65,7 @@ export default function HomeScreen() {
           <Text style={styles.titleStickerText}>study!</Text>
         </View>
       </View>
+      <Squiggle style={styles.squiggle} />
       <Text style={styles.sub}>Your own notes, plus trivia to practice on.</Text>
 
       <OfflineBanner message="Offline — everything saved still works" style={styles.banner} />
@@ -65,6 +77,7 @@ export default function HomeScreen() {
       <Pressable
         onPress={handleAddNotes}
         style={({ pressed }) => [styles.notesCard, pressed && styles.pressed]}>
+        <Tape />
         <View style={styles.notesBadge}>
           <Icon name="bulb" size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
         </View>
@@ -81,6 +94,7 @@ export default function HomeScreen() {
       <Pressable
         onPress={() => router.push('/trivia')}
         style={({ pressed }) => [styles.triviaCard, pressed && styles.pressed]}>
+        <Tape rotate="3deg" />
         <View style={styles.triviaBadge}>
           <Icon name="dice" size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
         </View>
@@ -94,9 +108,10 @@ export default function HomeScreen() {
               : 'Practice decks from Open Trivia DB'}
           </Text>
         </View>
-        <Text style={styles.chevron}>→</Text>
+        <Icon name="play" size={16} color={colors.accentDeep} />
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -105,9 +120,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
+  fill: {
+    flex: 1,
+  },
   content: {
     paddingHorizontal: 16,
     paddingBottom: tabClearance,
+  },
+  squiggle: {
+    marginTop: 2,
+    marginLeft: 2,
   },
   kicker: {
     fontFamily: font.bodyHeavy,
@@ -180,6 +202,28 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: colors.lineSoft,
   },
+  noteDeckCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.card,
+    padding: 14,
+    marginBottom: 10,
+    ...shadow.card,
+  },
+  noteDeckBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: colors.accentWash,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
+  },
   notesCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -203,7 +247,7 @@ const styles = StyleSheet.create({
   notesBadge: {
     width: 48,
     height: 48,
-    borderRadius: 16,
+    ...derpRadius,
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.edge,
@@ -214,7 +258,7 @@ const styles = StyleSheet.create({
   triviaBadge: {
     width: 48,
     height: 48,
-    borderRadius: 16,
+    ...derpRadius,
     backgroundColor: colors.surface2,
     borderWidth: 1.5,
     borderColor: colors.edge,
@@ -237,11 +281,6 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: colors.textDim,
     marginTop: 1,
-  },
-  chevron: {
-    fontFamily: font.heading,
-    fontSize: 19,
-    color: colors.accentDeep,
   },
   pressed: {
     opacity: 0.8,
