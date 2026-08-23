@@ -116,10 +116,21 @@ describe('rejecting unquizzable input', () => {
     expect(questions).toHaveLength(0);
   });
 
-  it('skips lines shorter than the minimum', () => {
+  it('skips lines shorter than the minimum and says why', () => {
     const { stats } = parseNotes('Cells\nDNA\nok');
     expect(stats.linesUsed).toBe(0);
-    expect(stats.linesSkipped).toBe(3);
+    expect(stats.skipped).toHaveLength(3);
+    expect(stats.skipped.every((s) => s.reason === 'too_short')).toBe(true);
+  });
+
+  it('reports a heading as skipped with the heading reason', () => {
+    const { stats } = parseNotes('Chapter 4: Cellular Respiration');
+    expect(stats.skipped[0]).toMatchObject({ reason: 'heading' });
+  });
+
+  it('keeps the original text of every skipped line', () => {
+    const { stats } = parseNotes('today we talked about stuff and things');
+    expect(stats.skipped[0].text).toBe('today we talked about stuff and things');
   });
 
   it('skips sentences too long to read on a phone', () => {
@@ -183,7 +194,7 @@ describe('answer options', () => {
       'Photosynthesis is the process that plants use for energy.'
     );
     expect(questions).toHaveLength(0);
-    expect(stats.droppedForOptions).toBe(1);
+    expect(stats.skipped.filter((s) => s.reason === 'no_options')).toHaveLength(1);
   });
 });
 

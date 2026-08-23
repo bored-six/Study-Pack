@@ -173,28 +173,41 @@ export async function removeDownload(deckId: string): Promise<void> {
 }
 
 /**
- * Saves a deck built from the student's own notes. Notes decks are local by
- * definition, so they're marked downloaded the moment they're created.
+ * Creates an empty subject (a notes deck). Notes decks are local by
+ * definition, so they count as downloaded from the moment they exist.
  */
-export async function createNoteDeck(
-  title: string,
-  questions: DownloadableQuestion[]
-): Promise<string> {
-  const db = getDb();
+export async function createSubject(name: string): Promise<string> {
   const now = Date.now();
   const deckId = `note:${now}`;
+  await getDb().runAsync(
+    `INSERT INTO decks (id, category_id, name, difficulty, question_count, source, downloaded_at)
+     VALUES (?, 0, ?, 'medium', 0, 'notes', ?)`,
+    deckId,
+    name,
+    now
+  );
+  return deckId;
+}
+
+/**
+ * Appends questions to a subject, so several pastes accumulate into one
+ * deck (Chapter 4 and Chapter 5 both land in Biology).
+ */
+export async function addQuestionsToDeck(
+  deckId: string,
+  questions: DownloadableQuestion[]
+): Promise<void> {
+  if (questions.length === 0) return;
+  const db = getDb();
 
   await db.withTransactionAsync(async () => {
-    await db.runAsync(
-      `INSERT INTO decks (id, category_id, name, difficulty, question_count, source, downloaded_at)
-       VALUES (?, 0, ?, 'medium', ?, 'notes', ?)`,
-      deckId,
-      title,
-      questions.length,
-      now
+    const row = await db.getFirstAsync<{ next: number | null }>(
+      'SELECT MAX(position) + 1 AS next FROM questions WHERE deck_id = ?',
+      deckId
     );
-    for (let position = 0; position < questions.length; position++) {
-      const q = questions[position];
+    let position = row?.next ?? 0;
+
+    for (const q of questions) {
       await db.runAsync(
         `INSERT INTO questions (id, deck_id, position, prompt, correct_answer, answers_json)
          VALUES (?, ?, ?, ?, ?, ?)`,
@@ -205,10 +218,17 @@ export async function createNoteDeck(
         q.correctAnswer,
         JSON.stringify(q.answers)
       );
+      position++;
     }
-  });
 
-  return deckId;
+    await db.runAsync(
+      `UPDATE decks
+       SET question_count = (SELECT COUNT(*) FROM questions WHERE deck_id = ?)
+       WHERE id = ?`,
+      deckId,
+      deckId
+    );
+  });
 }
 
 /** Removes a notes deck and its questions outright. */

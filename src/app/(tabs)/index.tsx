@@ -26,7 +26,11 @@ function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { decks, refresh } = useDecksStore();
-  const { decks: noteDecks, refresh: refreshNotes, remove: removeNoteDeck } = useNotesStore();
+  const {
+    subjects: noteDecks,
+    refresh: refreshNotes,
+    remove: removeNoteDeck,
+  } = useNotesStore();
 
   // Prefetch the catalog so the Trivia screen opens with data ready.
   useEffect(() => {

@@ -32,16 +32,27 @@ export interface ParsedQuestion {
   sourceLine: string;
 }
 
+export type SkipReason = 'too_short' | 'heading' | 'too_long' | 'no_fact' | 'no_options';
+
+/** Plain-language reasons, shown to the student beside the skipped line. */
+export const SKIP_LABEL: Record<SkipReason, string> = {
+  too_short: 'too short to test',
+  heading: 'looks like a heading',
+  too_long: 'too long to read as a question',
+  no_fact: 'no clear fact to test',
+  no_options: "couldn't build enough answer options",
+};
+
+export interface SkippedLine {
+  text: string;
+  reason: SkipReason;
+}
+
 export interface ParseStats {
   linesRead: number;
   linesUsed: number;
-  linesSkipped: number;
-  /**
-   * Facts we found but couldn't turn into multiple choice, because the notes
-   * didn't contain enough related terms to build believable wrong answers.
-   * Usually means "paste a bit more".
-   */
-  droppedForOptions: number;
+  /** Every line that produced no question, with the reason why. */
+  skipped: SkippedLine[];
   truncatedInput: boolean;
   cappedQuestions: boolean;
 }
@@ -71,6 +82,24 @@ const STOPWORDS = new Set(
     .split(/\s+/)
     .filter(Boolean)
 );
+
+/** Words that actually mark a heading, used to label the skip reason honestly. */
+const HEADING_WORDS = new Set([
+  'chapter',
+  'unit',
+  'week',
+  'lesson',
+  'section',
+  'part',
+  'topic',
+  'module',
+  'page',
+  'figure',
+  'table',
+  'diagram',
+  'summary',
+  'review',
+]);
 
 /** Words that organise notes rather than appear in them — never quizzable. */
 const STRUCTURAL = new Set([
@@ -181,7 +210,7 @@ function isNumeric(value: string): boolean {
  */
 function isHeading(line: string): boolean {
   const first = words(line)[0]?.toLowerCase().replace(/[^a-z]/g, '') ?? '';
-  if (STRUCTURAL.has(first)) return true;
+  if (HEADING_WORDS.has(first)) return true;
   // Short, capitalised, and unpunctuated is a title, not a statement.
   return wordCount(line) <= 6 && /^[A-Z]/.test(line) && !/[.!?,;]$/.test(line);
 }
@@ -343,8 +372,11 @@ function clozeCandidates(sentence: string, frequency: Map<string, number>): Cand
 
     const seen = frequency.get(lower) ?? 0;
     if (seen >= 2) score += 4;
-    if (bare.length >= 10) score += 3;
-    else if (bare.length >= 7) score += 1;
+    // Long words are domain terms far more often than filler ("cytoplasm",
+    // "photosynthesis"), so they clear the bar on length alone.
+    if (bare.length >= 9) score += 4;
+    else if (bare.length >= 7) score += 2;
+    else if (bare.length >= 6) score += 1;
 
     if (score <= 0) continue;
     if (wordCount(text) > LIMITS.maxAnswerWords) continue;
@@ -457,12 +489,12 @@ export function parseNotes(input: string): ParseResult {
   }
   const drafts: Draft[] = [];
   const termPool = new Set<string>();
+  const skipped: SkippedLine[] = [];
   let linesUsed = 0;
-  let linesSkipped = 0;
 
   for (const line of rawLines) {
     if (wordCount(line) < LIMITS.minWordsPerLine) {
-      linesSkipped++;
+      skipped.push({ text: line, reason: 'too_short' });
       continue;
     }
 
@@ -480,7 +512,7 @@ export function parseNotes(input: string): ParseResult {
     }
 
     if (isHeading(line)) {
-      linesSkipped++;
+      skipped.push({ text: line, reason: 'heading' });
       continue;
     }
 
@@ -491,9 +523,14 @@ export function parseNotes(input: string): ParseResult {
       .filter(Boolean);
 
     let used = false;
+    let reason: SkipReason = 'no_fact';
     for (const sentence of sentences) {
       const count = wordCount(sentence);
-      if (count < LIMITS.minWordsPerLine || count > LIMITS.maxSentenceWords) continue;
+      if (count > LIMITS.maxSentenceWords) {
+        reason = 'too_long';
+        continue;
+      }
+      if (count < LIMITS.minWordsPerLine) continue;
       if (/\?$/.test(sentence)) continue;
 
       const [best] = clozeCandidates(sentence, frequency);
@@ -510,7 +547,7 @@ export function parseNotes(input: string): ParseResult {
     }
 
     if (used) linesUsed++;
-    else linesSkipped++;
+    else skipped.push({ text: line, reason });
   }
 
   // Extra distractor material: capitalised terms anywhere in the notes.
@@ -526,7 +563,6 @@ export function parseNotes(input: string): ParseResult {
   const pool = [...termPool];
   const questions: ParsedQuestion[] = [];
   const seenPrompts = new Set<string>();
-  let droppedForOptions = 0;
 
   for (const draft of drafts) {
     if (questions.length >= LIMITS.maxQuestions) break;
@@ -542,7 +578,7 @@ export function parseNotes(input: string): ParseResult {
     // A multiple-choice question needs three believable wrong answers or it
     // isn't a question — drop it rather than pad with nonsense.
     if (distractors.length < 3) {
-      droppedForOptions++;
+      skipped.push({ text: draft.source, reason: 'no_options' });
       continue;
     }
 
@@ -561,8 +597,7 @@ export function parseNotes(input: string): ParseResult {
     stats: {
       linesRead: rawLines.length,
       linesUsed,
-      linesSkipped,
-      droppedForOptions,
+      skipped,
       truncatedInput,
       cappedQuestions: drafts.length > questions.length && questions.length >= LIMITS.maxQuestions,
     },
