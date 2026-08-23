@@ -5,6 +5,7 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSequence,
   withSpring,
   withTiming,
@@ -15,6 +16,8 @@ import { colors, font } from '@/theme/tokens';
 
 interface Props {
   combo: number;
+  /** True when the student has stalled; the pill breathes, not wanting to die. */
+  idle?: boolean;
 }
 
 interface Tier {
@@ -62,7 +65,7 @@ function Fleck({ angle, color, nonce }: { angle: number; color: string; nonce: n
  * at 5, 10, and 20, and visibly breaks on a miss. Decoration only —
  * honours reduce-motion by holding still.
  */
-export function ComboMeter({ combo }: Props) {
+export function ComboMeter({ combo, idle = false }: Props) {
   const reduced = useReducedMotion();
   const prev = useRef(0);
   const [broke, setBroke] = useState(false);
@@ -98,8 +101,28 @@ export function ComboMeter({ combo }: Props) {
     }
   }, [combo, reduced, scale, shift]);
 
+  const breathe = useSharedValue(1);
+
+  useEffect(() => {
+    if (idle && combo >= 3 && !reduced) {
+      breathe.value = withRepeat(
+        withSequence(
+          withTiming(1.07, { duration: 800 }),
+          withTiming(1, { duration: 800 })
+        ),
+        -1,
+        false
+      );
+    } else {
+      breathe.value = withTiming(1, { duration: 200 });
+    }
+  }, [breathe, combo, idle, reduced]);
+
   const style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { translateX: shift.value }],
+    transform: [
+      { scale: scale.value * breathe.value },
+      { translateX: shift.value },
+    ],
   }));
 
   if (combo < 3 && !broke) return null;

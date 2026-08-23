@@ -26,8 +26,10 @@ import { ComboMeter } from '@/components/ComboMeter';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
 import { ExamSheet } from '@/components/ExamSheet';
+import { DayTint, EmberDrift, PencilProgress, Tally } from '@/components/deskdress';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { readSetting, writeSetting } from '@/lib/db';
 import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL } from '@/lib/exam';
 import { MODES, questionSeconds, SURVIVAL_STRIKES } from '@/lib/mode';
@@ -88,6 +90,11 @@ export default function ExamRunScreen() {
   // telling you the answer through the meter.
   const scored = spec.feedback === 'instant';
   const [combo, setCombo] = useState(0);
+  const [idle, setIdle] = useState(false);
+  const [emberNonce, setEmberNonce] = useState(0);
+  const [wrongByItem, setWrongByItem] = useState<Record<string, number>>({});
+  const bestCombo = useRef<number | null>(null);
+  const itemIdRef = useRef<string | null>(null);
   const glow = useSharedValue(0);
   useEffect(() => {
     if (combo >= 10) {
@@ -101,6 +108,31 @@ export default function ExamRunScreen() {
     }
   }, [combo, glow]);
   const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.55 }));
+
+  // ~8s without progress and the desk starts fidgeting.
+  const idleKey = `${index}:${combo}:${Object.keys(drafts).length}`;
+  useEffect(() => {
+    setIdle(false);
+    const timer = setTimeout(() => setIdle(true), 8000);
+    return () => clearTimeout(timer);
+  }, [idleKey]);
+
+  // One ember drifts across the first time today's best combo falls.
+  useEffect(() => {
+    const day = Math.floor(Date.now() / 86_400_000);
+    const key = `combo_best:${day}`;
+    const check = async () => {
+      if (bestCombo.current == null) {
+        bestCombo.current = Number((await readSetting(key)) ?? '0');
+      }
+      if (combo > (bestCombo.current ?? 0) && combo >= 5) {
+        bestCombo.current = combo;
+        await writeSetting(key, String(combo));
+        setEmberNonce((n) => n + 1);
+      }
+    };
+    void check();
+  }, [combo]);
 
   const [showHelp, setShowHelp] = useState(false);
   const [confirmQuit, setConfirmQuit] = useState(false);
@@ -138,6 +170,11 @@ export default function ExamRunScreen() {
   const handleDone = useCallback(
     (correct: boolean) => {
       setCombo((c) => (correct ? c + 1 : 0));
+      if (!correct && itemIdRef.current) {
+        // A wrong try leaves an eraser smudge on this page.
+        const id = itemIdRef.current;
+        setWrongByItem((m) => ({ ...m, [id]: (m[id] ?? 0) + 1 }));
+      }
       void store.answer(correct).then(finished);
     },
     [store, finished]
@@ -217,6 +254,7 @@ export default function ExamRunScreen() {
   const questionShare =
     questionLeft == null ? 0 : Math.max(0, questionLeft) / (questionSeconds(item.format) * 1000);
   const paperLeft = paperDeadline == null ? null : paperDeadline - now;
+  itemIdRef.current = item.id;
   const isFlagged = flagged.includes(item.id);
   const lastItem = index + 1 >= items.length;
 
@@ -236,14 +274,16 @@ export default function ExamRunScreen() {
           {spec.repetition === 'until_out' ? (
             <Hearts strikes={strikes} />
           ) : (
-            <View style={styles.track}>
-              <View style={[styles.fill2, { width: `${progress * 100}%` }]} />
-            </View>
+            <PencilProgress progress={progress} combo={combo} />
           )}
 
-          <Text style={styles.counter}>{counterText}</Text>
+          {spec.repetition === 'once' ? (
+            <Tally count={index + 1} total={items.length} />
+          ) : (
+            <Text style={styles.counter}>{counterText}</Text>
+          )}
 
-          {scored ? <ComboMeter combo={combo} /> : null}
+          {scored ? <ComboMeter combo={combo} idle={idle} /> : null}
 
           {paperLeft != null ? (
             <Text style={[styles.timer, paperLeft < 60_000 && styles.timerLow]}>
@@ -310,7 +350,10 @@ export default function ExamRunScreen() {
             key={`${item.id}:${visits}`}
             entering={FadeInDown.springify().damping(16)}
             exiting={SlideOutUp.duration(220)}>
-            <ExamSheet format={item.format}>
+            <ExamSheet
+              format={item.format}
+              smudges={wrongByItem[item.id] ?? 0}
+              idle={idle}>
               <ExamItemView
                 item={item}
                 value={spec.feedback === 'deferred' ? (drafts[item.id] ?? emptyDraft(item)) : undefined}
@@ -349,6 +392,8 @@ export default function ExamRunScreen() {
           </View>
         ) : null}
 
+        <DayTint />
+        <EmberDrift nonce={emberNonce} />
         <Animated.View pointerEvents="none" style={[styles.glowFrame, glowStyle]} />
       </View>
 

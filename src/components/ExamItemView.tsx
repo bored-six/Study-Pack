@@ -1,5 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Squiggle } from '@/components/notebook';
@@ -78,6 +86,38 @@ function Verdict({
     </View>
   );
 }
+
+function BlinkRing() {
+  const pulse = useSharedValue(0);
+  const reduced = useReducedMotion();
+
+  useEffect(() => {
+    if (reduced) return;
+    pulse.value = withRepeat(
+      withSequence(withTiming(1, { duration: 750 }), withTiming(0, { duration: 750 })),
+      -1,
+      false
+    );
+  }, [pulse, reduced]);
+
+  const style = useAnimatedStyle(() => ({ opacity: 0.25 + pulse.value * 0.5 }));
+
+  // Sits behind the empty answer line, breathing like a cursor.
+  return <Animated.View pointerEvents="none" style={[blinkStyles.ring, style]} />;
+}
+
+const blinkStyles = StyleSheet.create({
+  ring: {
+    position: 'absolute',
+    left: -3,
+    right: -3,
+    height: 56,
+    marginTop: -3,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    borderRadius: radius.control + 3,
+  },
+});
 
 function Prompt({ text }: { text: string }) {
   return <Text style={styles.prompt}>{text}</Text>;
@@ -362,6 +402,7 @@ function Typed({ item, draft, setDraft, reveal, onDone }: Field<TypedItem, 'type
   return (
     <View style={styles.body}>
       <Prompt text={item.prompt} />
+      {reveal && !checked && draft.text.trim().length === 0 ? <BlinkRing /> : null}
       <TextInput
         value={draft.text}
         onChangeText={(text) => setDraft({ kind: 'typed', text, checked: draft.checked })}
@@ -758,9 +799,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    fontFamily: font.bodyBold,
-    fontSize: 16,
+    fontFamily: font.hero,
+    fontSize: 17,
     color: colors.text,
+    transform: [{ rotate: '-0.4deg' }],
   },
   /** Something is written here — the only signal a withheld paper gives. */
   inputFilled: {

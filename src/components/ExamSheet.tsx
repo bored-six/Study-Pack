@@ -1,11 +1,16 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { DeskProp } from '@/components/deskdress';
 import type { ExamFormat } from '@/lib/exam';
 import { colors, outline, radius, shadow } from '@/theme/tokens';
 
 interface Props {
   format: ExamFormat;
   children: React.ReactNode;
+  /** Eraser smudges left by wrong tries on this page. */
+  smudges?: number;
+  /** True after ~8s without input; the desk gets impatient. */
+  idle?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -91,27 +96,52 @@ const DECOR: Record<Paper, () => React.JSX.Element> = {
  * card for identification, graph paper for matching, a torn checklist
  * strip for enumeration. A dog-eared corner marks it as the working page.
  */
-export function ExamSheet({ format, children, style }: Props) {
+export function ExamSheet({ format, children, smudges = 0, idle = false, style }: Props) {
   const Decor = DECOR[PAPER[format]];
 
   return (
-    <View style={style}>
+    <View style={[styles.desk, style]}>
       {/* The pile underneath — pages still to come. */}
       <View style={[styles.under, styles.underDeep]} />
       <View style={[styles.under, styles.underNear]} />
 
       <View style={styles.sheet}>
         <Decor />
+        {Array.from({ length: Math.min(smudges, 3) }, (_, i) => (
+          <View key={i} style={[styles.smudge, SMUDGE_SPOTS[i]]} />
+        ))}
         <View style={styles.content}>{children}</View>
         {/* Dog-eared corner: the page you're on. */}
         <View style={styles.dogEar} />
         <View style={styles.dogEarShade} />
       </View>
+
+      <DeskProp format={format} idle={idle} />
     </View>
   );
 }
 
+/** Where erased mistakes end up — spread out, like a real messy page. */
+const SMUDGE_SPOTS: ViewStyle[] = [
+  { top: 18, right: 30, transform: [{ rotate: '-14deg' }] },
+  { bottom: 46, left: 22, transform: [{ rotate: '9deg' }] },
+  { top: '45%', right: 14, transform: [{ rotate: '-5deg' }] },
+];
+
 const styles = StyleSheet.create({
+  desk: {
+    backgroundColor: 'rgba(151, 106, 44, 0.07)',
+    borderRadius: radius.card + 8,
+    padding: 9,
+    paddingBottom: 14,
+  },
+  smudge: {
+    position: 'absolute',
+    width: 46,
+    height: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(39, 54, 43, 0.055)',
+  },
   under: {
     position: 'absolute',
     left: 4,
