@@ -30,30 +30,36 @@ function ctx(over: Partial<MomentContext> = {}): MomentContext {
 }
 
 describe('fire tiers', () => {
-  it('grows with the streak', () => {
+  it('grows with the streak through nine stages to a full year', () => {
     expect(fireFor(0).name).toBe('Unlit');
     expect(fireFor(1).name).toBe('Spark');
-    expect(fireFor(5).name).toBe('Kindling');
-    expect(fireFor(9).name).toBe('Steady burn');
-    expect(fireFor(20).name).toBe('Roaring');
-    expect(fireFor(45).name).toBe('Blue flame');
-    expect(fireFor(365).name).toBe('Everlasting');
+    expect(fireFor(5).name).toBe('Ember');
+    expect(fireFor(10).name).toBe('Kindling');
+    expect(fireFor(20).name).toBe('Steady burn');
+    expect(fireFor(50).name).toBe('Wildfire');
+    expect(fireFor(100).name).toBe('Blue flame');
+    expect(fireFor(200).name).toBe('White heat');
+    expect(fireFor(300).name).toBe('Violet crown');
+    expect(fireFor(365).name).toBe('The eternal year');
+    expect(fireFor(1000).name).toBe('The eternal year');
   });
 
   it('uses a different glyph as it grows', () => {
-    const icons = [1, 5, 9, 20, 120].map((s) => fireFor(s).icon);
-    expect(new Set(icons).size).toBeGreaterThan(3);
+    const icons = [1, 10, 20, 50, 200, 365].map((s) => fireFor(s).icon);
+    expect(new Set(icons).size).toBeGreaterThanOrEqual(5);
   });
 
   it('reports a tier only on the day it is reached', () => {
-    expect(newlyReachedTier(7, 6)?.name).toBe('Steady burn');
-    expect(newlyReachedTier(8, 7)).toBeNull();
+    expect(newlyReachedTier(5, 4)?.name).toBe('Ember');
+    expect(newlyReachedTier(6, 5)).toBeNull();
     expect(newlyReachedTier(2, 2)).toBeNull();
+    expect(newlyReachedTier(365, 364)?.name).toBe('The eternal year');
   });
 
   it('counts down to the next fire, and stops at the top', () => {
-    expect(daysToNextTier(5)).toBe(2);
-    expect(daysToNextTier(120)).toBeNull();
+    expect(daysToNextTier(5)).toBe(5);
+    expect(daysToNextTier(320)).toBe(45);
+    expect(daysToNextTier(365)).toBeNull();
   });
 });
 
@@ -96,9 +102,9 @@ describe('detectMoment', () => {
   });
 
   it('announces a new fire tier', () => {
-    const moment = detectMoment(ctx({ streak: 7, previousStreak: 6 }), []);
-    expect(moment?.id).toBe('fire:7');
-    expect(moment?.title).toBe('Steady burn');
+    const moment = detectMoment(ctx({ streak: 5, previousStreak: 4 }), []);
+    expect(moment?.id).toBe('fire:5');
+    expect(moment?.title).toBe('Ember');
   });
 
   it('is gentle about late nights', () => {

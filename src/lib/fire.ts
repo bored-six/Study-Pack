@@ -3,8 +3,9 @@
  * says "this has been going a while" at a glance — and gives the streak
  * somewhere to go beyond incrementing.
  *
- * Tier names are deliberately warm rather than gamey: nobody is ranking
- * up, their fire is just getting bigger.
+ * Nine stages, maxing out at a full year. Tier names are deliberately
+ * warm rather than gamey: nobody is ranking up, their fire is just
+ * getting bigger.
  */
 import type { IconName } from '@/components/Icon';
 import { colors } from '@/theme/tokens';
@@ -36,39 +37,61 @@ export const FIRE_TIERS: FireTier[] = [
     greeting: 'A spark. Everything starts here.',
   },
   {
-    from: 3,
-    name: 'Kindling',
+    from: 5,
+    name: 'Ember',
     icon: 'flameSmall',
     color: colors.gold,
-    greeting: 'Three days. It has caught.',
+    greeting: 'Five days in. It glows on its own now.',
   },
   {
-    from: 7,
-    name: 'Steady burn',
+    from: 10,
+    name: 'Kindling',
     icon: 'flame',
     color: '#D9832B',
-    greeting: 'A week of showing up. It burns on its own now.',
+    greeting: 'Ten days. The fire has properly caught.',
   },
   {
-    from: 14,
-    name: 'Roaring',
+    from: 20,
+    name: 'Steady burn',
     icon: 'flameBig',
     color: colors.coral,
-    greeting: 'Two weeks. This is a habit, not an effort.',
+    greeting: 'Twenty days. This is a habit, not an effort.',
   },
   {
-    from: 30,
-    name: 'Blue flame',
-    icon: 'flameBig',
-    color: '#2E6FA3',
-    greeting: 'A month. The fire went blue — that is the hottest part.',
+    from: 50,
+    name: 'Wildfire',
+    icon: 'flameTall',
+    color: '#A2322A',
+    greeting: 'Fifty days. It spreads to everything you touch.',
   },
   {
     from: 100,
-    name: 'Everlasting',
+    name: 'Blue flame',
+    icon: 'flameTall',
+    color: '#2E6FA3',
+    greeting: 'A hundred days. The fire went blue — that is the hottest part.',
+  },
+  {
+    from: 200,
+    name: 'White heat',
+    icon: 'flameCrown',
+    color: '#7E8CA0',
+    greeting: 'Two hundred days. Hotter than any color now.',
+  },
+  {
+    from: 300,
+    name: 'Violet crown',
     icon: 'flameCrown',
     color: '#6C51A8',
-    greeting: 'A hundred days. Hardly anyone gets here.',
+    greeting: 'Three hundred days. Fire like this gets its own name in old stories.',
+  },
+  {
+    from: 365,
+    name: 'The eternal year',
+    icon: 'flameYear',
+    color: '#AC761C',
+    greeting:
+      'Three hundred and sixty-five. A whole year, every single day. This fire does not go out.',
   },
 ];
 
