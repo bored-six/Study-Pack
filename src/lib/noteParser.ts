@@ -34,7 +34,13 @@ export interface ParsedQuestion {
   ordered?: boolean;
 }
 
-export type SkipReason = 'too_short' | 'heading' | 'too_long' | 'no_fact' | 'no_options';
+export type SkipReason =
+  | 'too_short'
+  | 'heading'
+  | 'too_long'
+  | 'no_fact'
+  | 'no_options'
+  | 'illustration';
 
 /** Plain-language reasons, shown to the student beside the skipped line. */
 export const SKIP_LABEL: Record<SkipReason, string> = {
@@ -43,6 +49,7 @@ export const SKIP_LABEL: Record<SkipReason, string> = {
   too_long: 'too long to read as a question',
   no_fact: 'no clear fact to test',
   no_options: "couldn't build enough answer options",
+  illustration: 'an example, not a fact to test',
 };
 
 export interface SkippedLine {
@@ -209,6 +216,21 @@ function wordCount(text: string): number {
   return words(text).length;
 }
 
+/**
+ * Cuts a trailing illustration off a definition. Notes often run the meaning
+ * and its example together on one line ("Hyperbole is exaggeration… Example:
+ * I have told you a million times"), and the example belongs to neither the
+ * question nor the answer. Returns '' when the text is nothing but example,
+ * so the caller's length check rejects it.
+ */
+function stripIllustration(text: string): string {
+  const cut = text.search(
+    /(?:^|[.;]\s+)(?:examples?\s*[:—-]|for example\b|for instance\b|e\.?g\.?[\s:,])/i
+  );
+  if (cut < 0) return text;
+  return text.slice(0, cut).replace(/[.;,\s]+$/, '');
+}
+
 function cleanTerm(term: string): string {
   return term.replace(/^[^\w(]+|[^\w)%]+$/g, '').trim();
 }
@@ -266,12 +288,12 @@ interface Definition {
   acronym: boolean;
 }
 
-function matchDefinition(line: string): Definition | null {
+function matchDefinitionShape(line: string): Definition | null {
   // "ATP stands for adenosine triphosphate"
   const stands = /^(.{1,40}?)\s+(?:stands for|is short for|is an acronym for)\s+(.+)$/i.exec(line);
   if (stands) {
     const term = cleanTerm(stands[1]);
-    const meaning = cleanTerm(stands[2]);
+    const meaning = stripIllustration(cleanTerm(stands[2]));
     if (term && wordCount(meaning) >= 1) return { term, meaning, acronym: true };
   }
 
@@ -279,7 +301,7 @@ function matchDefinition(line: string): Definition | null {
   const colon = /^([^:]{2,60}):\s+(.{6,})$/.exec(line);
   if (colon && !/https?$/i.test(colon[1]) && !/\d$/.test(colon[1])) {
     const term = cleanTerm(colon[1]);
-    const meaning = cleanTerm(colon[2]);
+    const meaning = stripIllustration(cleanTerm(colon[2]));
     if (term && wordCount(term) <= 6 && wordCount(meaning) >= 2) {
       return { term, meaning, acronym: false };
     }
@@ -289,7 +311,7 @@ function matchDefinition(line: string): Definition | null {
   const equals = /^([^=]{2,60})=\s*(.{6,})$/.exec(line);
   if (equals) {
     const term = cleanTerm(equals[1]);
-    const meaning = cleanTerm(equals[2]);
+    const meaning = stripIllustration(cleanTerm(equals[2]));
     if (term && wordCount(term) <= 6 && wordCount(meaning) >= 2) {
       return { term, meaning, acronym: false };
     }
@@ -299,7 +321,7 @@ function matchDefinition(line: string): Definition | null {
   const dash = /^(.{2,40}?)\s+-\s+(.{6,})$/.exec(line);
   if (dash) {
     const term = cleanTerm(dash[1]);
-    const meaning = cleanTerm(dash[2]);
+    const meaning = stripIllustration(cleanTerm(dash[2]));
     if (term && wordCount(term) <= 5 && wordCount(meaning) >= 2) {
       return { term, meaning, acronym: false };
     }
@@ -312,7 +334,7 @@ function matchDefinition(line: string): Definition | null {
     );
   if (verb) {
     const term = cleanTerm(verb[1] ?? verb[3] ?? verb[5] ?? '');
-    const meaning = cleanTerm(verb[2] ?? verb[4] ?? verb[6] ?? '');
+    const meaning = stripIllustration(cleanTerm(verb[2] ?? verb[4] ?? verb[6] ?? ''));
     const firstWord = words(term)[0]?.toLowerCase() ?? '';
     const negated = /^(?:not|also|only|still|always|never)\b/i.test(meaning);
     if (
@@ -330,6 +352,24 @@ function matchDefinition(line: string): Definition | null {
   }
 
   return null;
+}
+
+/**
+ * A definition, once the shapes that only look like one are turned away.
+ * "Example: Peter picked a peck of pickled peppers" is a colon line, but
+ * "Example" is not a term and the tongue twister is not its meaning.
+ */
+function matchDefinition(line: string): Definition | null {
+  const found = matchDefinitionShape(line);
+  if (!found) return null;
+
+  const firstWord = words(found.term)[0]?.toLowerCase().replace(/[^a-z]/g, '') ?? '';
+  if (STRUCTURAL.has(firstWord)) return null;
+
+  // stripIllustration can empty a meaning that was nothing but example.
+  if (wordCount(found.meaning) < 2) return null;
+
+  return found;
 }
 
 function definitionPrompt(def: Definition): string {
@@ -499,6 +539,14 @@ interface EnumDraft {
   ordered: boolean;
   source: string;
 }
+
+/**
+ * Sentences that show rather than tell. They exist to demonstrate the fact
+ * stated somewhere near them, so quizzing their contents tests recall of the
+ * illustration instead of the idea.
+ */
+const ILLUSTRATION =
+  /^(?:examples?\s*[:—-]|for example\b|for instance\b|e\.?g\.?\b|i\.?e\.?\b|such as\b|as in\b|like\b.*:)/i;
 
 /** Instructions ("read chapter 4") are tasks to do, not facts to learn. */
 const TASK_LINE =
@@ -720,6 +768,14 @@ export function parseNotes(input: string): ParseResult {
     let used = false;
     let reason: SkipReason = 'no_fact';
     for (const sentence of sentences) {
+      // An illustration demonstrates a fact, it doesn't state one. Blanking a
+      // word out of "Example: Peter picked a peck of pickled peppers" tests
+      // whether you memorised a tongue twister, not what alliteration is.
+      if (ILLUSTRATION.test(sentence)) {
+        reason = 'illustration';
+        continue;
+      }
+
       const count = wordCount(sentence);
       if (count > LIMITS.maxSentenceWords) {
         reason = 'too_long';

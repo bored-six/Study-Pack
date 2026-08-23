@@ -102,6 +102,48 @@ describe('cloze deletion', () => {
   });
 });
 
+describe('examples are demonstrations, not facts', () => {
+  const NOTES = `Alliteration repeats the same initial consonant sound in nearby words. Example: Peter picked a peck of pickled peppers.
+    Onomatopoeia uses words that imitate the sound they describe. Example: buzz, clang, hiss.
+    Oxymoron places two contradictory terms side by side. Example: deafening silence.
+    Metonymy: substituting a related word for the thing meant
+    Synecdoche: using a part to represent the whole`;
+
+  it('never quizzes the contents of an example sentence', () => {
+    for (const q of parseNotes(NOTES).questions) {
+      expect(q.prompt).not.toMatch(/^Example/i);
+      expect(q.correctAnswer).not.toBe('Peter');
+    }
+  });
+
+  it('says why, when a line is nothing but an example', () => {
+    const { questions, stats } = parseNotes(
+      `Alliteration: repeating the same initial consonant sound
+       Example: Peter picked a peck of pickled peppers.
+       Assonance: repeating vowel sounds inside words
+       Consonance: repeating consonant sounds at the end of words`
+    );
+    expect(questions.every((q) => q.correctAnswer !== 'Peter')).toBe(true);
+    expect(stats.skipped.some((s) => s.reason === 'illustration')).toBe(true);
+  });
+
+  it('still quizzes the fact the example was illustrating', () => {
+    const answers = parseNotes(NOTES).questions.map((q) => q.correctAnswer);
+    expect(answers).toContain('consonant');
+  });
+
+  it('cuts a trailing example out of a definition', () => {
+    const notes = `Hyperbole is deliberate exaggeration used for emphasis. Example: I have told you a million times.
+      Oxymoron: two contradictory terms placed side by side
+      Simile: a comparison using like or as
+      Metaphor: a comparison stating one thing is another`;
+    const hyperbole = parseNotes(notes).questions.find((q) => q.correctAnswer === 'Hyperbole');
+    expect(hyperbole?.prompt).toContain('deliberate exaggeration');
+    expect(hyperbole?.prompt).not.toMatch(/example/i);
+    expect(hyperbole?.prompt).not.toContain('million');
+  });
+});
+
 describe('rejecting unquizzable input', () => {
   it('returns nothing for vague prose with no facts', () => {
     const { questions } = parseNotes(`notes
