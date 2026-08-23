@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AchievementModal } from '@/components/AchievementModal';
+import { BurningFire } from '@/components/BurningFire';
 import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle } from '@/components/notebook';
 import { type AttemptWithDeck } from '@/lib/db';
@@ -147,7 +148,7 @@ export default function ProgressScreen() {
           <>
             <View style={styles.streak}>
               <View style={styles.streakRow}>
-                <Icon name={fire.icon} size={30} color={colors.ink} fill={fire.color} />
+                <BurningFire tier={fire} size={30} lit={currentStreak > 0} />
                 <Text style={styles.streakNum}>{currentStreak}</Text>
                 <Text style={[styles.fireName, { color: fire.color }]}>{fire.name}</Text>
               </View>
