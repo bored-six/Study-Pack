@@ -10,6 +10,8 @@
  * makes modified true/false exact to grade rather than guesswork.
  */
 
+import type { AnswerRecord } from './mastery';
+import { rankByNeed } from './pick';
 import type { Question } from './types';
 
 export type ExamFormat =
@@ -370,14 +372,22 @@ export function availability(questions: Question[]): Record<ExamFormat, number> 
  * is deliberate: testing the same fact as multiple choice and again as
  * true/false is reinforcement, and it's what lets a 21-question deck produce a
  * 40-question exam. Formats are interleaved and the order shuffled.
+ *
+ * `history` is the subject's answer log. Each format takes the first
+ * questions it can use from a single ordering, so ordering that pool by need
+ * rather than at random is what decides *which* ten of forty questions a
+ * ten-question request gets: the shaky and the unseen, not the first ten
+ * parsed. Pass an empty log and it degrades to the plain seeded shuffle.
  */
 export function buildExam(
   questions: Question[],
   requests: ExamRequest[],
-  seedText = 'exam'
+  seedText = 'exam',
+  history: readonly AnswerRecord[] = []
 ): ExamItem[] {
   const rand = seed(seedText + questions.length);
-  const pool = shuffleWith(questions, rand);
+  // Seeded rand, so the same exam rebuilds identically for its seed.
+  const pool = rankByNeed(shuffleWith(questions, rand), history, { random: rand });
   const items: ExamItem[] = [];
 
   // Matching first: one exercise consumes several questions at once, and no
@@ -434,4 +444,63 @@ export function buildExam(
   }
 
   return shuffleWith(items, rand);
+}
+
+/**
+ * Preference when a mode wants exactly one item per question. Typed recall
+ * beats recognition, so the formats that make you produce the answer come
+ * first and multiple choice is the fallback.
+ */
+const ONE_EACH_PREFERENCE: ExamFormat[] = [
+  'enumeration',
+  'fill_blank',
+  'identification',
+  'modified_true_false',
+  'multiple_choice',
+  'true_false',
+];
+
+/**
+ * One item per question, in the most demanding format that question
+ * supports. Order is preserved — a drill that hands you the worst question
+ * first should not shuffle that away. Matching is skipped because one grid
+ * consumes several questions at once.
+ */
+export function buildOnePerQuestion(questions: Question[], seedText = 'drill'): ExamItem[] {
+  const rand = seed(seedText + questions.length);
+  const items: ExamItem[] = [];
+
+  for (const question of questions) {
+    const supported = supportedFormats(question);
+    for (const format of ONE_EACH_PREFERENCE) {
+      if (!supported.includes(format)) continue;
+
+      let item: ExamItem | null = null;
+      switch (format) {
+        case 'multiple_choice':
+          item = buildChoice(question, rand);
+          break;
+        case 'true_false':
+          item = buildTrueFalse(question, rand);
+          break;
+        case 'modified_true_false':
+          item = buildModifiedTrueFalse(question, rand);
+          break;
+        case 'identification':
+        case 'fill_blank':
+          item = buildTyped(question);
+          break;
+        case 'enumeration':
+          item = buildEnumeration(question);
+          break;
+      }
+
+      if (item) {
+        items.push(item);
+        break;
+      }
+    }
+  }
+
+  return items;
 }

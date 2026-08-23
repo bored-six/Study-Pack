@@ -57,37 +57,52 @@ export function weightFor(
   return mastery.missedLast ? weight * MISSED_LAST_BOOST : weight;
 }
 
+export interface PickOptions {
+  now?: number;
+  /** Injectable so a seeded exam rebuilds identically. */
+  random?: () => number;
+}
+
 /**
- * Weighted sample without replacement (Efraimidis–Spirakis): give each item
- * the key random^(1/weight) and keep the highest. A heavier weight pushes the
- * key towards 1, so urgent questions usually win a place without ever being
- * guaranteed one.
+ * Every question, neediest first — a weighted shuffle rather than a sort.
+ *
+ * Uses Efraimidis–Spirakis keys: each item gets random^(1/weight), and a
+ * heavier weight pushes that key towards 1. So a weak question usually leads
+ * without ever being guaranteed to, which is what keeps a session varied
+ * instead of drilling the same five items forever.
+ *
+ * Ranking the whole list rather than truncating it lets a caller that fills
+ * several buckets — the exam builder, picking per format — walk one ordering
+ * and still take the neediest questions for each.
  */
-export function pickQuestions<T extends Pickable>(
+export function rankByNeed<T extends Pickable>(
   questions: readonly T[],
   answers: readonly AnswerRecord[],
-  options: { size?: number; now?: number; random?: () => number } = {}
+  options: PickOptions = {}
 ): T[] {
-  const {
-    size = MAX_SESSION,
-    now = Date.now(),
-    random = Math.random,
-  } = options;
-
-  const limit = Math.min(Math.max(0, size), questions.length);
-  if (limit === 0) return [];
-
+  const { now = Date.now(), random = Math.random } = options;
   const grouped = byQuestion(answers);
 
   return questions
     .map((question) => {
       const weight = weightFor(grouped.get(question.id) ?? [], now);
-      // random() can return exactly 0; log(0) is -Infinity, which would sort
-      // last rather than crashing, but nudging keeps every key finite.
+      // random() can return exactly 0, and 0^(1/w) is 0 for every weight —
+      // which would sort those items arbitrarily. Nudging keeps keys distinct.
       const roll = Math.max(random(), Number.MIN_VALUE);
       return { question, key: Math.pow(roll, 1 / weight) };
     })
     .sort((a, b) => b.key - a.key)
-    .slice(0, limit)
     .map((entry) => entry.question);
+}
+
+/** The first `size` of the ranking: one session's worth. */
+export function pickQuestions<T extends Pickable>(
+  questions: readonly T[],
+  answers: readonly AnswerRecord[],
+  options: PickOptions & { size?: number } = {}
+): T[] {
+  const { size = MAX_SESSION, ...rest } = options;
+  const limit = Math.min(Math.max(0, size), questions.length);
+  if (limit === 0) return [];
+  return rankByNeed(questions, answers, rest).slice(0, limit);
 }

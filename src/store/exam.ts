@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 
-import { getDeckById, listQuestions, saveAttempt } from '@/lib/db';
+import type { StoredAnswer } from '@/lib/db';
+import {
+  getDeckById,
+  listAnswersForDeck,
+  listQuestions,
+  saveAttempt,
+} from '@/lib/db';
 import {
   availability,
   buildExam,
@@ -22,6 +28,8 @@ interface ExamState {
   status: ExamStatus;
   deck: Deck | null;
   questions: Question[];
+  /** The subject's answer log, so the build can favour what needs work. */
+  history: StoredAnswer[];
   available: Record<ExamFormat, number>;
   /** How many of each format the student asked for. */
   counts: Record<ExamFormat, number>;
@@ -58,6 +66,7 @@ export const useExamStore = create<ExamState>((set, get) => ({
   status: 'idle',
   deck: null,
   questions: [],
+  history: [],
   available: { ...ZERO },
   counts: { ...ZERO },
   items: [],
@@ -71,7 +80,11 @@ export const useExamStore = create<ExamState>((set, get) => ({
   load: async (deckId) => {
     set({ status: 'loading', error: null, items: [], results: [], index: 0, briefed: [] });
     try {
-      const [deck, questions] = await Promise.all([getDeckById(deckId), listQuestions(deckId)]);
+      const [deck, questions, history] = await Promise.all([
+        getDeckById(deckId),
+        listQuestions(deckId),
+        listAnswersForDeck(deckId),
+      ]);
       if (!deck || questions.length === 0) {
         set({ status: 'error', error: 'This subject has no questions yet.' });
         return;
@@ -79,7 +92,7 @@ export const useExamStore = create<ExamState>((set, get) => ({
       const available = availability(questions);
       // Open on a sensible default: everything as multiple choice.
       const counts = { ...ZERO, multiple_choice: Math.min(10, available.multiple_choice) };
-      set({ status: 'setup', deck, questions, available, counts });
+      set({ status: 'setup', deck, questions, history, available, counts });
     } catch (e) {
       set({
         status: 'error',
@@ -97,12 +110,17 @@ export const useExamStore = create<ExamState>((set, get) => ({
   total: () => Object.values(get().counts).reduce((sum, n) => sum + n, 0),
 
   start: () => {
-    const { questions, counts, deck } = get();
+    const { questions, counts, deck, history } = get();
     const requests: ExamRequest[] = (Object.keys(counts) as ExamFormat[])
       .filter((format) => counts[format] > 0)
       .map((format) => ({ format, count: counts[format] }));
 
-    const items = buildExam(questions, requests, `${deck?.id ?? 'exam'}:${Date.now()}`);
+    const items = buildExam(
+      questions,
+      requests,
+      `${deck?.id ?? 'exam'}:${Date.now()}`,
+      history
+    );
     if (items.length === 0) {
       set({ status: 'error', error: 'Could not build an exam from those choices.' });
       return;

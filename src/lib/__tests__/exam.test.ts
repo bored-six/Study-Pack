@@ -240,3 +240,69 @@ describe('generated statements hold up across seeds', () => {
     }
   });
 });
+
+describe('buildExam question choice', () => {
+  const NOW = Date.now();
+  const DAY = 86_400_000;
+
+  /** Twenty usable questions; only a few can fit a short request. */
+  function bigDeck(): Question[] {
+    return Array.from({ length: 20 }, () => DEFINITION());
+  }
+
+  /**
+   * Choice is weighted, not sorted, so no single build is guaranteed to hold
+   * a given question — asserting one would be a flaky test *and* a wrong
+   * description of the behaviour. What must hold is the rate across builds.
+   */
+  it('picks questions that need work far more often than known ones', () => {
+    const deck = bigDeck();
+    const weak = deck.slice(0, 3).map((q) => q.id);
+    const known = deck.slice(3).map((q) => q.id);
+    const history = [
+      ...deck.slice(3).flatMap((q) => [
+        { questionId: q.id, correct: true, answeredAt: NOW - 3 * DAY },
+        { questionId: q.id, correct: true, answeredAt: NOW - 2 * DAY },
+        { questionId: q.id, correct: true, answeredAt: NOW - DAY },
+      ]),
+      ...deck.slice(0, 3).map((q) => ({
+        questionId: q.id,
+        correct: false,
+        answeredAt: NOW - DAY,
+      })),
+    ];
+
+    const picks = new Map<string, number>();
+    const RUNS = 60;
+    for (let i = 0; i < RUNS; i++) {
+      const items = buildExam(
+        deck,
+        [{ format: 'multiple_choice', count: 3 }],
+        `seed${i}`,
+        history
+      );
+      expect(items).toHaveLength(3);
+      items.forEach((item) => {
+        picks.set(item.questionId, (picks.get(item.questionId) ?? 0) + 1);
+      });
+    }
+
+    const rate = (ids: string[]) =>
+      ids.reduce((sum, id) => sum + (picks.get(id) ?? 0), 0) / ids.length / RUNS;
+
+    expect(rate(weak)).toBeGreaterThan(rate(known) * 3);
+  });
+
+  it('builds the same exam twice for one seed', () => {
+    const deck = bigDeck();
+    const request = [{ format: 'multiple_choice' as const, count: 5 }];
+    const first = buildExam(deck, request, 'stable', []);
+    const second = buildExam(deck, request, 'stable', []);
+    expect(second.map((i) => i.questionId)).toEqual(first.map((i) => i.questionId));
+  });
+
+  it('still builds with no history at all', () => {
+    const items = buildExam(bigDeck(), [{ format: 'multiple_choice', count: 4 }], 'seed');
+    expect(items).toHaveLength(4);
+  });
+});
