@@ -1,5 +1,7 @@
 import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 
+import { inferRepair } from './repair';
+
 import type {
   Attempt,
   Deck,
@@ -12,7 +14,7 @@ import type {
 } from './types';
 
 const DB_NAME = 'studypack.db';
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 let instance: SQLiteDatabase | null = null;
 
@@ -121,7 +123,43 @@ export async function initDb(): Promise<void> {
     `);
   }
 
+  if (version < 6) {
+    // Notes saved before the exam work — or before the save path forwarded
+    // these columns — are all labelled trivia, which offers multiple choice
+    // and nothing else. Their prompts still say how they were built, so
+    // repair them in place rather than making anyone paste their notes again.
+    await repairNoteQuestions(db);
+  }
+
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
+/**
+ * Re-labels questions in notes decks whose kind was lost. Only touches rows
+ * still marked trivia inside a notes deck, so real trivia is never altered
+ * and correctly-labelled rows are left alone.
+ */
+async function repairNoteQuestions(db: SQLiteDatabase): Promise<void> {
+  const rows = await db.getAllAsync<{ id: string; prompt: string; correct_answer: string }>(
+    `SELECT q.id, q.prompt, q.correct_answer
+     FROM questions q
+     JOIN decks d ON d.id = q.deck_id
+     WHERE d.source = 'notes' AND q.kind = 'trivia'`
+  );
+  if (rows.length === 0) return;
+
+  await db.withTransactionAsync(async () => {
+    for (const row of rows) {
+      const repair = inferRepair({ prompt: row.prompt, correctAnswer: row.correct_answer });
+      if (!repair) continue;
+      await db.runAsync(
+        'UPDATE questions SET kind = ?, source_line = ? WHERE id = ?',
+        repair.kind,
+        repair.sourceLine,
+        row.id
+      );
+    }
+  });
 }
 
 interface DeckRow {
