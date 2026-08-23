@@ -48,6 +48,20 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="planner"
+        options={{
+          title: 'Planner',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Icon
+              name="calendar"
+              color={color}
+              fill={focused ? colors.accentWash : colors.surface2}
+              size={size}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="progress"
         options={{
           title: 'Progress',

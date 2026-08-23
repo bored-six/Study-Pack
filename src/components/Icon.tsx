@@ -299,4 +299,36 @@ const glyphs = {
       <Circle cx={12} cy={17.3} r={0.5} />
     </>
   ),
+  clock: (f: string) => (
+    <>
+      <Circle cx={12} cy={12} r={8.5} fill={f} />
+      <Path d="M12 7.2V12l3.3 2" />
+    </>
+  ),
+  calendar: (f: string) => (
+    <>
+      <Rect x={3.5} y={5.5} width={17} height={15} rx={2.5} fill={f} />
+      <Path d="M3.5 10h17" />
+      <Path d="M8 3.5v4M16 3.5v4" />
+    </>
+  ),
+  bell: (f: string) => (
+    <>
+      <Path d="M12 3.5a5.5 5.5 0 0 1 5.5 5.5c0 4 1.5 5.5 1.5 5.5H5s1.5-1.5 1.5-5.5A5.5 5.5 0 0 1 12 3.5z" fill={f} />
+      <Path d="M10 17.5a2 2 0 0 0 4 0" />
+    </>
+  ),
+  plus: () => (
+    <>
+      <Path d="M12 5.5v13" />
+      <Path d="M5.5 12h13" />
+    </>
+  ),
+  trash: (f: string) => (
+    <>
+      <Path d="M4.5 6.5h15" />
+      <Path d="M9.5 6.5V4.8a1.3 1.3 0 0 1 1.3-1.3h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7" />
+      <Path d="M6.5 6.5h11l-.9 12.2a1.8 1.8 0 0 1-1.8 1.8H9.2a1.8 1.8 0 0 1-1.8-1.8z" fill={f} />
+    </>
+  ),
 } as const;

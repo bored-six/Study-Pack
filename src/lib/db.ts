@@ -1,9 +1,17 @@
 import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 
-import type { Attempt, Deck, DeckSource, Difficulty, Question } from './types';
+import type {
+  Attempt,
+  Deck,
+  DeckSource,
+  Difficulty,
+  Question,
+  Repeat,
+  Schedule,
+} from './types';
 
 const DB_NAME = 'studypack.db';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 let instance: SQLiteDatabase | null = null;
 
@@ -59,6 +67,28 @@ export async function initDb(): Promise<void> {
   if (version < 2) {
     // Existing rows are all trivia; notes decks arrive with this version.
     await db.execAsync(`ALTER TABLE decks ADD COLUMN source TEXT NOT NULL DEFAULT 'trivia'`);
+  }
+
+  if (version < 3) {
+    // Planned quizzes. Reminders are derived from these at read time, so
+    // there is no notification state here to fall out of sync.
+    // ON DELETE CASCADE means deleting a subject takes its plans with it.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+        time_of_day INTEGER NOT NULL,
+        repeat_rule TEXT NOT NULL,
+        start_date INTEGER NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_schedules_deck ON schedules(deck_id);
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
   }
 
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
@@ -333,4 +363,97 @@ export async function getBestScoreRatio(): Promise<number | null> {
     'SELECT MAX(CAST(score AS REAL) / total) AS best FROM attempts'
   );
   return row?.best ?? null;
+}
+
+interface ScheduleRow {
+  id: number;
+  deck_id: string;
+  time_of_day: number;
+  repeat_rule: string;
+  start_date: number;
+  enabled: number;
+  created_at: number;
+  deck_name: string | null;
+}
+
+function toSchedule(row: ScheduleRow): Schedule {
+  return {
+    id: row.id,
+    deckId: row.deck_id,
+    deckName: row.deck_name ?? 'Removed deck',
+    timeOfDay: row.time_of_day,
+    repeat: row.repeat_rule as Repeat,
+    startDate: row.start_date,
+    enabled: row.enabled === 1,
+    createdAt: row.created_at,
+  };
+}
+
+/** Every plan, earliest time of day first — the order the Planner renders. */
+export async function listSchedules(): Promise<Schedule[]> {
+  const rows = await getDb().getAllAsync<ScheduleRow>(
+    `SELECT s.*, d.name AS deck_name
+     FROM schedules s
+     LEFT JOIN decks d ON d.id = s.deck_id
+     ORDER BY s.time_of_day, s.created_at`
+  );
+  return rows.map(toSchedule);
+}
+
+export type NewSchedule = Pick<Schedule, 'deckId' | 'timeOfDay' | 'repeat' | 'startDate'>;
+
+export async function createSchedule(schedule: NewSchedule): Promise<number> {
+  const result = await getDb().runAsync(
+    `INSERT INTO schedules (deck_id, time_of_day, repeat_rule, start_date, enabled, created_at)
+     VALUES (?, ?, ?, ?, 1, ?)`,
+    schedule.deckId,
+    schedule.timeOfDay,
+    schedule.repeat,
+    schedule.startDate,
+    Date.now()
+  );
+  return result.lastInsertRowId;
+}
+
+export async function setScheduleEnabled(id: number, enabled: boolean): Promise<void> {
+  await getDb().runAsync(
+    'UPDATE schedules SET enabled = ? WHERE id = ?',
+    enabled ? 1 : 0,
+    id
+  );
+}
+
+export async function deleteSchedule(id: number): Promise<void> {
+  await getDb().runAsync('DELETE FROM schedules WHERE id = ?', id);
+}
+
+export async function readSetting(key: string): Promise<string | null> {
+  const row = await getDb().getFirstAsync<{ value: string }>(
+    'SELECT value FROM settings WHERE key = ?',
+    key
+  );
+  return row?.value ?? null;
+}
+
+export async function writeSetting(key: string, value: string): Promise<void> {
+  await getDb().runAsync(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    key,
+    value
+  );
+}
+
+/**
+ * Decks a quiz can actually run on right now: notes subjects with
+ * questions, plus downloaded trivia. Scheduling a deck you have not
+ * downloaded would produce a reminder that leads to a dead end.
+ */
+export async function listPlayableDecks(): Promise<Deck[]> {
+  const rows = await getDb().getAllAsync<DeckRow>(
+    `SELECT * FROM decks
+     WHERE downloaded_at IS NOT NULL AND question_count > 0
+     ORDER BY source DESC, name`
+  );
+  return rows.map(toDeck);
 }

@@ -45,3 +45,33 @@ export interface Attempt {
   durationMs: number;
   completedAt: number; // epoch ms
 }
+
+/** How a scheduled quiz repeats. */
+export type Repeat = 'once' | 'daily' | 'weekdays' | 'weekly';
+
+export const REPEATS: Repeat[] = ['once', 'daily', 'weekdays', 'weekly'];
+
+export const REPEAT_LABEL: Record<Repeat, string> = {
+  once: 'Once',
+  daily: 'Every day',
+  weekdays: 'Weekdays',
+  weekly: 'Weekly',
+};
+
+/**
+ * A quiz the student planned for themselves. Reminders are derived from
+ * these, never stored — see lib/schedule.ts.
+ */
+export interface Schedule {
+  id: number;
+  deckId: string;
+  /** Joined from decks at read time so the planner can render offline. */
+  deckName: string;
+  /** Minutes past local midnight, 0–1439. */
+  timeOfDay: number;
+  repeat: Repeat;
+  /** Epoch ms; the day a `once` fires, or the day a repeat starts. */
+  startDate: number;
+  enabled: boolean;
+  createdAt: number;
+}

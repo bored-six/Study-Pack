@@ -8,6 +8,8 @@ import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import type { Deck } from '@/lib/types';
 import { colors, derpRadius, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
+import { formatClock, joinDeckNames } from '@/lib/schedule';
+import { usePlannerStore } from '@/store/planner';
 import { useDecksStore } from '@/store/decks';
 import { useNotesStore } from '@/store/notes';
 
@@ -26,6 +28,7 @@ function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { decks, refresh } = useDecksStore();
+  const { refresh: refreshPlanner, upcoming } = usePlannerStore();
   const {
     subjects: noteDecks,
     refresh: refreshNotes,
@@ -41,7 +44,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       void refreshNotes();
-    }, [refreshNotes])
+      void refreshPlanner();
+    }, [refreshNotes, refreshPlanner])
   );
 
   const downloadedCount = useMemo(
@@ -63,6 +67,18 @@ export default function HomeScreen() {
     [removeNoteDeck]
   );
 
+  const nextSession = useMemo(() => upcoming()[0] ?? null, [upcoming]);
+  const nextLabel = useMemo(() => {
+    if (!nextSession) return '';
+    const minutes = Math.round((nextSession.at - Date.now()) / 60_000);
+    if (minutes <= 0) return 'Starting now';
+    if (minutes < 60) return `In ${minutes} min`;
+    if (minutes < 24 * 60) return `In ${Math.round(minutes / 60)} hr`;
+    return new Date(nextSession.at).toLocaleDateString(undefined, {
+      weekday: 'long',
+    });
+  }, [nextSession]);
+
   return (
     <View style={styles.screen}>
       <RuledPaper />
@@ -81,6 +97,25 @@ export default function HomeScreen() {
       <Text style={styles.sub}>Your own notes, plus trivia to practice on.</Text>
 
       <OfflineBanner message="Offline — everything saved still works" style={styles.banner} />
+
+      {nextSession ? (
+        <Pressable
+          onPress={() => router.push('/planner')}
+          style={({ pressed }) => [styles.nextCard, pressed && styles.pressed]}>
+          <Tape rotate="-3deg" />
+          <View style={styles.nextBadge}>
+            <Icon name="clock" size={24} color={colors.ink} fill={colors.goldWash} />
+          </View>
+          <View style={styles.cardText}>
+            <Text style={styles.nextKicker}>NEXT UP · {formatClock(nextSession.at)}</Text>
+            <Text style={styles.cardTitle}>
+              {joinDeckNames(nextSession.occurrences.map((o) => o.deckName))}
+            </Text>
+            <Text style={styles.cardBody}>{nextLabel}</Text>
+          </View>
+          <Icon name="play" size={16} color={colors.accentDeep} />
+        </Pressable>
+      ) : null}
 
       <SectionHeading icon="book" label="MY NOTES" />
 
@@ -316,6 +351,34 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: colors.textDim,
     marginTop: 1,
+  },
+  nextCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.goldWash,
+    ...outline,
+    borderRadius: radius.card,
+    padding: 14,
+    marginTop: 18,
+    ...shadow.card,
+  },
+  nextBadge: {
+    width: 48,
+    height: 48,
+    ...derpRadius,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
+  },
+  nextKicker: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 10.5,
+    letterSpacing: 1.3,
+    color: colors.gold,
   },
   pressed: {
     opacity: 0.8,
