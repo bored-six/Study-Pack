@@ -26,12 +26,14 @@ export function OfflineBanner({ message = '✈ Offline — showing device conten
 const styles = StyleSheet.create({
   banner: {
     backgroundColor: colors.goldWash,
+    borderColor: 'rgba(172, 118, 28, 0.22)',
+    borderWidth: 1.5,
     borderRadius: radius.control,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   text: {
-    fontFamily: font.semibold,
+    fontFamily: font.bodyBold,
     fontSize: 12,
     color: colors.gold,
   },

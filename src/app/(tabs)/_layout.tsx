@@ -13,16 +13,17 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: colors.textFaint,
         tabBarStyle: {
           backgroundColor: colors.surface,
-          borderTopColor: colors.hairlineSoft,
+          borderTopWidth: 1.5,
+          borderTopColor: colors.lineSoft,
         },
-        tabBarLabelStyle: { fontFamily: font.semibold, fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: font.bodyHeavy, fontSize: 11 },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Decks',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="albums-outline" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'albums' : 'albums-outline'} color={color} size={size} />
           ),
         }}
       />
@@ -30,8 +31,12 @@ export default function TabsLayout() {
         name="progress"
         options={{
           title: 'Progress',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart-outline" color={color} size={size} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? 'stats-chart' : 'stats-chart-outline'}
+              color={color}
+              size={size}
+            />
           ),
         }}
       />

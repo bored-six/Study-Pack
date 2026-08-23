@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type AttemptWithDeck } from '@/lib/db';
 import { useProgressStore } from '@/store/progress';
-import { colors, font, radius } from '@/theme/tokens';
+import { colors, font, radius, shadow } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -78,7 +78,8 @@ export default function ProgressScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.title}>Progress</Text>
+      <Text style={styles.kicker}>STUDYPACK</Text>
+      <Text style={styles.title}>Your progress 📈</Text>
       <Text style={styles.sub}>
         {totalAttempts > 0
           ? `${totalAttempts} ${totalAttempts === 1 ? 'quiz' : 'quizzes'} · saved on this device`
@@ -91,6 +92,7 @@ export default function ProgressScreen() {
         </View>
       ) : empty ? (
         <View style={styles.empty}>
+          <Text style={styles.emptyEmoji}>🌱</Text>
           <Text style={styles.emptyTitle}>No quizzes yet</Text>
           <Text style={styles.emptyBody}>
             Download a deck and take your first quiz — your scores and streak will live
@@ -100,13 +102,13 @@ export default function ProgressScreen() {
       ) : (
         <>
           <View style={styles.stats}>
-            <View style={styles.stat}>
+            <View style={[styles.stat, styles.statStreak]}>
+              <Text style={styles.statEmoji}>🔥</Text>
               <Text style={[styles.statNum, { color: colors.gold }]}>{currentStreak}</Text>
-              <Text style={styles.statLabel}>
-                {currentStreak === 1 ? 'day streak' : 'day streak'}
-              </Text>
+              <Text style={styles.statLabel}>day streak</Text>
             </View>
             <View style={styles.stat}>
+              <Text style={styles.statEmoji}>🏆</Text>
               <Text style={[styles.statNum, { color: colors.accentDeep }]}>
                 {bestPct != null ? `${bestPct}%` : '—'}
               </Text>
@@ -125,7 +127,7 @@ export default function ProgressScreen() {
           />
 
           <View style={styles.longestPill}>
-            <Text style={styles.longestText}>▲ Longest streak: {longestStreak}{' '}
+            <Text style={styles.longestText}>⚡ Longest streak: {longestStreak}{' '}
               {longestStreak === 1 ? 'day' : 'days'}
             </Text>
           </View>
@@ -141,16 +143,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     paddingHorizontal: 16,
   },
+  kicker: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 11,
+    letterSpacing: 2,
+    color: colors.accentDeep,
+  },
   title: {
-    fontFamily: font.bold,
-    fontSize: 28,
+    fontFamily: font.display,
+    fontSize: 30,
+    lineHeight: 38,
     color: colors.text,
   },
   sub: {
-    fontFamily: font.medium,
+    fontFamily: font.bodySemibold,
     fontSize: 13,
     color: colors.textFaint,
-    marginTop: 2,
+    marginTop: 1,
   },
   center: {
     flex: 1,
@@ -159,110 +168,124 @@ const styles = StyleSheet.create({
   },
   stats: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
+    gap: 12,
+    marginTop: 16,
   },
   stat: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderColor: colors.hairlineSoft,
-    borderWidth: 1,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     borderRadius: radius.card,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    ...shadow.card,
+  },
+  statStreak: {
+    backgroundColor: colors.goldWash,
+    borderColor: 'rgba(172, 118, 28, 0.25)',
+  },
+  statEmoji: {
+    fontSize: 20,
+    marginBottom: 2,
   },
   statNum: {
-    fontFamily: font.bold,
-    fontSize: 26,
+    fontFamily: font.display,
+    fontSize: 30,
+    lineHeight: 36,
     fontVariant: ['tabular-nums'],
-    letterSpacing: -0.5,
   },
   statLabel: {
-    fontFamily: font.medium,
-    fontSize: 11.5,
+    fontFamily: font.bodyBold,
+    fontSize: 12,
     color: colors.textDim,
-    marginTop: 1,
   },
   listCard: {
     backgroundColor: colors.surface,
-    borderColor: colors.hairlineSoft,
-    borderWidth: 1,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     borderRadius: radius.card,
-    marginTop: 12,
+    marginTop: 14,
     flexGrow: 0,
     flexShrink: 1,
+    ...shadow.card,
   },
   listContent: {
-    paddingHorizontal: 14,
-    paddingVertical: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
   },
   separator: {
     height: 1,
-    backgroundColor: colors.hairlineSoft,
+    backgroundColor: colors.lineSoft,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
-    paddingVertical: 10,
+    paddingVertical: 11,
   },
   rowLeft: {
     flexShrink: 1,
   },
   rowName: {
-    fontFamily: font.medium,
-    fontSize: 13.5,
+    fontFamily: font.bodyBold,
+    fontSize: 14,
     color: colors.text,
   },
   rowWhen: {
-    fontFamily: font.medium,
-    fontSize: 11,
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
     color: colors.textFaint,
     marginTop: 1,
   },
   chip: {
-    borderRadius: 8,
-    paddingHorizontal: 8,
+    borderRadius: 10,
+    paddingHorizontal: 9,
     paddingVertical: 4,
   },
   chipText: {
-    fontFamily: font.bold,
-    fontSize: 12,
+    fontFamily: font.bodyHeavy,
+    fontSize: 12.5,
     fontVariant: ['tabular-nums'],
   },
   longestPill: {
     alignSelf: 'flex-start',
     backgroundColor: colors.goldWash,
     borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     marginTop: 12,
     marginBottom: 16,
   },
   longestText: {
-    fontFamily: font.semibold,
-    fontSize: 11.5,
+    fontFamily: font.bodyHeavy,
+    fontSize: 12,
     color: colors.gold,
   },
   empty: {
     backgroundColor: colors.surface,
-    borderColor: colors.hairlineSoft,
-    borderWidth: 1,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     borderRadius: radius.card,
-    padding: 20,
+    padding: 22,
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     marginTop: 16,
+    ...shadow.card,
+  },
+  emptyEmoji: {
+    fontSize: 30,
+    marginBottom: 4,
   },
   emptyTitle: {
-    fontFamily: font.semibold,
-    fontSize: 15,
+    fontFamily: font.heading,
+    fontSize: 16,
     color: colors.text,
   },
   emptyBody: {
-    fontFamily: font.regular,
-    fontSize: 13,
+    fontFamily: font.body,
+    fontSize: 13.5,
     color: colors.textDim,
     textAlign: 'center',
   },

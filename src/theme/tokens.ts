@@ -1,47 +1,72 @@
 /**
- * StudyPack design tokens — warm pastel green.
- * Single light theme by design: cream cards on a mint-green ground,
- * warm forest ink (never pure black), gold reserved for streaks and
- * the offline banner.
+ * StudyPack design tokens — "sticker book" casual.
+ * Warm paper ground, white cards outlined in forest ink with hard offset
+ * shadows, chunky press-down buttons, and a small set of candy washes that
+ * rotate across deck cards. Green stays the hero; gold is reserved for
+ * streaks and the offline banner. Single light theme by design.
  */
 export const colors = {
   // ground
-  bg: '#E6F3E7',
-  surface: '#FFFDF6',
-  surface2: '#EEF5EC',
-  hairline: 'rgba(35, 59, 40, 0.12)',
-  hairlineSoft: 'rgba(35, 59, 40, 0.08)',
+  bg: '#FAF3E1',
+  surface: '#FFFFFF',
+  surface2: '#F4EDDA',
+  line: 'rgba(39, 54, 43, 0.14)',
+  lineSoft: 'rgba(39, 54, 43, 0.09)',
   // ink
-  text: '#233524',
-  textDim: '#5B7159',
-  textFaint: '#748A76',
-  // accent
-  accent: '#85D79B',
+  text: '#27362B',
+  textDim: '#5D6F5C',
+  textFaint: '#82927F',
+  // accent (hero green)
+  accent: '#5FD184',
+  accentEdge: '#38A75F',
   accentDeep: '#2C8A4A',
-  onAccent: '#0F3315',
-  accentWash: '#D9EFD9',
+  onAccent: '#0E3018',
+  accentWash: '#DDF3DC',
   // semantics
   leaf: '#3B7527',
-  leafWash: '#E4F2D2',
-  coral: '#B44F3F',
-  coralWash: '#FBE2DB',
-  gold: '#B0791F',
-  goldWash: '#FAEDD0',
+  leafWash: '#E3F2CE',
+  coral: '#C24E38',
+  coralWash: '#FBE1D7',
+  gold: '#AC761C',
+  goldWash: '#FAECCB',
   // controls
-  track: '#D3E7D4',
-  disabledBg: '#E3EDE2',
-  disabledText: '#9AAA9C',
+  track: '#EFE5CB',
+  disabledBg: '#EDE6D2',
+  disabledText: '#A5AF9E',
 } as const;
 
+/** Candy washes rotated across deck cards for sticker-sheet variety. */
+export const candy = [
+  { wash: '#DDF3DC', ink: '#2C8A4A' }, // mint
+  { wash: '#FFE5D2', ink: '#BC5A2E' }, // peach
+  { wash: '#FCEBC0', ink: '#A0731A' }, // sun
+  { wash: '#DBEEFB', ink: '#2E6FA3' }, // sky
+  { wash: '#EAE2FA', ink: '#6C51A8' }, // lilac
+] as const;
+
 export const radius = {
-  card: 16,
-  control: 12,
+  card: 22,
+  control: 16,
   pill: 999,
 } as const;
 
+/** Hard offset shadows — the sticker look. Requires RN >= 0.76 (new arch). */
+export const shadow = {
+  card: { boxShadow: '0 3px 0 rgba(39, 54, 43, 0.10)' },
+  pop: { boxShadow: '0 4px 0 rgba(39, 54, 43, 0.16)' },
+} as const;
+
+/** Depth of the pressable button "edge" in px. */
+export const buttonEdge = 4;
+
 export const font = {
-  regular: 'Inter_400Regular',
-  medium: 'Inter_500Medium',
-  semibold: 'Inter_600SemiBold',
-  bold: 'Inter_700Bold',
+  // Baloo 2 — rounded display for titles, numbers, and buttons
+  display: 'Baloo2_800ExtraBold',
+  heading: 'Baloo2_700Bold',
+  headingSnug: 'Baloo2_600SemiBold',
+  // Nunito — friendly body
+  body: 'Nunito_500Medium',
+  bodySemibold: 'Nunito_600SemiBold',
+  bodyBold: 'Nunito_700Bold',
+  bodyHeavy: 'Nunito_800ExtraBold',
 } as const;

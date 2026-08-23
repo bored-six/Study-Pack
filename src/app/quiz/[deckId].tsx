@@ -3,9 +3,10 @@ import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ChunkyButton } from '@/components/ChunkyButton';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useQuizStore } from '@/store/quiz';
-import { colors, font, radius } from '@/theme/tokens';
+import { colors, font, radius, shadow } from '@/theme/tokens';
 
 export default function QuizScreen() {
   const insets = useSafeAreaInsets();
@@ -42,13 +43,15 @@ export default function QuizScreen() {
     return (
       <View style={[styles.screen, styles.center, { padding: 24 }]}>
         <View style={styles.errorCard}>
+          <Text style={styles.errorEmoji}>🙈</Text>
           <Text style={styles.errorTitle}>Can't start this quiz</Text>
           <Text style={styles.errorBody}>{error}</Text>
-          <Pressable
+          <ChunkyButton
+            label="Back to decks"
+            size="lg"
             onPress={() => router.back()}
-            style={({ pressed }) => [styles.nextBtn, pressed && styles.pressed]}>
-            <Text style={styles.nextBtnText}>Back to decks</Text>
-          </Pressable>
+            style={styles.errorBtn}
+          />
         </View>
       </View>
     );
@@ -58,13 +61,17 @@ export default function QuizScreen() {
   if (!question) return null;
 
   const revealed = selected != null;
+  const gotItRight = revealed && selected === question.correctAnswer;
   const isLast = index + 1 === questions.length;
   const progress = (index + (revealed ? 1 : 0)) / questions.length;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
-        <Pressable onPress={handleQuit} hitSlop={12} style={styles.quitBtn}>
+        <Pressable
+          onPress={handleQuit}
+          hitSlop={12}
+          style={({ pressed }) => [styles.quitBtn, pressed && styles.pressed]}>
           <Text style={styles.quitText}>✕</Text>
         </Pressable>
         <Text style={styles.counter}>
@@ -104,7 +111,7 @@ export default function QuizScreen() {
                   showCorrect && styles.answerCorrect,
                   showWrong && styles.answerWrong,
                   revealed && !showCorrect && !showWrong && styles.answerFaded,
-                  pressed && !revealed && styles.pressed,
+                  pressed && !revealed && styles.answerPressed,
                 ]}>
                 <Text
                   style={[
@@ -124,13 +131,18 @@ export default function QuizScreen() {
 
       <View style={{ paddingBottom: insets.bottom + 16 }}>
         {revealed ? (
-          <Pressable
-            onPress={handleAdvance}
-            style={({ pressed }) => [styles.nextBtn, pressed && styles.pressed]}>
-            <Text style={styles.nextBtnText}>{isLast ? 'See results' : 'Next question'}</Text>
-          </Pressable>
+          <>
+            <Text style={[styles.feedback, gotItRight ? styles.feedbackRight : styles.feedbackWrong]}>
+              {gotItRight ? 'Nice one! 🎉' : 'Not quite 😅'}
+            </Text>
+            <ChunkyButton
+              label={isLast ? 'See results' : 'Next question'}
+              size="lg"
+              onPress={handleAdvance}
+            />
+          </>
         ) : (
-          <Text style={styles.hint}>Pick an answer</Text>
+          <Text style={styles.hint}>Tap an answer 👆</Text>
         )}
       </View>
     </View>
@@ -153,41 +165,45 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   quitBtn: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   quitText: {
-    fontFamily: font.semibold,
+    fontFamily: font.bodyHeavy,
     fontSize: 14,
     color: colors.textDim,
   },
   counter: {
-    fontFamily: font.bold,
-    fontSize: 12.5,
+    fontFamily: font.heading,
+    fontSize: 13.5,
     color: colors.textDim,
     fontVariant: ['tabular-nums'],
   },
   track: {
     flex: 1,
-    height: 6,
+    height: 12,
     borderRadius: radius.pill,
     backgroundColor: colors.track,
+    borderColor: colors.lineSoft,
+    borderWidth: 1,
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
     borderRadius: radius.pill,
-    backgroundColor: colors.accentDeep,
+    backgroundColor: colors.accent,
   },
   offline: {
     marginTop: 12,
   },
   deckName: {
-    fontFamily: font.semibold,
+    fontFamily: font.bodyHeavy,
     fontSize: 12.5,
     color: colors.textFaint,
     marginTop: 14,
@@ -199,9 +215,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   prompt: {
-    fontFamily: font.semibold,
-    fontSize: 20,
-    lineHeight: 27,
+    fontFamily: font.heading,
+    fontSize: 21,
+    lineHeight: 28,
     color: colors.text,
     marginTop: 6,
     marginBottom: 18,
@@ -214,88 +230,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     borderRadius: radius.control,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    ...shadow.card,
+  },
+  answerPressed: {
+    backgroundColor: colors.accentWash,
+    borderColor: colors.accentEdge,
   },
   answerCorrect: {
     backgroundColor: colors.leafWash,
-    borderColor: 'rgba(59, 117, 39, 0.25)',
-    borderWidth: 1,
+    borderColor: 'rgba(59, 117, 39, 0.4)',
   },
   answerWrong: {
     backgroundColor: colors.coralWash,
-    borderColor: 'rgba(180, 79, 63, 0.22)',
-    borderWidth: 1,
+    borderColor: 'rgba(194, 78, 56, 0.4)',
   },
   answerFaded: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
   answerText: {
     flexShrink: 1,
-    fontFamily: font.medium,
-    fontSize: 14.5,
+    fontFamily: font.bodyBold,
+    fontSize: 15,
     lineHeight: 20,
     color: colors.text,
   },
   answerTextCorrect: {
-    fontFamily: font.semibold,
+    fontFamily: font.bodyHeavy,
     color: colors.leaf,
   },
   answerTextWrong: {
-    fontFamily: font.semibold,
+    fontFamily: font.bodyHeavy,
     color: colors.coral,
   },
   markCorrect: {
-    fontFamily: font.bold,
-    fontSize: 14,
+    fontFamily: font.bodyHeavy,
+    fontSize: 15,
     color: colors.leaf,
   },
   markWrong: {
-    fontFamily: font.bold,
-    fontSize: 14,
+    fontFamily: font.bodyHeavy,
+    fontSize: 15,
     color: colors.coral,
   },
-  nextBtn: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.control,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  nextBtnText: {
-    fontFamily: font.bold,
+  feedback: {
+    fontFamily: font.heading,
     fontSize: 15,
-    color: colors.onAccent,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  feedbackRight: {
+    color: colors.leaf,
+  },
+  feedbackWrong: {
+    color: colors.coral,
   },
   hint: {
-    fontFamily: font.medium,
-    fontSize: 12.5,
+    fontFamily: font.bodyBold,
+    fontSize: 13.5,
     color: colors.textFaint,
     textAlign: 'center',
-    paddingVertical: 13,
+    paddingVertical: 16,
   },
   errorCard: {
     backgroundColor: colors.surface,
-    borderColor: colors.hairlineSoft,
-    borderWidth: 1,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     borderRadius: radius.card,
-    padding: 20,
+    padding: 22,
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     alignSelf: 'stretch',
+    ...shadow.card,
+  },
+  errorEmoji: {
+    fontSize: 30,
   },
   errorTitle: {
-    fontFamily: font.semibold,
-    fontSize: 16,
+    fontFamily: font.heading,
+    fontSize: 17,
     color: colors.text,
   },
   errorBody: {
-    fontFamily: font.regular,
-    fontSize: 13.5,
+    fontFamily: font.body,
+    fontSize: 14,
     color: colors.textDim,
     textAlign: 'center',
-    marginBottom: 6,
+  },
+  errorBtn: {
+    marginTop: 8,
+    alignSelf: 'stretch',
   },
   pressed: {
     opacity: 0.7,

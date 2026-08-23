@@ -1,9 +1,14 @@
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
+  Baloo2_600SemiBold,
+  Baloo2_700Bold,
+  Baloo2_800ExtraBold,
+} from '@expo-google-fonts/baloo-2';
+import {
+  Nunito_500Medium,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+  Nunito_800ExtraBold,
+} from '@expo-google-fonts/nunito';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -20,10 +25,13 @@ type DbState = 'pending' | 'ready' | 'error';
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+    Baloo2_600SemiBold,
+    Baloo2_700Bold,
+    Baloo2_800ExtraBold,
+    Nunito_500Medium,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
   });
   const [dbState, setDbState] = useState<DbState>('pending');
 
@@ -83,12 +91,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   errorTitle: {
-    fontFamily: font.semibold,
-    fontSize: 17,
+    fontFamily: font.heading,
+    fontSize: 18,
     color: colors.text,
   },
   errorBody: {
-    fontFamily: font.regular,
+    fontFamily: font.body,
     fontSize: 14,
     color: colors.textDim,
     textAlign: 'center',

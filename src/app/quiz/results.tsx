@@ -1,10 +1,11 @@
 import { Redirect, router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ChunkyButton } from '@/components/ChunkyButton';
 import { DIFFICULTY_LABEL } from '@/lib/types';
 import { useQuizStore } from '@/store/quiz';
-import { colors, font, radius } from '@/theme/tokens';
+import { colors, font, radius, shadow } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -26,10 +27,10 @@ export default function ResultsScreen() {
   const pct = Math.round((score / total) * 100);
   const tone =
     pct >= 80
-      ? { color: colors.leaf, wash: colors.leafWash, label: 'Excellent' }
+      ? { color: colors.leaf, wash: colors.leafWash, label: 'You crushed it!', emoji: '🎉' }
       : pct >= 50
-        ? { color: colors.gold, wash: colors.goldWash, label: 'Solid effort' }
-        : { color: colors.coral, wash: colors.coralWash, label: 'Keep practicing' };
+        ? { color: colors.gold, wash: colors.goldWash, label: 'Solid effort', emoji: '💪' }
+        : { color: colors.coral, wash: colors.coralWash, label: 'Keep at it', emoji: '🌱' };
 
   return (
     <View
@@ -38,6 +39,7 @@ export default function ResultsScreen() {
         { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 },
       ]}>
       <View style={styles.card}>
+        <Text style={styles.emoji}>{tone.emoji}</Text>
         <View style={[styles.badge, { backgroundColor: tone.wash }]}>
           <Text style={[styles.badgeText, { color: tone.color }]}>{tone.label}</Text>
         </View>
@@ -58,18 +60,15 @@ export default function ResultsScreen() {
       </View>
 
       <View style={styles.actions}>
-        <Pressable
+        <ChunkyButton
+          label="Try again"
+          variant="soft"
+          size="lg"
           onPress={() =>
             router.replace({ pathname: '/quiz/[deckId]', params: { deckId: deck.id } })
           }
-          style={({ pressed }) => [styles.btnWash, pressed && styles.pressed]}>
-          <Text style={styles.btnWashText}>Try again</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => router.back()}
-          style={({ pressed }) => [styles.btnPrimary, pressed && styles.pressed]}>
-          <Text style={styles.btnPrimaryText}>Done</Text>
-        </Pressable>
+        />
+        <ChunkyButton label="Done" size="lg" onPress={() => router.back()} />
       </View>
     </View>
   );
@@ -84,33 +83,38 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderColor: colors.hairlineSoft,
-    borderWidth: 1,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     borderRadius: radius.card,
     padding: 28,
     alignItems: 'center',
     gap: 6,
     marginTop: 24,
+    ...shadow.pop,
+  },
+  emoji: {
+    fontSize: 44,
+    marginBottom: 2,
   },
   badge: {
     borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     marginBottom: 10,
   },
   badgeText: {
-    fontFamily: font.bold,
-    fontSize: 12.5,
+    fontFamily: font.heading,
+    fontSize: 13.5,
   },
   score: {
-    fontFamily: font.bold,
-    fontSize: 52,
+    fontFamily: font.display,
+    fontSize: 56,
+    lineHeight: 64,
     color: colors.text,
     fontVariant: ['tabular-nums'],
-    letterSpacing: -1,
   },
   pct: {
-    fontFamily: font.semibold,
+    fontFamily: font.bodyHeavy,
     fontSize: 15,
     color: colors.textDim,
   },
@@ -123,7 +127,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   metaText: {
-    fontFamily: font.medium,
+    fontFamily: font.bodySemibold,
     fontSize: 12.5,
     color: colors.textFaint,
   },
@@ -131,37 +135,12 @@ const styles = StyleSheet.create({
     color: colors.textFaint,
   },
   saved: {
-    fontFamily: font.semibold,
-    fontSize: 12,
+    fontFamily: font.bodyBold,
+    fontSize: 12.5,
     color: colors.accentDeep,
     marginTop: 14,
   },
   actions: {
-    gap: 10,
-  },
-  btnPrimary: {
-    backgroundColor: colors.accent,
-    borderRadius: radius.control,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  btnPrimaryText: {
-    fontFamily: font.bold,
-    fontSize: 15,
-    color: colors.onAccent,
-  },
-  btnWash: {
-    backgroundColor: colors.accentWash,
-    borderRadius: radius.control,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  btnWashText: {
-    fontFamily: font.bold,
-    fontSize: 15,
-    color: colors.accentDeep,
-  },
-  pressed: {
-    opacity: 0.7,
+    gap: 12,
   },
 });

@@ -11,12 +11,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ChunkyButton } from '@/components/ChunkyButton';
 import { DeckCard } from '@/components/DeckCard';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useOnline } from '@/hooks/useOnline';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
+import { colors, font, radius, shadow } from '@/theme/tokens';
 import { useDecksStore } from '@/store/decks';
-import { colors, font, radius } from '@/theme/tokens';
 
 export default function DecksScreen() {
   const insets = useSafeAreaInsets();
@@ -70,7 +71,8 @@ export default function DecksScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.title}>Decks</Text>
+      <Text style={styles.kicker}>STUDYPACK</Text>
+      <Text style={styles.title}>Pick a deck 🃏</Text>
       <Text style={styles.sub}>
         {decks.length > 0
           ? `${downloadedCount} of ${decks.length} saved for offline`
@@ -96,7 +98,11 @@ export default function DecksScreen() {
             <Pressable
               key={level}
               onPress={() => setDifficulty(level)}
-              style={[styles.chip, active && styles.chipActive]}>
+              style={({ pressed }) => [
+                styles.chip,
+                active && styles.chipActive,
+                pressed && !active && styles.chipPressed,
+              ]}>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
                 {DIFFICULTY_LABEL[level]}
               </Text>
@@ -130,16 +136,14 @@ export default function DecksScreen() {
         ListEmptyComponent={
           status === 'error' ? (
             <View style={styles.empty}>
+              <Text style={styles.emptyEmoji}>🙈</Text>
               <Text style={styles.emptyTitle}>Couldn't load decks</Text>
               <Text style={styles.emptyBody}>{error}</Text>
-              <Pressable
-                onPress={refresh}
-                style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}>
-                <Text style={styles.retryText}>Try again</Text>
-              </Pressable>
+              <ChunkyButton label="Try again" size="md" onPress={refresh} style={styles.retry} />
             </View>
           ) : status === 'ready' ? (
             <View style={styles.empty}>
+              <Text style={styles.emptyEmoji}>🍃</Text>
               <Text style={styles.emptyTitle}>No decks here yet</Text>
               <Text style={styles.emptyBody}>Pull down to refresh the catalog.</Text>
             </View>
@@ -156,16 +160,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     paddingHorizontal: 16,
   },
+  kicker: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 11,
+    letterSpacing: 2,
+    color: colors.accentDeep,
+  },
   title: {
-    fontFamily: font.bold,
-    fontSize: 28,
+    fontFamily: font.display,
+    fontSize: 30,
+    lineHeight: 38,
     color: colors.text,
   },
   sub: {
-    fontFamily: font.medium,
+    fontFamily: font.bodySemibold,
     fontSize: 13,
     color: colors.textFaint,
-    marginTop: 2,
+    marginTop: 1,
   },
   cacheNote: {
     marginTop: 10,
@@ -175,71 +186,72 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   cacheNoteText: {
-    fontFamily: font.semibold,
+    fontFamily: font.bodyBold,
     fontSize: 12,
     color: colors.gold,
   },
   chips: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 12,
-    marginBottom: 12,
+    marginTop: 14,
+    marginBottom: 14,
   },
   chip: {
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     borderRadius: radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 15,
+    paddingVertical: 7,
+  },
+  chipPressed: {
+    opacity: 0.7,
   },
   chipActive: {
     backgroundColor: colors.accent,
+    borderColor: colors.accentEdge,
+    ...shadow.pop,
   },
   chipText: {
-    fontFamily: font.semibold,
-    fontSize: 12.5,
+    fontFamily: font.bodyHeavy,
+    fontSize: 13,
     color: colors.textDim,
   },
   chipTextActive: {
     color: colors.onAccent,
   },
   list: {
-    gap: 10,
+    gap: 12,
     paddingBottom: 24,
   },
   empty: {
     backgroundColor: colors.surface,
-    borderColor: colors.hairlineSoft,
-    borderWidth: 1,
+    borderColor: colors.line,
+    borderWidth: 1.5,
     borderRadius: radius.card,
-    padding: 20,
+    padding: 22,
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     marginTop: 12,
+    ...shadow.card,
+  },
+  emptyEmoji: {
+    fontSize: 30,
+    marginBottom: 4,
   },
   emptyTitle: {
-    fontFamily: font.semibold,
-    fontSize: 15,
+    fontFamily: font.heading,
+    fontSize: 16,
     color: colors.text,
   },
   emptyBody: {
-    fontFamily: font.regular,
-    fontSize: 13,
+    fontFamily: font.body,
+    fontSize: 13.5,
     color: colors.textDim,
     textAlign: 'center',
   },
-  retryBtn: {
-    marginTop: 8,
-    backgroundColor: colors.accent,
-    borderRadius: radius.control,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  retryText: {
-    fontFamily: font.bold,
-    fontSize: 13,
-    color: colors.onAccent,
-  },
-  pressed: {
-    opacity: 0.7,
+  retry: {
+    marginTop: 10,
+    alignSelf: 'stretch',
   },
 });
