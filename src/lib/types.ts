@@ -8,13 +8,21 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   hard: 'Hard',
 };
 
-/** A deck is one Open Trivia DB category at one difficulty. */
+/** Where a deck came from: the trivia API, or the student's own notes. */
+export type DeckSource = 'trivia' | 'notes';
+
+/**
+ * A trivia deck is one Open Trivia DB category at one difficulty.
+ * A notes deck is generated on-device from pasted notes and is therefore
+ * downloaded from the moment it exists.
+ */
 export interface Deck {
-  id: string; // `${categoryId}:${difficulty}`
+  id: string; // trivia: `${categoryId}:${difficulty}` · notes: `note:${timestamp}`
   categoryId: number;
   name: string;
   difficulty: Difficulty;
   questionCount: number;
+  source: DeckSource;
   /** Epoch ms when the deck's questions were saved locally; null = not downloaded. */
   downloadedAt: number | null;
 }

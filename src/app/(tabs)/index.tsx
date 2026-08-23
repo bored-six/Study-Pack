@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,8 +6,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import type { Deck } from '@/lib/types';
 import { colors, derpRadius, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
 import { useDecksStore } from '@/store/decks';
+import { useNotesStore } from '@/store/notes';
 
 function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
   return (
@@ -43,13 +45,19 @@ export default function HomeScreen() {
     [decks]
   );
 
-  const handleAddNotes = useCallback(() => {
-    Alert.alert(
-      'Add your notes',
-      "Coming next: paste your class notes and Flipp turns them into quiz questions — no internet, no AI needed.",
-      [{ text: 'Got it' }]
-    );
-  }, []);
+  const handleDeleteNote = useCallback(
+    (deck: Deck) => {
+      Alert.alert('Delete these notes?', `"${deck.name}" and its questions will be removed.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => void removeNoteDeck(deck.id),
+        },
+      ]);
+    },
+    [removeNoteDeck]
+  );
 
   return (
     <View style={styles.screen}>
@@ -72,17 +80,40 @@ export default function HomeScreen() {
 
       <SectionHeading icon="book" label="MY NOTES" />
 
-      {/* Note decks will list here once the parser lands. */}
+      {noteDecks.map((deck) => (
+        <Pressable
+          key={deck.id}
+          onPress={() =>
+            router.push({ pathname: '/quiz/[deckId]', params: { deckId: deck.id } })
+          }
+          onLongPress={() => handleDeleteNote(deck)}
+          style={({ pressed }) => [styles.noteDeckCard, pressed && styles.pressed]}>
+          <View style={styles.noteDeckBadge}>
+            <Icon name="book" size={24} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
+          </View>
+          <View style={styles.cardText}>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {deck.name}
+            </Text>
+            <Text style={styles.cardBody}>
+              {deck.questionCount} question{deck.questionCount === 1 ? '' : 's'} · always offline
+            </Text>
+          </View>
+          <Icon name="play" size={16} color={colors.accentDeep} />
+        </Pressable>
+      ))}
 
       <Pressable
-        onPress={handleAddNotes}
+        onPress={() => router.push('/notes/new')}
         style={({ pressed }) => [styles.notesCard, pressed && styles.pressed]}>
         <Tape />
         <View style={styles.notesBadge}>
           <Icon name="bulb" size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
         </View>
         <View style={styles.cardText}>
-          <Text style={styles.cardTitle}>Add your notes</Text>
+          <Text style={styles.cardTitle}>
+            {noteDecks.length > 0 ? 'Add more notes' : 'Add your notes'}
+          </Text>
           <Text style={styles.cardBody}>
             Paste notes from class and we'll turn them into a quiz you can take anywhere.
           </Text>

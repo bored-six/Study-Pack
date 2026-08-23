@@ -1,9 +1,9 @@
 import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 
-import type { Attempt, Deck, Difficulty, Question } from './types';
+import type { Attempt, Deck, DeckSource, Difficulty, Question } from './types';
 
 const DB_NAME = 'studypack.db';
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 let instance: SQLiteDatabase | null = null;
 
@@ -56,6 +56,11 @@ export async function initDb(): Promise<void> {
     });
   }
 
+  if (version < 2) {
+    // Existing rows are all trivia; notes decks arrive with this version.
+    await db.execAsync(`ALTER TABLE decks ADD COLUMN source TEXT NOT NULL DEFAULT 'trivia'`);
+  }
+
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -65,6 +70,7 @@ interface DeckRow {
   name: string;
   difficulty: string;
   question_count: number;
+  source: string | null;
   downloaded_at: number | null;
 }
 
@@ -75,14 +81,20 @@ function toDeck(row: DeckRow): Deck {
     name: row.name,
     difficulty: row.difficulty as Difficulty,
     questionCount: row.question_count,
+    source: (row.source as DeckSource) ?? 'trivia',
     downloadedAt: row.downloaded_at,
   };
 }
 
-export async function listDecks(): Promise<Deck[]> {
+/** Trivia decks sort by name; notes decks sort newest first. */
+export async function listDecks(source: DeckSource = 'trivia'): Promise<Deck[]> {
+  const order =
+    source === 'notes'
+      ? 'downloaded_at DESC'
+      : `name, CASE difficulty WHEN 'easy' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END`;
   const rows = await getDb().getAllAsync<DeckRow>(
-    `SELECT * FROM decks
-     ORDER BY name, CASE difficulty WHEN 'easy' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END`
+    `SELECT * FROM decks WHERE source = ? ORDER BY ${order}`,
+    source
   );
   return rows.map(toDeck);
 }
@@ -91,13 +103,15 @@ export async function listDecks(): Promise<Deck[]> {
  * Refreshes the browsable catalog. Never touches downloaded_at or questions,
  * so a catalog refresh can't corrupt an existing download.
  */
-export async function upsertCatalog(decks: Omit<Deck, 'downloadedAt'>[]): Promise<void> {
+export async function upsertCatalog(
+  decks: Omit<Deck, 'downloadedAt' | 'source'>[]
+): Promise<void> {
   const db = getDb();
   await db.withTransactionAsync(async () => {
     for (const deck of decks) {
       await db.runAsync(
-        `INSERT INTO decks (id, category_id, name, difficulty, question_count)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO decks (id, category_id, name, difficulty, question_count, source)
+         VALUES (?, ?, ?, ?, ?, 'trivia')
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name,
            question_count = CASE
@@ -155,6 +169,54 @@ export async function removeDownload(deckId: string): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.runAsync('DELETE FROM questions WHERE deck_id = ?', deckId);
     await db.runAsync('UPDATE decks SET downloaded_at = NULL WHERE id = ?', deckId);
+  });
+}
+
+/**
+ * Saves a deck built from the student's own notes. Notes decks are local by
+ * definition, so they're marked downloaded the moment they're created.
+ */
+export async function createNoteDeck(
+  title: string,
+  questions: DownloadableQuestion[]
+): Promise<string> {
+  const db = getDb();
+  const now = Date.now();
+  const deckId = `note:${now}`;
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO decks (id, category_id, name, difficulty, question_count, source, downloaded_at)
+       VALUES (?, 0, ?, 'medium', ?, 'notes', ?)`,
+      deckId,
+      title,
+      questions.length,
+      now
+    );
+    for (let position = 0; position < questions.length; position++) {
+      const q = questions[position];
+      await db.runAsync(
+        `INSERT INTO questions (id, deck_id, position, prompt, correct_answer, answers_json)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        `${deckId}:${position}`,
+        deckId,
+        position,
+        q.prompt,
+        q.correctAnswer,
+        JSON.stringify(q.answers)
+      );
+    }
+  });
+
+  return deckId;
+}
+
+/** Removes a notes deck and its questions outright. */
+export async function deleteDeck(deckId: string): Promise<void> {
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM questions WHERE deck_id = ?', deckId);
+    await db.runAsync('DELETE FROM decks WHERE id = ?', deckId);
   });
 }
 
