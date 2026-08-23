@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon } from '@/components/Icon';
+import { PromptModal } from '@/components/PromptModal';
 import { LIMITS } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
@@ -31,6 +32,7 @@ export default function NewNotesScreen() {
   const { subjects, targetId, refresh, setTarget, addSubject, parse } = useNotesStore();
   const [body, setBody] = useState('');
   const [scan, setScan] = useState<{ lines: number; found: number } | null>(null);
+  const [newSubject, setNewSubject] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,22 +49,13 @@ export default function NewNotesScreen() {
     [body.length]
   );
 
-  const promptForSubject = useCallback(() => {
-    Alert.prompt?.(
-      'New subject',
-      'What are you studying?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Create',
-          onPress: (value?: string) => {
-            if (value?.trim()) void addSubject(value);
-          },
-        },
-      ],
-      'plain-text'
-    );
-  }, [addSubject]);
+  const handleCreateSubject = useCallback(
+    (name: string) => {
+      setNewSubject(false);
+      void addSubject(name);
+    },
+    [addSubject]
+  );
 
   const runParse = useCallback(async () => {
     let subjectId = targetId;
@@ -150,7 +143,7 @@ export default function NewNotesScreen() {
                 );
               })}
               <Pressable
-                onPress={promptForSubject}
+                onPress={() => setNewSubject(true)}
                 style={({ pressed }) => [styles.chipNew, pressed && styles.pressed]}>
                 <Text style={styles.chipNewText}>+ New subject</Text>
               </Pressable>
@@ -203,6 +196,16 @@ export default function NewNotesScreen() {
             Runs entirely on your phone — no internet, no AI, nothing uploaded.
           </Text>
         </ScrollView>
+
+        <PromptModal
+          visible={newSubject}
+          title="New subject"
+          message="What are you studying?"
+          placeholder="Biology"
+          confirmLabel="Create"
+          onCancel={() => setNewSubject(false)}
+          onConfirm={handleCreateSubject}
+        />
       </View>
     </KeyboardAvoidingView>
   );
