@@ -13,6 +13,7 @@ const SOURCES = {
   wrong: require('../../assets/sfx/wrong.wav'),
   combo: require('../../assets/sfx/combo.wav'),
   tear: require('../../assets/sfx/tear.wav'),
+  stamp: require('../../assets/sfx/stamp.wav'),
   bell: require('../../assets/sfx/bell.wav'),
   star: require('../../assets/sfx/star.wav'),
   aplus: require('../../assets/sfx/aplus.wav'),

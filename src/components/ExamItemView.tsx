@@ -312,14 +312,15 @@ function ModifiedTrueFalse({
           {[true, false].map((value) => (
             <Pressable
               key={String(value)}
-              onPress={() =>
+              onPress={() => {
+                tapSelect();
                 patch({
                   saidTrue: value,
                   // Saying "false" opens the correction step; saying "true"
                   // is the whole answer either way.
                   done: reveal ? value !== item.isTrue || item.isTrue : value === true,
-                })
-              }
+                });
+              }}
               style={({ pressed }) => [styles.tfBtn, pressed && styles.pressed]}>
               <Text style={styles.tfText}>{value ? 'True' : 'False'}</Text>
             </Pressable>
@@ -346,7 +347,10 @@ function ModifiedTrueFalse({
                 // Locked in once picked, unless answers are being withheld —
                 // then changing your mind is part of sitting the paper.
                 disabled={reveal && wordIndex != null}
-                onPress={() => patch({ wordIndex: i })}
+                onPress={() => {
+                  tapSelect();
+                  patch({ wordIndex: i });
+                }}
                 style={({ pressed }) => [
                   styles.word,
                   chosen && styles.wordChosen,
@@ -544,6 +548,7 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
   /** Tapping a paired term releases it, so a mistap is never a dead end. */
   const tapTerm = (i: number) => {
     if (checked) return;
+    tapSelect();
     if (pairs[i] != null) {
       const next = { ...pairs };
       delete next[i];
@@ -646,6 +651,7 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
                 onLayout={(e) => setMeaningBoxes((b) => ({ ...b, [j]: box(e) }))}
                 onPress={() => {
                   if (activeTerm == null) return;
+                  tapSelect();
                   setDraft({
                     ...draft,
                     pairs: { ...pairs, [activeTerm]: j },

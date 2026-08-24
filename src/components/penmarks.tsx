@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Ellipse, Path } from 'react-native-svg';
 
+import { playSfx } from '@/lib/sfx';
 import { colors, font } from '@/theme/tokens';
 
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
@@ -145,12 +146,15 @@ export function Stamp({
   const opacity = useSharedValue(reduced ? 1 : 0);
 
   useEffect(() => {
-    if (reduced) return;
+    // The thud lands when the stamp makes contact, reduced motion or not.
+    const timer = setTimeout(() => playSfx('stamp'), reduced ? 0 : 140);
+    if (reduced) return () => clearTimeout(timer);
     opacity.value = withTiming(1, { duration: 90 });
     scale.value = withSequence(
       withTiming(0.92, { duration: 140, easing: Easing.in(Easing.quad) }),
       withSpring(1, { damping: 11, stiffness: 320 })
     );
+    return () => clearTimeout(timer);
   }, [opacity, reduced, scale]);
 
   const animStyle = useAnimatedStyle(() => ({
