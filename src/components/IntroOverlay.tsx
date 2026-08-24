@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Icon } from '@/components/Icon';
+import { playSfx } from '@/lib/sfx';
 import { Squiggle, Tape } from '@/components/notebook';
 import { colors, font, outline, shadow, textPop } from '@/theme/tokens';
 
@@ -22,7 +23,7 @@ const HOLD_MS = 2100;
 const REDUCED_HOLD_MS = 1200;
 const EXIT_MS = 320;
 
-const POP_SPRING = { damping: 12, stiffness: 150 } as const;
+const POP_SPRING = { damping: 10, stiffness: 120 } as const;
 
 /** Confetti dots scattered around the logo cluster, in candy inks. */
 const DOTS = [
@@ -72,8 +73,8 @@ export function IntroOverlay({ onDone }: Props) {
   const reduced = useReducedMotion();
   const doneRef = useRef(false);
 
-  const cardScale = useSharedValue(reduced ? 1 : 0.5);
-  const cardRotate = useSharedValue(reduced ? -4 : -16);
+  const cardScale = useSharedValue(reduced ? 1 : 0.2);
+  const cardRotate = useSharedValue(reduced ? -4 : 180); // Start upside down for a derpy flip
   const cardOpacity = useSharedValue(reduced ? 1 : 0);
   const wordY = useSharedValue(reduced ? 0 : 18);
   const wordOpacity = useSharedValue(reduced ? 1 : 0);
@@ -83,11 +84,14 @@ export function IntroOverlay({ onDone }: Props) {
 
   useEffect(() => {
     if (reduced) return;
-    cardOpacity.value = withTiming(1, { duration: 140 });
+    playSfx('star'); // Play a satisfying chime for the flip!
+    cardOpacity.value = withTiming(1, { duration: 180 });
     cardScale.value = withSpring(1, POP_SPRING);
-    cardRotate.value = withSpring(-4, POP_SPRING);
-    wordOpacity.value = withDelay(260, withTiming(1, { duration: 240 }));
-    wordY.value = withDelay(260, withSpring(0, { damping: 14, stiffness: 160 }));
+    cardRotate.value = withSpring(-8, POP_SPRING, () => {
+        runOnJS(playSfx)('combo'); // Play a clean combo sound when it lands
+    });
+    wordOpacity.value = withDelay(360, withTiming(1, { duration: 240 }));
+    wordY.value = withDelay(360, withSpring(0, { damping: 12, stiffness: 140 }));
     tagOpacity.value = withDelay(620, withTiming(1, { duration: 300 }));
   }, [cardOpacity, cardRotate, cardScale, reduced, tagOpacity, wordOpacity, wordY]);
 
@@ -126,9 +130,8 @@ export function IntroOverlay({ onDone }: Props) {
           {DOTS.map((dot) => (
             <Dot key={`${dot.x},${dot.y}`} {...dot} reduced={reduced} />
           ))}
-          <Animated.View style={[styles.sticker, cardStyle]}>
-            <Tape />
-            <Icon name="cardsFilled" size={52} color={colors.accent} strokeWidth={1.6} />
+          <Animated.View style={cardStyle}>
+            <Icon name="derpBrain" size={104} color={colors.ink} fill={colors.accent} strokeWidth={1.5} />
           </Animated.View>
           <Animated.Text style={[styles.wordmark, wordStyle]}>Flipp</Animated.Text>
           <Animated.View style={[styles.taglineRow, tagStyle]}>
