@@ -53,24 +53,28 @@ function FormatChip({
 
   const scale = useSharedValue(1);
   const baseRot = index % 2 === 0 ? -2.5 : 1.5;
-  const rot = useSharedValue(baseRot);
+  const iconScale = useSharedValue(1);
 
   useEffect(() => {
-    rot.value = withDelay(
+    iconScale.value = withDelay(
       index * 200,
       withRepeat(
         withSequence(
-          withTiming(baseRot + 1, { duration: 2000 }),
-          withTiming(baseRot - 1, { duration: 2000 })
+          withTiming(1.05, { duration: 1500 }),
+          withTiming(1, { duration: 1500 })
         ),
         -1,
         true
       )
     );
-  }, [baseRot, index, rot]);
+  }, [index, iconScale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { rotate: `${rot.value}deg` }],
+    transform: [{ scale: scale.value }, { rotate: `${baseRot}deg` }],
+  }));
+
+  const animatedIconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: on ? iconScale.value : 1 }],
   }));
 
   const handlePress = () => {
@@ -96,7 +100,9 @@ function FormatChip({
         ]}>
         <View style={[styles.tape, { transform: [{ rotate: index % 2 === 0 ? '-4deg' : '2deg' }] }]} />
         <View style={styles.tickboxContainer}>
-          <DerpCheck checked={on} style={styles.derpCheckSvg} />
+          <Animated.View style={animatedIconStyle}>
+            <DerpCheck checked={on} style={styles.derpCheckSvg} />
+          </Animated.View>
         </View>
         <Text
           style={[styles.chipName, on && styles.chipNameOn, off && styles.chipTextOff]}
@@ -125,8 +131,21 @@ function StepBtn({
   children: React.ReactNode;
 }) {
   const scale = useSharedValue(1);
+  const iconScale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const animatedIconStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
   const disabled = delta > 0 ? count >= max : count <= 1;
+
+  useEffect(() => {
+    iconScale.value = withRepeat(
+      withSequence(
+        withTiming(1.05, { duration: 1500 }),
+        withTiming(1, { duration: 1500 })
+      ),
+      -1,
+      true
+    );
+  }, [iconScale]);
 
   const handlePress = () => {
     if (disabled) return;
@@ -145,7 +164,7 @@ function StepBtn({
           disabled && styles.stepBtnOff,
           pressed && styles.pressed,
         ]}>
-        <View style={{ opacity: disabled ? 0.3 : 1 }}>{children}</View>
+        <Animated.View style={[{ opacity: disabled ? 0.3 : 1 }, animatedIconStyle]}>{children}</Animated.View>
       </Pressable>
     </Animated.View>
   );
@@ -167,22 +186,7 @@ function AmountRow({
 }) {
   const [draft, setDraft] = useState(String(count));
   const baseRot = index % 2 === 0 ? 0.5 : -0.5;
-  const rot = useSharedValue(baseRot);
   const numScale = useSharedValue(1);
-
-  useEffect(() => {
-    rot.value = withDelay(
-      index * 300,
-      withRepeat(
-        withSequence(
-          withTiming(baseRot + 0.5, { duration: 2500 }),
-          withTiming(baseRot - 0.5, { duration: 2500 })
-        ),
-        -1,
-        true
-      )
-    );
-  }, [baseRot, index, rot]);
 
   // Keep the field in step when − + or Max changes the number underneath it.
   useEffect(() => {
@@ -194,10 +198,6 @@ function AmountRow({
     const parsed = parseInt(draft.replace(/[^0-9]/g, ''), 10);
     onChange(Number.isNaN(parsed) ? 0 : parsed);
   };
-
-  const animatedRowStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rot.value}deg` }],
-  }));
 
   const animatedNumStyle = useAnimatedStyle(() => ({
     transform: [{ scale: numScale.value }, { rotate: '-3deg' }],
@@ -214,7 +214,7 @@ function AmountRow({
   };
 
   return (
-    <Animated.View style={[styles.amountRow, animatedRowStyle]}>
+    <View style={[styles.amountRow, { transform: [{ rotate: `${baseRot}deg` }] }]}>
       <View style={[styles.tape, { left: -10, top: '50%', marginTop: -8, width: 30, transform: [{ rotate: '85deg' }] }]} />
       <View style={styles.rowText}>
         <Text style={styles.rowTitle}>{FORMAT_LABEL[format]}</Text>
@@ -251,7 +251,7 @@ function AmountRow({
       <StepBtn delta={STEP} count={count} max={max} onPress={handleStep}>
         <DerpPlus width={42} height={42} />
       </StepBtn>
-    </Animated.View>
+    </View>
   );
 }
 
