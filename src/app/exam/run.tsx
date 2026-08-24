@@ -1,6 +1,7 @@
 import { Redirect, router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -213,6 +214,16 @@ export default function ExamRunScreen() {
     void store.answer(false, true).then(finished);
   }, [now, itemDeadline, spec.clock, store, finished]);
 
+  // One attempt per mount, tracked so a failed resume doesn't loop.
+  const [recovery, setRecovery] = useState<'idle' | 'trying' | 'failed'>('idle');
+  useEffect(() => {
+    if (status === 'active' || recovery !== 'idle') return;
+    setRecovery('trying');
+    void store.resume().then((restored) => {
+      if (!restored) setRecovery('failed');
+    });
+  }, [status, recovery, store]);
+
   const submitting = useRef(false);
   const submitPaper = useCallback(() => {
     if (submitting.current) return;
@@ -225,8 +236,16 @@ export default function ExamRunScreen() {
     if (now >= paperDeadline) submitPaper();
   }, [now, paperDeadline, spec.clock, submitPaper]);
 
+  // A reload wipes the in-memory sitting, and bailing to Home from here is
+  // what made a locked phone cost you your paper. Try the snapshot first;
+  // only give up once there is genuinely nothing to come back to.
   if (status !== 'active' || !item) {
-    return <Redirect href="/" />;
+    if (recovery === 'failed') return <Redirect href="/" />;
+    return (
+      <View style={[styles.screen, styles.center]}>
+        <ActivityIndicator color={colors.accentDeep} />
+      </View>
+    );
   }
 
   // Introduce each format the first time it comes up in this sitting.

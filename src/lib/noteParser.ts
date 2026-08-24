@@ -247,8 +247,13 @@ function isNumeric(value: string): boolean {
 function isHeading(line: string): boolean {
   const first = words(line)[0]?.toLowerCase().replace(/[^a-z]/g, '') ?? '';
   if (HEADING_WORDS.has(first)) return true;
-  // Short, capitalised, and unpunctuated is a title, not a statement.
-  return wordCount(line) <= 6 && /^[A-Z]/.test(line) && !/[.!?,;]$/.test(line);
+
+  // A heading labels what follows; it doesn't claim anything. "The eight most
+  // common figures of speech" has no verb and no full stop, so there is
+  // nothing in it to be right or wrong about.
+  if (/[.!?;]$/.test(line)) return false;
+  if (CLAIM_VERB.test(line)) return false;
+  return wordCount(line) <= 8;
 }
 
 function isYear(value: string): boolean {
@@ -547,6 +552,14 @@ interface EnumDraft {
  */
 const ILLUSTRATION =
   /^(?:examples?\s*[:—-]|for example\b|for instance\b|e\.?g\.?\b|i\.?e\.?\b|such as\b|as in\b|like\b.*:)/i;
+
+/**
+ * Auxiliaries and copulas: the cheapest reliable sign that a line asserts
+ * something rather than just naming a topic. Used to tell a heading from a
+ * fact, and to keep true/false away from sentence fragments.
+ */
+const CLAIM_VERB =
+  /\b(?:is|are|was|were|be|been|has|have|had|can|cannot|will|would|should|must|may|might|does|do|did|means|refers)\b/i;
 
 /** Instructions ("read chapter 4") are tasks to do, not facts to learn. */
 const TASK_LINE =
