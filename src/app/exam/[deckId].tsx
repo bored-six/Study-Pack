@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import { DerpArrow, DerpCheck, DerpMinus, DerpPlus, DerpScribbleLine } from '@/components/DerpIcons';
 import { Icon } from '@/components/Icon';
 import { FORMAT_HOWTO, FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib/exam';
 import { MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
@@ -30,11 +31,13 @@ function FormatChip({
   max,
   on,
   onPress,
+  index,
 }: {
   format: ExamFormat;
   max: number;
   on: boolean;
   onPress: () => void;
+  index: number;
 }) {
   const off = max === 0;
   return (
@@ -45,12 +48,14 @@ function FormatChip({
       accessibilityState={{ checked: on, disabled: off }}
       style={({ pressed }) => [
         styles.chip,
+        { transform: [{ rotate: index % 2 === 0 ? '-2.5deg' : '1.5deg' }] },
         on && styles.chipOn,
         off && styles.chipOff,
         pressed && styles.pressed,
       ]}>
-      <View style={[styles.tick, on && styles.tickOn, off && styles.tickOff]}>
-        {on ? <Icon name="check" size={12} color={colors.onAccent} strokeWidth={3.2} /> : null}
+      <View style={[styles.tape, { transform: [{ rotate: index % 2 === 0 ? '-4deg' : '2deg' }] }]} />
+      <View style={styles.tickboxContainer}>
+        <DerpCheck checked={on} style={styles.derpCheckSvg} />
       </View>
       <Text
         style={[styles.chipName, on && styles.chipNameOn, off && styles.chipTextOff]}
@@ -70,11 +75,13 @@ function AmountRow({
   count,
   max,
   onChange,
+  index,
 }: {
   format: ExamFormat;
   count: number;
   max: number;
   onChange: (next: number) => void;
+  index: number;
 }) {
   const [draft, setDraft] = useState(String(count));
 
@@ -89,7 +96,8 @@ function AmountRow({
   };
 
   return (
-    <View style={styles.amountRow}>
+    <View style={[styles.amountRow, { transform: [{ rotate: index % 2 === 0 ? '0.5deg' : '-0.5deg' }] }]}>
+      <View style={[styles.tape, { left: -10, top: '50%', marginTop: -8, width: 30, transform: [{ rotate: '85deg' }] }]} />
       <View style={styles.rowText}>
         <Text style={styles.rowTitle}>{FORMAT_LABEL[format]}</Text>
         <Text style={styles.rowHow} numberOfLines={2}>
@@ -113,7 +121,9 @@ function AmountRow({
           count <= 1 && styles.stepBtnOff,
           pressed && styles.pressed,
         ]}>
-        <Text style={[styles.stepGlyph, count <= 1 && styles.stepGlyphOff]}>−</Text>
+        <View style={{ opacity: count <= 1 ? 0.3 : 1 }}>
+          <DerpMinus width={42} height={42} />
+        </View>
       </Pressable>
 
       <TextInput
@@ -139,7 +149,9 @@ function AmountRow({
           count >= max && styles.stepBtnOff,
           pressed && styles.pressed,
         ]}>
-        <Text style={[styles.stepGlyph, count >= max && styles.stepGlyphOff]}>+</Text>
+        <View style={{ opacity: count >= max ? 0.3 : 1 }}>
+          <DerpPlus width={42} height={42} />
+        </View>
       </Pressable>
     </View>
   );
@@ -335,11 +347,16 @@ export default function ExamSetupScreen() {
           onPress={() => setStep('mode')}
           hitSlop={10}
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
-          <Text style={styles.backArrow}>←</Text>
+          <DerpArrow width={24} height={24} />
         </Pressable>
         <View style={styles.headText}>
-          <Text style={styles.title}>Build your exam</Text>
-          <Text style={styles.sub} numberOfLines={1}>
+          <View style={{ position: 'relative', alignSelf: 'flex-start' }}>
+            <Text style={[styles.title, { transform: [{ rotate: '-1.5deg' }] }]}>Build your exam!</Text>
+            <View style={styles.scribbleLine}>
+              <DerpScribbleLine width="120%" height="15" />
+            </View>
+          </View>
+          <Text style={[styles.sub, { transform: [{ rotate: '1deg' }], marginTop: 6 }]} numberOfLines={1}>
             {MODES[mode].name} · {deck?.name}
           </Text>
         </View>
@@ -351,9 +368,10 @@ export default function ExamSetupScreen() {
         keyboardShouldPersistTaps="handled">
         <Text style={styles.kicker}>WHICH TYPES?</Text>
         <View style={styles.grid}>
-          {FORMAT_ORDER.map((format) => (
+          {FORMAT_ORDER.map((format, i) => (
             <FormatChip
               key={format}
+              index={i}
               format={format}
               max={available[format]}
               on={picks.includes(format)}
@@ -365,9 +383,10 @@ export default function ExamSetupScreen() {
         {picks.length > 0 ? (
           <>
             <Text style={styles.kicker}>HOW MANY OF EACH?</Text>
-            {picks.map((format) => (
+            {picks.map((format, i) => (
               <AmountRow
                 key={format}
+                index={i}
                 format={format}
                 count={counts[format]}
                 max={available[format]}
@@ -449,6 +468,12 @@ const styles = StyleSheet.create({
   headText: {
     flex: 1,
   },
+  scribbleLine: {
+    position: 'absolute',
+    bottom: -6,
+    left: -4,
+    transform: [{ rotate: '-2deg' }],
+  },
   title: {
     fontFamily: font.hero,
     fontSize: 26,
@@ -499,23 +524,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface2,
     opacity: 0.7,
   },
-  tick: {
-    width: 20,
-    height: 20,
-    borderRadius: 7,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 3,
+  tape: {
+    position: 'absolute',
+    top: -8,
+    alignSelf: 'center',
+    width: 40,
+    height: 16,
+    backgroundColor: 'rgba(239, 229, 203, 0.85)',
+    zIndex: 10,
+    ...derpRadius,
   },
-  tickOn: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accentEdge,
+  tickboxContainer: {
+    width: 28,
+    height: 28,
+    marginBottom: 6,
+    position: 'relative',
   },
-  tickOff: {
-    backgroundColor: colors.disabledBg,
+  derpCheckSvg: {
+    width: 42,
+    height: 42,
+    position: 'absolute',
+    top: -7,
+    left: -7,
   },
   chipName: {
     fontFamily: font.heading,
@@ -551,16 +581,10 @@ const styles = StyleSheet.create({
   stepBtn: {
     width: 42,
     height: 42,
-    borderRadius: 15,
-    backgroundColor: colors.accentWash,
-    borderWidth: 1.5,
-    borderColor: colors.accentEdge,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBtnOff: {
-    backgroundColor: colors.disabledBg,
-    borderColor: colors.edge,
   },
   stepGlyph: {
     fontFamily: font.heading,
@@ -600,16 +624,15 @@ const styles = StyleSheet.create({
   },
   countInput: {
     width: 54,
-    borderWidth: 1.5,
-    borderColor: colors.ink,
-    borderRadius: 13,
-    backgroundColor: colors.surface2,
+    borderBottomWidth: 3,
+    borderBottomColor: colors.ink,
     paddingVertical: 7,
     textAlign: 'center',
     fontFamily: font.hero,
-    fontSize: 22,
+    fontSize: 26,
     color: colors.text,
     fontVariant: ['tabular-nums'],
+    transform: [{ rotate: '-3deg' }],
   },
   maxBtn: {
     alignSelf: 'flex-start',
