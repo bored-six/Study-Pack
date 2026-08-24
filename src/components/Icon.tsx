@@ -18,6 +18,13 @@ interface Props {
   strokeWidth?: number;
 }
 
+/** Every glyph leans a little, deterministically — hand-placed, not printed. */
+function wonkFor(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return ((hash % 15) - 7) / 2; // -3.5deg … +3.5deg
+}
+
 export function Icon({
   name,
   size = 22,
@@ -32,7 +39,8 @@ export function Icon({
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
-        fill="none">
+        fill="none"
+        transform={`rotate(${wonkFor(name)} 12 12)`}>
         {glyphs[name](fill, color)}
       </G>
     </Svg>
@@ -75,17 +83,22 @@ const glyphs = {
       <Path d="M4.5 19.5h15" />
     </>
   ),
-  play: (f: string, ink: string) => <Path d="M8.5 5.5 18 12l-9.5 6.5z" fill={f === 'none' ? ink : f} />,
-  check: () => <Path d="m5 12.5 4.5 4.5L19 7" />,
+  play: (f: string, ink: string) => (
+    <Path
+      d="M8.8 5.3c3.2 1.8 6.3 4 9.3 6.6-3 2.5-6.2 4.7-9.6 6.6.1-4.4.1-8.8.3-13.2z"
+      fill={f === 'none' ? ink : f}
+    />
+  ),
+  check: () => <Path d="M4.8 13.1c1.6 1.2 2.9 2.6 4.1 4.4 2.5-4.5 5.6-8 10.2-10.8" />,
   cross: () => (
     <>
-      <Path d="M6.5 6.5 17.5 17.5" />
-      <Path d="M17.5 6.5 6.5 17.5" />
+      <Path d="M6.7 6.2c3.5 3.7 7 7.5 10.7 11.5" />
+      <Path d="M17.7 6.5C13.6 10 9.9 13.9 6.3 17.8" />
     </>
   ),
   flame: (f: string) => (
     <Path
-      d="M12 3c.8 2.6-.3 4.2 1.6 6.4 1.5 1.8 3.4 3.3 3.4 5.6a5 5 0 0 1-10 0c0-1.6.7-3 1.7-4.4.5.8 1 1.2 1.8 1.4C11 9.5 10.6 6 12 3z"
+      d="M12.6 2.9c.5 2.7-.8 4.2 1.1 6.5 1.5 1.8 3.3 3.3 3.2 5.7a5 5 0 0 1-10-.3c.1-1.6.8-3 1.9-4.3.4.9.9 1.3 1.7 1.5-.7-3.1-.4-6.2 2.1-9.1z"
       fill={f}
     />
   ),
@@ -122,7 +135,7 @@ const glyphs = {
   ),
   star: (f: string) => (
     <Path
-      d="m12 3.5 2.47 5.26 5.53.7-4.1 3.9 1.07 5.64L12 16.2 7.03 19l1.07-5.64L4 9.46l5.53-.7z"
+      d="m12.3 3.1 2.8 5.6 5.5 1-4.3 4 1.3 5.7-5.5-2.8-5 3.1.9-5.9-4.2-4 5.7-.9z"
       fill={f}
     />
   ),
@@ -314,8 +327,8 @@ const glyphs = {
   ),
   bell: (f: string) => (
     <>
-      <Path d="M12 3.5a5.5 5.5 0 0 1 5.5 5.5c0 4 1.5 5.5 1.5 5.5H5s1.5-1.5 1.5-5.5A5.5 5.5 0 0 1 12 3.5z" fill={f} />
-      <Path d="M10 17.5a2 2 0 0 0 4 0" />
+      <Path d="M12.4 3.3a5.6 5.6 0 0 1 5.2 5.9c.2 3.8 1.7 5.1 1.7 5.1l-14.7.4s1.7-1.7 1.5-5.4a5.6 5.6 0 0 1 6.3-6z" fill={f} />
+      <Path d="M10.6 17.4a2 2 0 0 0 4 .3" />
     </>
   ),
   plus: () => (
@@ -370,7 +383,7 @@ const glyphs = {
   ),
   heart: (f: string) => (
     <Path
-      d="M12 20.3s-7.5-4.4-7.5-9.5a4.3 4.3 0 0 1 7.5-2.9 4.3 4.3 0 0 1 7.5 2.9c0 5.1-7.5 9.5-7.5 9.5z"
+      d="M12.2 20.2S4.6 15.6 4.8 10.6a4.2 4.2 0 0 1 7.2-3 4.5 4.5 0 0 1 7.7 3.3c-.3 4.9-7.5 9.3-7.5 9.3z"
       fill={f}
     />
   ),
@@ -383,8 +396,10 @@ const glyphs = {
   ),
   pencil: (f: string) => (
     <>
-      <Path d="m14.5 5.5 4 4L8 20l-4.6.6L4 16z" fill={f} />
-      <Path d="m12.8 7.2 4 4" />
+      <Path d="m14.2 5.2 4.6 4.6L8.4 20.4l-5.2.9.8-5.3z" fill={f} />
+      <Path d="m12.4 7.1 4.5 4.5" />
+      <Path d="m16.3 3.2 4.4 4.4" />
+      <Path d="M4 21.2l1.6-.3" />
     </>
   ),
   flameTall: (f: string) => (
@@ -397,9 +412,15 @@ const glyphs = {
       <Path d="M5.6 7.8c-.5 1-.3 1.9.2 2.6M18.4 6.4c.4 1 .2 1.9-.3 2.6" />
     </>
   ),
+  sound: (f: string) => (
+    <>
+      <Path d="M12.5 4.5 7.5 8.5H4.5v7h3l5 4z" fill={f} />
+      <Path d="M15.8 9.4a3.8 3.8 0 0 1 0 5.2M18.4 6.8a7.4 7.4 0 0 1 0 10.4" />
+    </>
+  ),
   gear: (f: string) => (
     <>
-      <Path d="M12 3.2v2.2M12 18.6v2.2M3.2 12h2.2M18.6 12h2.2M5.8 5.8l1.5 1.5M16.7 16.7l1.5 1.5M16.7 7.3l1.5-1.5M7.3 16.7l-1.5 1.5" />
+      <Path d="M12 3.6v1.7M12 18.7v1.7M3.6 12h1.7M18.7 12h1.7M6.1 6.1l1.2 1.2M16.7 16.7l1.2 1.2M16.7 7.3l1.2-1.2M7.3 16.7l-1.2 1.2" />
       <Circle cx={12} cy={12} r={6.2} fill={f} />
       <Circle cx={12} cy={12} r={2.3} />
     </>
@@ -411,6 +432,25 @@ const glyphs = {
         fill={f}
       />
       <Path d="M12 1.6v1.7M4.6 4.7l1.2 1.2M19.4 4.7l-1.2 1.2M2.6 11.8h1.7M19.7 11.8h1.7M4.6 18.4l1.2-1.2M19.4 18.4l-1.2-1.2M12 20.7v1.7" />
+    </>
+  ),
+  derpBrain: (f: string) => (
+    <>
+      <Path
+        d="M12 4.5c-3 0-5 2-5 4c-2 0-3.5 1.5-3.5 3.5c0 2 1.5 3.5 3.5 3.5c0 2 2 4.5 5 4.5s5-2.5 5-4.5c2 0 3.5-1.5 3.5-3.5c0-2-1.5-3.5-3.5-3.5c0-2-2-4-5-4z"
+        fill={f}
+      />
+      <Rect x={4.5} y={9.5} width={6} height={4.5} rx={1.5} />
+      <Rect x={13.5} y={9.5} width={6} height={4.5} rx={1.5} />
+      <Path d="M10.5 11.5h3" />
+      <Path d="M4.5 11.5h-1" />
+      <Path d="M19.5 11.5h1" />
+      
+      <Circle cx={8} cy={11.5} r={0.6} fill={colors.ink} stroke="none" />
+      <Circle cx={16} cy={11.5} r={0.6} fill={colors.ink} stroke="none" />
+      
+      <Path d="M10.5 15.5v2c0 2 3 2 3 0v-2" fill={colors.coral} />
+      <Path d="M12 15.5v2" />
     </>
   ),
 } as const;

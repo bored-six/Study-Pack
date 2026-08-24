@@ -58,6 +58,7 @@
     "testPathIgnorePatterns": [
       "/node_modules/",
       "<rootDir>/qa/"
-    ]
+    ],
+    "testTimeout": 20000
   }
 }

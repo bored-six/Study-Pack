@@ -77,8 +77,40 @@ export function DeskProp({
   const tap = useSharedValue(0);
   const blink = useSharedValue(1);
   const lean = useSharedValue(0);
+  const sway = useSharedValue(0);
+  const bounce = useSharedValue(0);
 
   const effectiveMood: DeskMood = idle ? 'sleep' : mood;
+
+  // Alive even at rest: a slow breathe-and-sway, so it reads as a
+  // creature, not a prop.
+  useEffect(() => {
+    if (reduced) return;
+    sway.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) }),
+        withTiming(-1, { duration: 1400, easing: Easing.inOut(Easing.quad) })
+      ),
+      -1,
+      false
+    );
+  }, [reduced, sway]);
+
+  // A little hop-hop while a combo is running.
+  useEffect(() => {
+    if (effectiveMood === 'happy' && !reduced) {
+      bounce.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 260, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: 260, easing: Easing.in(Easing.quad) })
+        ),
+        -1,
+        false
+      );
+    } else {
+      bounce.value = withTiming(0, { duration: 180 });
+    }
+  }, [bounce, effectiveMood, reduced]);
 
   useEffect(() => {
     if (idle && !reduced) {
@@ -123,8 +155,8 @@ export function DeskProp({
 
   const style = useAnimatedStyle(() => ({
     transform: [
-      { rotate: `${32 + tap.value * 7 - lean.value * 14}deg` },
-      { translateY: tap.value * -2 + (lean.value === 1 ? -3 : 0) },
+      { rotate: `${30 + sway.value * 2.5 + tap.value * 7 - lean.value * 14}deg` },
+      { translateY: tap.value * -2 - bounce.value * 5 + (lean.value === 1 ? -3 : 0) },
     ],
   }));
 
@@ -146,7 +178,7 @@ export function DeskProp({
         <Animated.View style={style}>
           <Icon
             name="pencil"
-            size={26}
+            size={40}
             color={prop === 'redpen' ? colors.coral : colors.ink}
             fill={prop === 'redpen' ? colors.coralWash : colors.goldWash}
             strokeWidth={1.8}
@@ -260,10 +292,10 @@ const styles = StyleSheet.create({
   },
   propCorner: {
     position: 'absolute',
-    right: -4,
-    bottom: -10,
-    width: 70,
-    height: 40,
+    right: 0,
+    bottom: -6,
+    width: 92,
+    height: 58,
   },
   ruler: {
     width: 54,
@@ -285,15 +317,15 @@ const styles = StyleSheet.create({
   },
   face: {
     position: 'absolute',
-    top: 9,
-    left: 7,
+    top: 13,
+    left: 11,
     flexDirection: 'row',
-    gap: 2.5,
+    gap: 3.5,
   },
   eye: {
-    width: 5.5,
-    height: 5.5,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4.5,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.ink,
@@ -301,21 +333,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pupil: {
-    width: 2,
-    height: 2,
-    borderRadius: 1,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
     backgroundColor: colors.ink,
   },
   eyeShut: {
-    width: 5.5,
-    height: 1.6,
+    width: 8,
+    height: 2,
     borderRadius: 1,
     backgroundColor: colors.ink,
     marginTop: 2,
   },
   eyeWince: {
-    width: 5.5,
-    height: 3,
+    width: 8,
+    height: 4,
     borderRadius: 1.5,
     borderWidth: 1.2,
     borderColor: colors.ink,
@@ -324,10 +356,10 @@ const styles = StyleSheet.create({
   },
   zzz: {
     position: 'absolute',
-    top: -10,
-    right: -4,
+    top: -14,
+    right: -2,
     fontFamily: font.hero,
-    fontSize: 12,
+    fontSize: 16,
     color: colors.textFaint,
   },
   crumb: {

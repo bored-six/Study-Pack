@@ -1,5 +1,16 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { ZoomIn } from 'react-native-reanimated';
+import { useEffect } from 'react';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+  ZoomIn,
+} from 'react-native-reanimated';
 
 import { Icon } from '@/components/Icon';
 
@@ -70,12 +81,7 @@ export function ExamSheet({
       {stars > 0 ? (
         <View style={styles.starShelf} pointerEvents="none">
           {Array.from({ length: shownStars }, (_, i) => (
-            <Animated.View
-              key={i}
-              entering={i === shownStars - 1 ? ZoomIn.springify().damping(9) : undefined}
-              style={{ transform: [{ rotate: `${(i % 3) * 7 - 7}deg` }] }}>
-              <Icon name="star" size={17} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
-            </Animated.View>
+            <TwinkleStar key={i} index={i} newest={i === shownStars - 1} />
           ))}
           {stars > 7 ? <Text style={styles.starMore}>+{stars - 7}</Text> : null}
         </View>
@@ -83,6 +89,43 @@ export function ExamSheet({
 
       <DeskProp format={format} idle={idle} mood={mood} />
     </View>
+  );
+}
+
+/** A landed star that keeps twinkling — a slow shimmer, phased per star. */
+function TwinkleStar({ index, newest }: { index: number; newest: boolean }) {
+  const reduced = useReducedMotion();
+  const shimmer = useSharedValue(0);
+
+  useEffect(() => {
+    if (reduced) return;
+    shimmer.value = withDelay(
+      index * 380,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 1600 })
+        ),
+        -1,
+        false
+      )
+    );
+  }, [index, reduced, shimmer]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { rotate: `${(index % 3) * 7 - 7 + shimmer.value * 10}deg` },
+      { scale: 1 + shimmer.value * 0.25 },
+    ],
+  }));
+
+  return (
+    <Animated.View
+      entering={newest ? ZoomIn.springify().damping(9) : undefined}
+      style={style}>
+      <Icon name="star" size={24} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+    </Animated.View>
   );
 }
 
@@ -126,14 +169,14 @@ const styles = StyleSheet.create({
   starShelf: {
     position: 'absolute',
     left: 12,
-    bottom: -4,
+    bottom: -8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 5,
   },
   starMore: {
     fontFamily: font.hero,
-    fontSize: 13,
+    fontSize: 16,
     color: colors.gold,
     marginLeft: 2,
   },
