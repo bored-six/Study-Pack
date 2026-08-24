@@ -1,7 +1,17 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
@@ -29,100 +39,70 @@ import { useDecksStore } from '@/store/decks';
 import { useNotesStore } from '@/store/notes';
 import { usePlannerStore } from '@/store/planner';
 import { useProgressStore } from '@/store/progress';
-import { colors, derpRadius, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
+import { colors, derpRadius, font, outline, radius, shadow } from '@/theme/tokens';
 
 /** Which destructive action is waiting on a yes. */
 type Pending = 'trivia' | 'history' | 'erase' | 'eraseReally';
 
-function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
-  return (
-    <View style={styles.sectionHead}>
-      <View style={styles.sectionBadge}>
-        <Icon name={icon} size={14} color={colors.ink} strokeWidth={2.4} />
-      </View>
-      <Text style={styles.sectionLabel}>{label}</Text>
-      <View style={styles.sectionRule} />
-    </View>
-  );
-}
-
-function SwitchRow({
+/**
+ * One line of a settings card. Rows are grouped inside a single card with
+ * hairlines between them rather than each floating on its own sticker —
+ * five choices should read as one short list, not nine separate objects.
+ */
+function Row({
   icon,
   title,
-  body,
-  value,
-  onChange,
-}: {
-  icon: IconName;
-  title: string;
-  body: string;
-  value: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  return (
-    <View style={styles.row}>
-      <View style={styles.rowBadge}>
-        <Icon
-          name={icon}
-          size={19}
-          color={colors.ink}
-          fill={value ? colors.accentWash : colors.surface2}
-          strokeWidth={1.9}
-        />
-      </View>
-      <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>{title}</Text>
-        <Text style={styles.rowBody}>{body}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        accessibilityLabel={title}
-        trackColor={{ true: colors.accent, false: colors.track }}
-        thumbColor={colors.surface}
-      />
-    </View>
-  );
-}
-
-function ActionRow({
-  icon,
-  title,
-  body,
-  label,
+  hint,
+  right,
   onPress,
   tone,
+  style,
 }: {
   icon: IconName;
   title: string;
-  body: string;
-  label: string;
-  onPress: () => void;
+  hint?: string;
+  right?: React.ReactNode;
+  onPress?: () => void;
   tone?: 'danger';
+  style?: StyleProp<ViewStyle>;
 }) {
-  return (
-    <View style={styles.row}>
-      <View style={[styles.rowBadge, tone === 'danger' && styles.rowBadgeDanger]}>
-        <Icon
-          name={icon}
-          size={19}
-          color={tone === 'danger' ? colors.coral : colors.ink}
-          fill={tone === 'danger' ? colors.coralWash : colors.surface2}
-          strokeWidth={1.9}
-        />
-      </View>
-      <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>{title}</Text>
-        <Text style={styles.rowBody}>{body}</Text>
-      </View>
-      <ChunkyButton
-        label={label}
-        variant="paper"
-        size="sm"
-        onPress={onPress}
-        labelColor={tone === 'danger' ? colors.coral : undefined}
+  const ink = tone === 'danger' ? colors.coral : colors.ink;
+  const body = (
+    <>
+      <Icon
+        name={icon}
+        size={19}
+        color={ink}
+        fill={tone === 'danger' ? colors.coralWash : colors.surface2}
+        strokeWidth={1.9}
       />
-    </View>
+      <View style={styles.rowText}>
+        <Text style={[styles.rowTitle, tone === 'danger' && styles.rowTitleDanger]}>{title}</Text>
+        {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
+      </View>
+      {right}
+    </>
+  );
+
+  if (!onPress) return <View style={[styles.row, style]}>{body}</View>;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, style, pressed && styles.pressed]}>
+      {body}
+    </Pressable>
+  );
+}
+
+function Toggle({ value, onChange, label }: { value: boolean; onChange: (on: boolean) => void; label: string }) {
+  return (
+    <Switch
+      value={value}
+      onValueChange={onChange}
+      accessibilityLabel={label}
+      trackColor={{ true: colors.accent, false: colors.track }}
+      thumbColor={colors.surface}
+    />
   );
 }
 
@@ -147,7 +127,7 @@ export default function SettingsScreen() {
     readStorage();
   }, [readStorage]);
 
-  // One writer for all four switches: flip the UI now, persist after, so a
+  // One writer for every switch: flip the UI now, persist after, so a
   // toggle never feels like it lagged behind the thumb.
   const change = useCallback(
     <K extends keyof Prefs>(key: K, write: (on: boolean) => Promise<void>) =>
@@ -202,19 +182,20 @@ export default function SettingsScreen() {
       await eraseEverything();
       await Promise.all([refreshNotes(), refreshDecks(), refreshProgress(), refreshPlanner()]);
       setPrefs(DEFAULT_PREFS);
-      setNotice({
-        title: 'Wiped',
-        message: 'Flipp is back to the day you installed it.',
-      });
+      setNotice({ title: 'Wiped', message: 'Flipp is back to the day you installed it.' });
     }
     readStorage();
   }, [pending, readStorage, refreshDecks, refreshNotes, refreshPlanner, refreshProgress]);
 
   const version = Constants.expoConfig?.version ?? '1.0.0';
-  const leadLabel =
-    leads.length > 0
-      ? leads.map((lead) => LEAD_LABEL[lead] ?? `${lead} min`).join(' · ')
-      : 'No advance warning';
+  const reminderValue =
+    capability === 'unsupported'
+      ? 'Not on this device'
+      : capability === 'denied'
+        ? 'Off'
+        : leads.length > 0
+          ? leads.map((lead) => LEAD_LABEL[lead] ?? `${lead} min`).join(' · ')
+          : 'At start time';
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
@@ -240,159 +221,123 @@ export default function SettingsScreen() {
 
       <ScrollView
         style={styles.fill}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + tabClearance }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
         showsVerticalScrollIndicator={false}>
-        <SectionHeading icon="bell" label="SOUND & FEEL" />
-
-        <SwitchRow
-          icon="bell"
-          title="Sound effects"
-          body={prefs.sound ? 'Blups, boings, and the sad trombone.' : 'The exam sits quietly.'}
-          value={prefs.sound}
-          onChange={change('sound', setSound)}
-        />
-        <SwitchRow
-          icon="smartphone"
-          title="Vibration"
-          body={prefs.vibration ? 'A little buzz on every answer.' : 'No buzzing.'}
-          value={prefs.vibration}
-          onChange={change('vibration', setVibration)}
-        />
-        <SwitchRow
-          icon="star"
-          title="Opening animation"
-          body={prefs.intro ? 'The logo does its thing on launch.' : 'Straight to your subjects.'}
-          value={prefs.intro}
-          onChange={change('intro', setIntro)}
-        />
-
-        <SectionHeading icon="book" label="STUDYING" />
-
-        <SwitchRow
-          icon="question"
-          title="Format how-tos"
-          body={
-            prefs.briefings
-              ? 'Each exam format explains itself the first time it shows up.'
-              : 'Hidden. The ? button in an exam still brings them back.'
-          }
-          value={prefs.briefings}
-          onChange={change('briefings', setBriefings)}
-        />
-
-        <SectionHeading icon="clock" label="REMINDERS" />
-
-        {capability === 'unsupported' ? (
-          <View style={styles.row}>
-            <View style={styles.rowBadge}>
-              <Icon name="alert" size={19} color={colors.ink} fill={colors.surface2} strokeWidth={1.9} />
-            </View>
-            <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Not on this device</Text>
-              <Text style={styles.rowBody}>
-                Reminders need a phone. Plans still show up in the Planner here.
-              </Text>
-            </View>
-          </View>
-        ) : capability === 'denied' ? (
-          <ActionRow
-            icon="bell"
-            title="Reminders are off"
-            body="Flipp can't nudge you about a planned quiz until you allow notifications."
-            label="Turn on"
-            onPress={() => void askForReminders()}
+        <View style={styles.card}>
+          <Row
+            icon="sound"
+            title="Sound effects"
+            right={<Toggle label="Sound effects" value={prefs.sound} onChange={change('sound', setSound)} />}
+            style={styles.divided}
           />
-        ) : (
-          <View style={styles.row}>
-            <View style={styles.rowBadge}>
-              <Icon name="bell" size={19} color={colors.ink} fill={colors.accentWash} strokeWidth={1.9} />
-            </View>
-            <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Reminders are on</Text>
-              <Text style={styles.rowBody}>
-                {leadLabel} · Android delivers these around the time, not to the minute.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        <Pressable
-          onPress={() => router.push('/planner')}
-          style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-          <View style={styles.rowBadge}>
-            <Icon name="calendar" size={19} color={colors.ink} fill={colors.surface2} strokeWidth={1.9} />
-          </View>
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>When to remind you</Text>
-            <Text style={styles.rowBody}>Set lead times next to your plans.</Text>
-          </View>
-          <Icon name="play" size={14} color={colors.accentDeep} />
-        </Pressable>
-
-        <SectionHeading icon="smartphone" label="ON THIS DEVICE" />
-
-        <View style={styles.storageCard}>
-          <Tape rotate="-3deg" />
-          <Text style={styles.storageTitle}>Everything is stored here</Text>
-          <Text style={styles.storageBody}>
-            No account, no cloud, no internet needed. Which also means: uninstalling Flipp takes
-            your notes with it.
-          </Text>
-          <View style={styles.statRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statNumber}>{storage?.subjects ?? 0}</Text>
-              <Text style={styles.statLabel}>subjects</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statNumber}>{storage?.noteQuestions ?? 0}</Text>
-              <Text style={styles.statLabel}>questions</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statNumber}>{storage?.sittings ?? 0}</Text>
-              <Text style={styles.statLabel}>sittings</Text>
-            </View>
-          </View>
+          <Row
+            icon="smartphone"
+            title="Vibration"
+            right={
+              <Toggle
+                label="Vibration"
+                value={prefs.vibration}
+                onChange={change('vibration', setVibration)}
+              />
+            }
+            style={styles.divided}
+          />
+          <Row
+            icon="star"
+            title="Opening animation"
+            right={<Toggle label="Opening animation" value={prefs.intro} onChange={change('intro', setIntro)} />}
+            style={styles.divided}
+          />
+          <Row
+            icon="question"
+            title="Format how-tos"
+            hint="Shown the first time a format appears"
+            right={
+              <Toggle
+                label="Format how-tos"
+                value={prefs.briefings}
+                onChange={change('briefings', setBriefings)}
+              />
+            }
+            style={styles.divided}
+          />
+          {capability === 'denied' ? (
+            <Row
+              icon="bell"
+              title="Reminders"
+              hint="Allow notifications and Flipp can nudge you"
+              right={<ChunkyButton label="Turn on" variant="paper" size="sm" onPress={() => void askForReminders()} />}
+            />
+          ) : (
+            <Row
+              icon="bell"
+              title="Reminders"
+              right={
+                <View style={styles.value}>
+                  <Text style={styles.valueText}>{reminderValue}</Text>
+                  {capability === 'approximate' ? (
+                    <Icon name="play" size={13} color={colors.accentDeep} />
+                  ) : null}
+                </View>
+              }
+              onPress={capability === 'approximate' ? () => router.push('/planner') : undefined}
+            />
+          )}
         </View>
 
-        {storage && storage.triviaDecks > 0 ? (
-          <ActionRow
-            icon="dice"
-            title="Saved trivia"
-            body={`${storage.triviaDecks} deck${storage.triviaDecks === 1 ? '' : 's'} · ${
-              storage.triviaQuestions
-            } questions kept offline.`}
-            label="Remove"
-            onPress={() => setPending('trivia')}
+        <View style={styles.card}>
+          <View style={styles.storageHead}>
+            <Tape rotate="-3deg" />
+            <Text style={styles.storageTitle}>Everything is stored here</Text>
+            <Text style={styles.storageBody}>
+              No account, no cloud. Uninstalling Flipp takes your notes with it.
+            </Text>
+            {storage && storage.subjects + storage.noteQuestions + storage.sittings > 0 ? (
+            <View style={styles.statRow}>
+              <View style={styles.stat}>
+                <Text style={styles.statNumber}>{storage?.subjects ?? 0}</Text>
+                <Text style={styles.statLabel}>subjects</Text>
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statNumber}>{storage?.noteQuestions ?? 0}</Text>
+                <Text style={styles.statLabel}>questions</Text>
+              </View>
+              <View style={styles.stat}>
+                <Text style={styles.statNumber}>{storage?.sittings ?? 0}</Text>
+                <Text style={styles.statLabel}>sittings</Text>
+              </View>
+            </View>
+            ) : null}
+          </View>
+
+          {storage && storage.triviaDecks > 0 ? (
+            <Row
+              icon="dice"
+              title="Remove saved trivia"
+              hint={`${storage.triviaDecks} deck${storage.triviaDecks === 1 ? '' : 's'} kept offline`}
+              onPress={() => setPending('trivia')}
+              style={styles.dividedTop}
+            />
+          ) : null}
+          <Row
+            icon="chart"
+            title="Clear practice history"
+            hint="Scores and streak. Your notes stay."
+            tone="danger"
+            onPress={() => setPending('history')}
+            style={styles.dividedTop}
           />
-        ) : null}
-
-        <ActionRow
-          icon="chart"
-          title="Clear practice history"
-          body="Scores, streak, mastery, and moments. Your notes stay."
-          label="Clear"
-          onPress={() => setPending('history')}
-          tone="danger"
-        />
-
-        <ActionRow
-          icon="trash"
-          title="Delete everything"
-          body="Subjects, notes, plans, history — all of it, off this phone."
-          label="Delete"
-          onPress={() => setPending('erase')}
-          tone="danger"
-        />
-
-        <SectionHeading icon="bulb" label="ABOUT" />
-
-        <View style={styles.aboutCard}>
-          <Text style={styles.aboutTitle}>Flipp v{version}</Text>
-          <Text style={styles.aboutBody}>
-            Built to work with the plane on. Notes become questions on your phone, and nothing you
-            write ever leaves it.
-          </Text>
+          <Row
+            icon="trash"
+            title="Delete everything"
+            hint="Notes, plans, and history."
+            tone="danger"
+            onPress={() => setPending('erase')}
+            style={styles.dividedTop}
+          />
         </View>
+
+        <Text style={styles.footer}>Flipp v{version} · made to work offline</Text>
       </ScrollView>
 
       <ConfirmModal
@@ -452,7 +397,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingTop: 2,
+    paddingTop: 6,
   },
   navRow: {
     flexDirection: 'row',
@@ -506,71 +451,29 @@ const styles = StyleSheet.create({
     marginTop: 1,
     marginLeft: 2,
   },
-  sectionHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 22,
-    marginBottom: 9,
-  },
-  sectionBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    backgroundColor: colors.surface2,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-4deg' }],
-  },
-  sectionLabel: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 12,
-    letterSpacing: 1.4,
-    color: colors.text,
-  },
-  sectionRule: {
-    flex: 1,
-    height: 2,
-    borderRadius: 2,
-    backgroundColor: colors.lineSoft,
+  card: {
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.card,
+    marginBottom: 14,
+    ...shadow.card,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.card,
-    padding: 13,
-    marginBottom: 9,
-    ...shadow.card,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+    minHeight: 56,
   },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.card,
-    padding: 13,
-    marginBottom: 9,
-    ...shadow.card,
+  // Hairlines instead of gaps: one list, not a stack of stickers.
+  divided: {
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.lineSoft,
   },
-  rowBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: colors.surface2,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-3deg' }],
-  },
-  rowBadgeDanger: {
-    backgroundColor: colors.coralWash,
+  dividedTop: {
+    borderTopWidth: 1.5,
+    borderTopColor: colors.lineSoft,
   },
   rowText: {
     flex: 1,
@@ -581,19 +484,27 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.text,
   },
-  rowBody: {
+  rowTitleDanger: {
+    color: colors.coral,
+  },
+  rowHint: {
     fontFamily: font.bodySemibold,
-    fontSize: 12,
-    lineHeight: 16.5,
+    fontSize: 11.5,
+    lineHeight: 15.5,
+    color: colors.textFaint,
+  },
+  value: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  valueText: {
+    fontFamily: font.bodyBold,
+    fontSize: 12.5,
     color: colors.textDim,
   },
-  storageCard: {
-    backgroundColor: colors.goldWash,
-    ...outline,
-    borderRadius: radius.card,
+  storageHead: {
     padding: 15,
-    marginBottom: 9,
-    ...shadow.card,
   },
   storageTitle: {
     fontFamily: font.heading,
@@ -615,7 +526,7 @@ const styles = StyleSheet.create({
   },
   stat: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface2,
     ...derpRadius,
     borderWidth: 1.5,
     borderColor: colors.edge,
@@ -634,23 +545,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     color: colors.textFaint,
   },
-  aboutCard: {
-    backgroundColor: colors.surface2,
-    ...outline,
-    borderRadius: radius.card,
-    padding: 15,
-  },
-  aboutTitle: {
-    fontFamily: font.hero,
-    fontSize: 20,
-    lineHeight: 26,
-    color: colors.text,
-  },
-  aboutBody: {
+  footer: {
     fontFamily: font.bodySemibold,
-    fontSize: 12,
-    lineHeight: 16.5,
-    color: colors.textDim,
+    fontSize: 11.5,
+    color: colors.textFaint,
+    textAlign: 'center',
     marginTop: 2,
   },
   pressed: {

@@ -142,7 +142,7 @@ describe('the settings screen', () => {
   it('never erases on the first yes', async () => {
     const tree = await render();
 
-    pressLabelled(tree, 'Delete');
+    pressLabelled(tree, 'Delete everything');
     await act(async () => {
       pressLabelled(tree, 'Continue');
     });
@@ -157,7 +157,7 @@ describe('the settings screen', () => {
   it('clears history without touching the notes', async () => {
     const tree = await render();
 
-    pressLabelled(tree, 'Clear');
+    pressLabelled(tree, 'Clear practice history');
     await act(async () => {
       pressLabelled(tree, 'Clear it');
     });
