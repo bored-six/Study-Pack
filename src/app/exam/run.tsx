@@ -28,7 +28,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
-import { ComboMeter } from '@/components/ComboMeter';
+import { ComboMeter, comboColor } from '@/components/ComboMeter';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
 import { ExamSheet } from '@/components/ExamSheet';
@@ -114,6 +114,7 @@ export default function ExamRunScreen() {
   const bestCombo = useRef<number | null>(null);
   const itemIdRef = useRef<string | null>(null);
   const glow = useSharedValue(0);
+  const hitPulse = useSharedValue(0);
   useEffect(() => {
     if (combo >= 10) {
       glow.value = withRepeat(
@@ -126,6 +127,7 @@ export default function ExamRunScreen() {
     }
   }, [combo, glow]);
   const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.55 }));
+  const hitPulseStyle = useAnimatedStyle(() => ({ opacity: hitPulse.value * 0.13 }));
 
   // Formats the student asked never to be briefed on again. The ? button
   // in the header still reopens the instructions any time — skipping the
@@ -251,6 +253,14 @@ export default function ExamRunScreen() {
       if (correct) {
         setCombo((c) => {
           tapTier(c + 1);
+          if (c + 1 >= 3) {
+            // A soft wash of the tier's colour breathes across the stage.
+            hitPulse.value = 0;
+            hitPulse.value = withSequence(
+              withTiming(1, { duration: 180, easing: Easing.out(Easing.quad) }),
+              withTiming(0, { duration: 520, easing: Easing.inOut(Easing.quad) })
+            );
+          }
           return c + 1;
         });
         // A page answered right on the first try earns a star sticker.
@@ -595,6 +605,14 @@ export default function ExamRunScreen() {
             <Text style={styles.noteText}>{note}</Text>
           </Animated.View>
         ) : null}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: comboColor(combo) },
+            hitPulseStyle,
+          ]}
+        />
         <Animated.View pointerEvents="none" style={[styles.glowFrame, glowStyle]} />
       </View>
 

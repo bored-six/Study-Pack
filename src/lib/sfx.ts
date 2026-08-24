@@ -58,11 +58,18 @@ export function setSfxEnabled(on: boolean): void {
   enabled = on;
 }
 
+/** Most sounds sit back; the ones that celebrate cut through. */
+const VOLUME: Partial<Record<SfxName, number>> = {
+  combo: 0.9,
+  aplus: 0.8,
+  bell: 0.7,
+};
+
 function playerFor(name: SfxName): AudioPlayer {
   let player = players[name];
   if (!player) {
     player = createAudioPlayer(SOURCES[name]);
-    player.volume = 0.55;
+    player.volume = VOLUME[name] ?? 0.55;
     players[name] = player;
   }
   return player;

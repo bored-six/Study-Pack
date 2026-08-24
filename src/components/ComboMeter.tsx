@@ -39,6 +39,11 @@ const TIERS: Tier[] = [
   { from: 20, icon: 'flameBig', color: '#6C51A8', wash: '#EAE2FA', word: 'ON FIRE' },
 ];
 
+/** The tier's colour, for effects that live outside the meter. */
+export function comboColor(combo: number): string {
+  return tierFor(Math.max(combo, 3)).color;
+}
+
 function tierFor(combo: number): Tier {
   let tier = TIERS[0];
   for (const t of TIERS) if (combo >= t.from) tier = t;
@@ -82,6 +87,7 @@ export function ComboMeter({ combo, idle = false }: Props) {
   const breathe = useSharedValue(1);
   const rock = useSharedValue(0);
   const flareAnim = useSharedValue(0);
+  const spin = useSharedValue(1);
 
   useEffect(() => {
     const was = prev.current;
@@ -90,20 +96,25 @@ export function ComboMeter({ combo, idle = false }: Props) {
     if (combo >= 3 && combo > was) {
       setBurst((n) => n + 1);
       if (!reduced) {
+        const tierUp = combo === 3 || combo === 5 || combo === 10 || combo === 20;
         scale.value = withSequence(
-          withTiming(1.35, { duration: 110 }),
-          withSpring(1, { damping: 9, stiffness: 220 })
+          withTiming(tierUp ? 1.5 : 1.3, { duration: 130 }),
+          withSpring(1, { damping: 12, stiffness: 200 })
         );
+        if (tierUp) {
+          spin.value = 0;
+          spin.value = withSpring(1, { damping: 16, stiffness: 90 });
+        }
         // The flare: the count leaps out over the page, then melts away —
         // unless a stamp just claimed the spotlight; two leaps is noise.
         if (msSinceJuice('stamp') < 600) return;
         setFlare(combo);
         flareAnim.value = 0;
         flareAnim.value = withSequence(
-          withSpring(1, { damping: 12, stiffness: 260 }),
-          withDelay(420, withTiming(2, { duration: 320, easing: Easing.in(Easing.quad) }))
+          withSpring(1, { damping: 15, stiffness: 190 }),
+          withDelay(520, withTiming(2, { duration: 420, easing: Easing.inOut(Easing.quad) }))
         );
-        const timer = setTimeout(() => setFlare(null), 1150);
+        const timer = setTimeout(() => setFlare(null), 1450);
         return () => clearTimeout(timer);
       }
     }
@@ -153,9 +164,19 @@ export function ComboMeter({ combo, idle = false }: Props) {
     transform: [
       { scale: scale.value * breathe.value },
       { translateX: shift.value },
-      { rotate: `${5 + rock.value * 3}deg` },
+      { rotate: `${5 + rock.value * 3 + (1 - spin.value) * 360}deg` },
     ],
   }));
+
+  const glowDiscStyle = useAnimatedStyle(() => {
+    const p = flareAnim.value;
+    const entering = Math.min(p, 1);
+    const leaving = Math.max(0, p - 1);
+    return {
+      opacity: 0.85 * entering * (1 - leaving),
+      transform: [{ scale: 0.3 + entering * 2.1 }],
+    };
+  });
 
   const flareStyle = useAnimatedStyle(() => {
     const p = flareAnim.value;
@@ -189,7 +210,11 @@ export function ComboMeter({ combo, idle = false }: Props) {
     <>
       {flare != null ? (
         <Animated.View pointerEvents="none" style={[styles.flare, flareStyle]} exiting={FadeOut}>
-          <Icon name={tier.icon} size={30} color={colors.ink} fill={tier.color} strokeWidth={1.8} />
+          <Animated.View style={[styles.flareGlow, { backgroundColor: tier.wash }, glowDiscStyle]} />
+          {[0.5, 1.4, 2.4, 3.4, 4.3, 5.3].map((angle) => (
+            <Fleck key={angle} angle={angle} color={tier.color} nonce={burst} />
+          ))}
+          <Icon name={tier.icon} size={44} color={colors.ink} fill={tier.color} strokeWidth={1.7} />
           <Text style={[styles.flareText, { color: tier.color }]}>×{flare}</Text>
         </Animated.View>
       ) : null}
@@ -279,8 +304,15 @@ const styles = StyleSheet.create({
   },
   flareText: {
     fontFamily: font.hero,
-    fontSize: 44,
-    lineHeight: 52,
+    fontSize: 64,
+    lineHeight: 74,
+  },
+  flareGlow: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    alignSelf: 'center',
   },
   fleck: {
     position: 'absolute',
