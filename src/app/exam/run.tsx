@@ -14,6 +14,8 @@ import {
 import Animated, {
   Easing,
   FadeIn,
+  FadeOut,
+  SlideInRight,
   ZoomIn,
   FadeInDown,
   SlideOutUp,
@@ -31,7 +33,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
 import { ExamSheet } from '@/components/ExamSheet';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
-import { DayTint, EmberDrift, PageCount, PencilProgress } from '@/components/deskdress';
+import { DayTint, EmberDrift, PageCount, PencilProgress, type DeskMood } from '@/components/deskdress';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
@@ -104,6 +106,10 @@ export default function ExamRunScreen() {
   const [wrongByItem, setWrongByItem] = useState<Record<string, number>>({});
   const wrongByItemRef = useRef<Record<string, number>>({});
   const [stars, setStars] = useState(0);
+  const [lastWrongAt, setLastWrongAt] = useState(0);
+  const [note, setNote] = useState<string | null>(null);
+  const notesShown = useRef(0);
+  const bellShownAt = useRef<number | null>(null);
   const bestCombo = useRef<number | null>(null);
   const itemIdRef = useRef<string | null>(null);
   const glow = useSharedValue(0);
@@ -138,6 +144,23 @@ export default function ExamRunScreen() {
   }, []);
 
   // ~8s without progress and the desk starts fidgeting.
+  const NOTE_POOL = ['keep going!', "you've got this", 'nice pace!', 'breathe. next one.', 'still with you'];
+
+  // A folded note slides in maybe twice a sitting, never two pages in a row.
+  useEffect(() => {
+    if (index < 3 || notesShown.current >= 2) return;
+    if (Math.random() > 0.08) return;
+    notesShown.current += 1;
+    const line =
+      index >= items.length - 3 && items.length > 5
+        ? 'almost there!'
+        : NOTE_POOL[Math.floor(Math.random() * NOTE_POOL.length)];
+    setNote(line);
+    const timer = setTimeout(() => setNote(null), 2100);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
   const idleKey = `${index}:${combo}:${Object.keys(drafts).length}`;
   useEffect(() => {
     setIdle(false);
@@ -227,6 +250,7 @@ export default function ExamRunScreen() {
       } else {
         tapWrong();
         setCombo(0);
+        setLastWrongAt(Date.now());
         if (id) {
           // A wrong try leaves an eraser smudge on this page.
           setWrongByItem((m) => {
@@ -379,6 +403,15 @@ export default function ExamRunScreen() {
   const isFlagged = flagged.includes(item.id);
   const lastItem = index + 1 >= items.length;
 
+  // The deskmate reads the room: a fresh miss gets a wince, a hot combo a
+  // lean-in, otherwise it just watches (sleep is handled by idle).
+  const mood: DeskMood =
+    Date.now() - lastWrongAt < 2200 ? 'wince' : combo >= 5 ? 'happy' : 'watch';
+
+  // The bell: one small ring before the final page of a straight sitting.
+  const showBell = lastItem && spec.repetition === 'once' && items.length > 3;
+  if (showBell && bellShownAt.current !== index) bellShownAt.current = index;
+
   return (
     <KeyboardAvoidingView
       style={styles.fill}
@@ -475,6 +508,15 @@ export default function ExamRunScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
+          {showBell ? (
+            <Animated.View
+              key={`bell:${index}`}
+              entering={ZoomIn.springify().damping(11)}
+              style={styles.bell}>
+              <Icon name="bell" size={15} color={colors.ink} fill={colors.goldWash} strokeWidth={2.1} />
+              <Text style={styles.bellText}>last one!</Text>
+            </Animated.View>
+          ) : null}
           <Animated.View
             key={`${item.id}:${visits}`}
             entering={FadeInDown.springify().damping(16)}
@@ -487,7 +529,8 @@ export default function ExamRunScreen() {
               accent={FORMAT_META[item.format].ink}
               smudges={wrongByItem[item.id] ?? 0}
               stars={stars}
-              idle={idle}>
+              idle={idle}
+              mood={mood}>
               <ExamItemView
                 item={item}
                 value={spec.feedback === 'deferred' ? (drafts[item.id] ?? emptyDraft(item)) : undefined}
@@ -528,6 +571,16 @@ export default function ExamRunScreen() {
 
         <DayTint />
         <EmberDrift nonce={emberNonce} />
+        {note ? (
+          <Animated.View
+            entering={SlideInRight.springify().damping(16)}
+            exiting={FadeOut.duration(250)}
+            style={styles.passingNote}
+            pointerEvents="none">
+            <View style={styles.noteFold} />
+            <Text style={styles.noteText}>{note}</Text>
+          </Animated.View>
+        ) : null}
         <Animated.View pointerEvents="none" style={[styles.glowFrame, glowStyle]} />
       </View>
 
@@ -626,6 +679,56 @@ export default function ExamRunScreen() {
 }
 
 const styles = StyleSheet.create({
+  bell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: colors.goldWash,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 8,
+    transform: [{ rotate: '-2deg' }],
+  },
+  bellText: {
+    fontFamily: font.hero,
+    fontSize: 15,
+    color: colors.gold,
+  },
+  passingNote: {
+    position: 'absolute',
+    right: 10,
+    top: '38%',
+    zIndex: 45,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    borderRadius: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    transform: [{ rotate: '3deg' }],
+    ...shadow.pop,
+  },
+  noteFold: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 0,
+    height: 0,
+    borderStyle: 'solid',
+    borderLeftWidth: 12,
+    borderTopWidth: 12,
+    borderTopColor: colors.surface2,
+    borderLeftColor: 'transparent',
+  },
+  noteText: {
+    fontFamily: font.hero,
+    fontSize: 15,
+    color: colors.textDim,
+  },
   fill: {
     flex: 1,
   },

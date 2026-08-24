@@ -56,10 +56,29 @@ const PROP_FOR: Partial<Record<ExamFormat, 'ruler' | 'redpen'>> = {
   modified_true_false: 'redpen',
 };
 
-/** The tool lying at the desk's edge; taps impatiently when you stall. */
-export function DeskProp({ format, idle }: { format: ExamFormat; idle: boolean }) {
+export type DeskMood = 'watch' | 'happy' | 'wince' | 'sleep';
+
+/**
+ * The deskmate: the pencil at the desk's edge, now with eyes. It watches
+ * you work, blinks, leans in when a combo is going, winces at a miss, and
+ * dozes off when you stall. One small component on purpose — if a proper
+ * mascot ever lands, this is the single place it replaces.
+ */
+export function DeskProp({
+  format,
+  idle,
+  mood = 'watch',
+}: {
+  format: ExamFormat;
+  idle: boolean;
+  mood?: DeskMood;
+}) {
   const reduced = useReducedMotion();
   const tap = useSharedValue(0);
+  const blink = useSharedValue(1);
+  const lean = useSharedValue(0);
+
+  const effectiveMood: DeskMood = idle ? 'sleep' : mood;
 
   useEffect(() => {
     if (idle && !reduced) {
@@ -78,8 +97,39 @@ export function DeskProp({ format, idle }: { format: ExamFormat; idle: boolean }
     }
   }, [idle, reduced, tap]);
 
+  // A slow blink, whatever else is happening (closed eyes while asleep).
+  useEffect(() => {
+    if (reduced || effectiveMood === 'sleep') {
+      blink.value = 1;
+      return;
+    }
+    blink.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2600 }),
+        withTiming(0.1, { duration: 90 }),
+        withTiming(1, { duration: 110 })
+      ),
+      -1,
+      false
+    );
+  }, [blink, effectiveMood, reduced]);
+
+  useEffect(() => {
+    if (reduced) return;
+    lean.value = withTiming(effectiveMood === 'happy' ? 1 : effectiveMood === 'wince' ? -1 : 0, {
+      duration: 260,
+    });
+  }, [effectiveMood, lean, reduced]);
+
   const style = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${32 + tap.value * 7}deg` }, { translateY: tap.value * -2 }],
+    transform: [
+      { rotate: `${32 + tap.value * 7 - lean.value * 14}deg` },
+      { translateY: tap.value * -2 + (lean.value === 1 ? -3 : 0) },
+    ],
+  }));
+
+  const eyeStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleY: blink.value }],
   }));
 
   const prop = PROP_FOR[format];
@@ -101,6 +151,29 @@ export function DeskProp({ format, idle }: { format: ExamFormat; idle: boolean }
             fill={prop === 'redpen' ? colors.coralWash : colors.goldWash}
             strokeWidth={1.8}
           />
+          <View style={styles.face}>
+            {effectiveMood === 'sleep' ? (
+              <>
+                <View style={styles.eyeShut} />
+                <View style={styles.eyeShut} />
+              </>
+            ) : effectiveMood === 'wince' ? (
+              <>
+                <View style={styles.eyeWince} />
+                <View style={styles.eyeShut} />
+              </>
+            ) : (
+              <>
+                <Animated.View style={[styles.eye, eyeStyle]}>
+                  <View style={styles.pupil} />
+                </Animated.View>
+                <Animated.View style={[styles.eye, eyeStyle]}>
+                  <View style={styles.pupil} />
+                </Animated.View>
+              </>
+            )}
+          </View>
+          {effectiveMood === 'sleep' ? <Text style={styles.zzz}>z</Text> : null}
         </Animated.View>
       )}
       {/* eraser crumbs */}
@@ -209,6 +282,53 @@ const styles = StyleSheet.create({
     width: 1.2,
     height: 5,
     backgroundColor: colors.textDim,
+  },
+  face: {
+    position: 'absolute',
+    top: 9,
+    left: 7,
+    flexDirection: 'row',
+    gap: 2.5,
+  },
+  eye: {
+    width: 5.5,
+    height: 5.5,
+    borderRadius: 3,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pupil: {
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: colors.ink,
+  },
+  eyeShut: {
+    width: 5.5,
+    height: 1.6,
+    borderRadius: 1,
+    backgroundColor: colors.ink,
+    marginTop: 2,
+  },
+  eyeWince: {
+    width: 5.5,
+    height: 3,
+    borderRadius: 1.5,
+    borderWidth: 1.2,
+    borderColor: colors.ink,
+    backgroundColor: colors.surface,
+    marginTop: 1,
+  },
+  zzz: {
+    position: 'absolute',
+    top: -10,
+    right: -4,
+    fontFamily: font.hero,
+    fontSize: 12,
+    color: colors.textFaint,
   },
   crumb: {
     position: 'absolute',

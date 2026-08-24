@@ -1,10 +1,18 @@
 import { Redirect, router } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
-import Animated, { ZoomIn } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+  ZoomIn,
+} from 'react-native-reanimated';
 
 import { ExamDebrief } from '@/components/ExamDebrief';
 import { Icon } from '@/components/Icon';
@@ -62,6 +70,39 @@ function MarkedRow({
     </View>
   );
 }
+
+/** A gold-foil glint sweeping across the A+ stamp. */
+function Shimmer() {
+  const sweep = useSharedValue(-1);
+  useEffect(() => {
+    sweep.value = withRepeat(
+      withSequence(
+        withTiming(1.4, { duration: 1100, easing: Easing.inOut(Easing.quad) }),
+        withTiming(-1, { duration: 0 }),
+        withTiming(-1, { duration: 900 })
+      ),
+      -1,
+      false
+    );
+  }, [sweep]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateX: sweep.value * 46 }, { rotate: '18deg' }],
+  }));
+  return (
+    <Animated.View pointerEvents="none" style={[shimmerStyles.bar, style]} />
+  );
+}
+
+const shimmerStyles = StyleSheet.create({
+  bar: {
+    position: 'absolute',
+    top: -8,
+    bottom: -8,
+    width: 14,
+    backgroundColor: 'rgba(255, 235, 170, 0.75)',
+    borderRadius: 7,
+  },
+});
 
 export default function ExamResultsScreen() {
   const insets = useSafeAreaInsets();
@@ -133,6 +174,10 @@ export default function ExamResultsScreen() {
     return count;
   })();
 
+  // A perfect straight sitting of real length gets the ceremony.
+  const perfect =
+    spec.repetition === 'once' && total >= 5 && score === total;
+
   const grade =
     spec.repetition === 'until_out'
       ? total >= 25
@@ -150,15 +195,17 @@ export default function ExamResultsScreen() {
           : retired / Math.max(1, items.length) >= 0.6
             ? 'B'
             : 'C'
-        : pct >= 90
-          ? 'A'
-          : pct >= 80
-            ? 'B'
-            : pct >= 70
-              ? 'C'
-              : pct >= 55
-                ? 'D'
-                : 'F';
+        : perfect
+          ? 'A+'
+          : pct >= 90
+            ? 'A'
+            : pct >= 80
+              ? 'B'
+              : pct >= 70
+                ? 'C'
+                : pct >= 55
+                  ? 'D'
+                  : 'F';
   // The tone still colours the card; the words on it come from the debrief,
   // so the line at the top is about this paper rather than this bracket.
   const tone =
@@ -211,8 +258,15 @@ export default function ExamResultsScreen() {
             </View>
             <Animated.View
               entering={ZoomIn.springify().damping(9).delay(250)}
-              style={[styles.gradeStamp, { borderColor: tone.color }]}>
-              <Text style={[styles.gradeText, { color: tone.color }]}>{grade}</Text>
+              style={[
+                styles.gradeStamp,
+                { borderColor: perfect ? colors.gold : tone.color },
+                perfect && styles.gradeStampGold,
+              ]}>
+              {perfect ? <Shimmer /> : null}
+              <Text style={[styles.gradeText, { color: perfect ? colors.gold : tone.color }]}>
+                {grade}
+              </Text>
             </Animated.View>
           </View>
 
@@ -226,9 +280,21 @@ export default function ExamResultsScreen() {
           {stars > 0 ? (
             <View style={styles.starRow}>
               {Array.from({ length: Math.min(stars, 7) }, (_, i) => (
-                <View key={i} style={{ transform: [{ rotate: `${(i % 3) * 7 - 7}deg` }] }}>
-                  <Icon name="star" size={16} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
-                </View>
+                <Animated.View
+                  key={i}
+                  entering={
+                    perfect
+                      ? ZoomIn.springify().damping(8).delay(500 + i * 90)
+                      : undefined
+                  }
+                  style={{
+                    transform: [
+                      { rotate: `${perfect ? (i - Math.min(stars, 7) / 2) * 10 : (i % 3) * 7 - 7}deg` },
+                      { translateY: perfect ? -Math.abs(i - (Math.min(stars, 7) - 1) / 2) * -2 : 0 },
+                    ],
+                  }}>
+                  <Icon name="star" size={perfect ? 19 : 16} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+                </Animated.View>
               ))}
               <Text style={styles.starText}>
                 {stars > 7 ? `+${stars - 7} ` : ''}first try
@@ -349,7 +415,11 @@ const styles = StyleSheet.create({
   reportLeft: {
     alignItems: 'flex-start',
   },
+  gradeStampGold: {
+    backgroundColor: 'rgba(250, 236, 203, 0.8)',
+  },
   gradeStamp: {
+    overflow: 'hidden',
     borderWidth: 3.5,
     borderRadius: 12,
     width: 64,

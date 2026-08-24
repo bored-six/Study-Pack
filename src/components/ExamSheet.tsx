@@ -3,7 +3,7 @@ import Animated, { ZoomIn } from 'react-native-reanimated';
 
 import { Icon } from '@/components/Icon';
 
-import { DeskProp } from '@/components/deskdress';
+import { DeskProp, type DeskMood } from '@/components/deskdress';
 import { Squiggle } from '@/components/notebook';
 import type { ExamFormat } from '@/lib/exam';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
@@ -21,6 +21,8 @@ interface Props {
   stars?: number;
   /** True after ~8s without input; the desk gets impatient. */
   idle?: boolean;
+  /** The deskmate's mood — leaning in, wincing, or watching. */
+  mood?: DeskMood;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -38,6 +40,7 @@ export function ExamSheet({
   smudges = 0,
   stars = 0,
   idle = false,
+  mood = 'watch',
   style,
 }: Props) {
   const shownStars = Math.min(stars, 7);
@@ -78,7 +81,7 @@ export function ExamSheet({
         </View>
       ) : null}
 
-      <DeskProp format={format} idle={idle} />
+      <DeskProp format={format} idle={idle} mood={mood} />
     </View>
   );
 }
