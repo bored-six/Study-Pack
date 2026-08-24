@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -25,7 +26,7 @@ import type {
   TypedItem,
 } from '@/lib/exam';
 import { checkAnswer, checkEnumeration } from '@/lib/grade';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { candy, colors, font, outline, radius, shadow } from '@/theme/tokens';
 
 interface Props {
   item: ExamItem;
@@ -387,22 +388,28 @@ function ModifiedTrueFalse({
     );
   }
 
+  // Every wrong path names the correct word. Being told only what was wrong
+  // leaves you knowing the statement was false and still not knowing the fact.
+  const swapped = item.words[item.falseWordIndex];
   const detail = wrongCall
     ? item.isTrue
-      ? 'That statement was true'
-      : 'That statement was false'
+      ? 'That statement was true — nothing needed changing'
+      : `That statement was false: "${swapped}" should be "${item.correctWord}"`
     : !correctWordPicked
-      ? `The wrong word was "${item.words[item.falseWordIndex]}"`
+      ? `The wrong word was "${swapped}" — it should be "${item.correctWord}"`
       : graded.nearMiss
-        ? `Close — you typed "${typed.trim()}", the answer was "${item.correctWord}"`
-        : `The answer was "${item.correctWord}"`;
+        ? `Right word. You typed "${typed.trim()}", the answer was "${item.correctWord}"`
+        : `Right word. The answer was "${item.correctWord}"`;
 
   return (
     <View style={styles.body}>
       <View style={styles.wordWrap}>
         {item.words.map((word, i) =>
           i === item.falseWordIndex && !item.isTrue ? (
-            <CircledWord key={`${i}-${word}`} word={word} />
+            <View key={`${i}-${word}`} style={styles.fixWrap}>
+              <Text style={styles.fixWord}>{item.correctWord}</Text>
+              <CircledWord word={word} />
+            </View>
           ) : (
             <Text key={`${i}-${word}`} style={styles.statement}>
               {word}
@@ -488,6 +495,19 @@ function Typed({ item, draft, setDraft, reveal, onDone }: Field<TypedItem, 'type
 
 // --- matching -----------------------------------------------------------
 
+interface ChipBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** A wobbly pen line between a term and its meaning — workbook style. */
+function penPath(from: { x: number; y: number }, to: { x: number; y: number }): string {
+  const midX = (from.x + to.x) / 2;
+  return `M ${from.x} ${from.y} C ${midX} ${from.y - 5}, ${midX} ${to.y + 5}, ${to.x} ${to.y}`;
+}
+
 function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem, 'matching'>) {
   const { pairs, activeTerm } = draft;
   const checked = reveal && draft.checked;
@@ -496,8 +516,19 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
   const correct = item.terms.every((_, i) => pairs[i] === item.correctIndexFor[i]);
   const takenMeanings = new Set(Object.values(pairs));
 
+  // Chip geometry, measured relative to the two columns, for the pen lines.
+  const [termBoxes, setTermBoxes] = useState<Record<number, ChipBox>>({});
+  const [meaningBoxes, setMeaningBoxes] = useState<Record<number, ChipBox>>({});
+  const [cols, setCols] = useState<{ left: ChipBox | null; right: ChipBox | null }>({
+    left: null,
+    right: null,
+  });
+
+  const toneFor = (i: number) => candy[i % candy.length];
+
   /** Tapping a paired term releases it, so a mistap is never a dead end. */
   const tapTerm = (i: number) => {
+    if (checked) return;
     if (pairs[i] != null) {
       const next = { ...pairs };
       delete next[i];
@@ -507,29 +538,72 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
     setDraft({ ...draft, activeTerm: activeTerm === i ? null : i });
   };
 
+  const box = (e: { nativeEvent: { layout: { x: number; y: number; width: number; height: number } } }): ChipBox => ({
+    x: e.nativeEvent.layout.x,
+    y: e.nativeEvent.layout.y,
+    w: e.nativeEvent.layout.width,
+    h: e.nativeEvent.layout.height,
+  });
+
   return (
     <View style={styles.body}>
       <Text style={styles.stepLabel}>
         {activeTerm == null
-          ? 'Tap a term, then tap its meaning.'
-          : 'Now tap its meaning. Tap a paired term to undo it.'}
+          ? 'Tap a term, then its meaning — a line joins them up.'
+          : 'Now tap its meaning. Tap a joined term to unhook it.'}
       </Text>
 
       <View style={styles.matchCols}>
-        <View style={styles.matchCol}>
+        {/* The pen lines, drawn under the chips. */}
+        {cols.left && cols.right ? (
+          <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
+            {Object.entries(pairs).map(([termKey, j]) => {
+              const i = Number(termKey);
+              const t = termBoxes[i];
+              const m = meaningBoxes[j];
+              if (!t || !m || !cols.left || !cols.right) return null;
+              const from = {
+                x: cols.left.x + t.x + t.w,
+                y: cols.left.y + t.y + t.h / 2,
+              };
+              const to = { x: cols.right.x + m.x, y: cols.right.y + m.y + m.h / 2 };
+              const good = checked && item.correctIndexFor[i] === j;
+              const stroke = checked
+                ? good
+                  ? colors.leaf
+                  : colors.coral
+                : toneFor(i).ink;
+              return (
+                <Path
+                  key={termKey}
+                  d={penPath(from, to)}
+                  stroke={stroke}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeDasharray={checked && !good ? '5 6' : undefined}
+                  fill="none"
+                />
+              );
+            })}
+          </Svg>
+        ) : null}
+
+        <View style={styles.matchCol} onLayout={(e) => setCols((c) => ({ ...c, left: box(e) }))}>
           {item.terms.map((term, i) => {
             const paired = pairs[i] != null;
             const good = checked && pairs[i] === item.correctIndexFor[i];
             const bad = checked && paired && !good;
+            const tone = toneFor(i);
             return (
               <Pressable
                 key={term}
                 disabled={checked}
+                onLayout={(e) => setTermBoxes((b) => ({ ...b, [i]: box(e) }))}
                 onPress={() => tapTerm(i)}
                 style={({ pressed }) => [
                   styles.matchChip,
                   activeTerm === i && styles.matchActive,
-                  paired && !checked && styles.matchPaired,
+                  paired && !checked && { backgroundColor: tone.wash, borderColor: tone.ink },
                   good && styles.optionGood,
                   bad && styles.optionBad,
                   pressed && !checked && styles.pressed,
@@ -540,41 +614,42 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
                   </Text>
                   {bad ? <PenStrike color={colors.coral} /> : null}
                 </View>
-                {good ? (
-                  <PenTick size={15} />
-                ) : paired ? (
-                  <Text style={styles.matchNum}>{pairs[i] + 1}</Text>
-                ) : null}
+                {good ? <PenTick size={15} /> : null}
               </Pressable>
             );
           })}
         </View>
 
-        <View style={styles.matchCol}>
-          {item.meanings.map((meaning, j) => (
-            <Pressable
-              key={meaning}
-              disabled={checked || activeTerm == null || takenMeanings.has(j)}
-              onPress={() => {
-                if (activeTerm == null) return;
-                setDraft({
-                  ...draft,
-                  pairs: { ...pairs, [activeTerm]: j },
-                  activeTerm: null,
-                });
-              }}
-              style={({ pressed }) => [
-                styles.matchChip,
-                styles.matchMeaning,
-                takenMeanings.has(j) && styles.matchPaired,
-                pressed && styles.pressed,
-              ]}>
-              <Text style={styles.matchNum}>{j + 1}</Text>
-              <Text style={styles.matchText} numberOfLines={3}>
-                {meaning}
-              </Text>
-            </Pressable>
-          ))}
+        <View style={styles.matchCol} onLayout={(e) => setCols((c) => ({ ...c, right: box(e) }))}>
+          {item.meanings.map((meaning, j) => {
+            const pairedTerm = Object.entries(pairs).find(([, v]) => v === j)?.[0];
+            const tone = pairedTerm != null ? toneFor(Number(pairedTerm)) : null;
+            return (
+              <Pressable
+                key={meaning}
+                disabled={checked || activeTerm == null || takenMeanings.has(j)}
+                onLayout={(e) => setMeaningBoxes((b) => ({ ...b, [j]: box(e) }))}
+                onPress={() => {
+                  if (activeTerm == null) return;
+                  setDraft({
+                    ...draft,
+                    pairs: { ...pairs, [activeTerm]: j },
+                    activeTerm: null,
+                  });
+                }}
+                style={({ pressed }) => [
+                  styles.matchChip,
+                  styles.matchMeaning,
+                  tone && !checked && { backgroundColor: tone.wash, borderColor: tone.ink },
+                  activeTerm != null && !takenMeanings.has(j) && !checked && styles.matchInviting,
+                  pressed && styles.pressed,
+                ]}>
+                <Text style={styles.matchText} numberOfLines={3}>
+                  {meaning}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
@@ -638,6 +713,9 @@ function Enumeration({ item, draft, setDraft, reveal, onDone }: Field<Enumeratio
                 autoCapitalize="none"
                 autoCorrect={false}
               />
+              {checked && outcome?.matched == null ? (
+                <Text style={styles.enumFix}>{item.items[i]}</Text>
+              ) : null}
             </View>
           );
         })}
@@ -815,6 +893,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  fixWrap: {
+    alignItems: 'center',
+  },
+  fixWord: {
+    fontFamily: font.hero,
+    fontSize: 14,
+    lineHeight: 17,
+    color: colors.leaf,
+    transform: [{ rotate: '-3deg' }],
+  },
+  enumFix: {
+    fontFamily: font.hero,
+    fontSize: 14,
+    color: colors.leaf,
+    marginLeft: 6,
+    flexShrink: 1,
+  },
+  matchInviting: {
+    borderStyle: 'dashed',
+    borderColor: colors.accentDeep,
   },
   matchTextWrap: {
     flex: 1,
