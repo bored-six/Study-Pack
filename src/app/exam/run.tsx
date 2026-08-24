@@ -358,7 +358,6 @@ export default function ExamRunScreen() {
             <Text style={styles.counter}>{counterText}</Text>
           )}
 
-          {scored ? <ComboMeter combo={combo} idle={idle} /> : null}
 
           {paperLeft != null ? (
             <Text style={[styles.timer, paperLeft < 60_000 && styles.timerLow]}>
@@ -433,6 +432,7 @@ export default function ExamRunScreen() {
             key={`${item.id}:${visits}`}
             entering={FadeInDown.springify().damping(16)}
             exiting={SlideOutUp.duration(220)}>
+            {scored ? <ComboMeter combo={combo} idle={idle} /> : null}
             <ExamSheet
               format={item.format}
               title={FORMAT_LABEL[item.format]}
