@@ -25,14 +25,16 @@ export function PencilProgress({ progress, combo }: { progress: number; combo: n
   const heat = Math.min(combo, 20) / 20;
   return (
     <View style={styles.penTrack}>
+      {/* Faint guide line, so the stroke has somewhere visible to go. */}
+      <View style={styles.penGuide} />
       <View
         style={[
           styles.penStroke,
           {
-            width: `${Math.max(2, progress * 100)}%`,
-            height: 2.5 + heat * 2.5,
-            backgroundColor: heat > 0.45 ? colors.ink : '#6B7280',
-            opacity: 0.55 + heat * 0.45,
+            width: `${Math.max(8, progress * 100)}%`,
+            height: 3.5 + heat * 2.5,
+            backgroundColor: heat > 0.45 ? colors.ink : '#5B6570',
+            opacity: 0.75 + heat * 0.25,
           },
         ]}
       />
@@ -40,34 +42,12 @@ export function PencilProgress({ progress, combo }: { progress: number; combo: n
   );
 }
 
-/** ||||-strokes instead of "4/10". Falls back to digits on long papers. */
-export function Tally({ count, total }: { count: number; total?: number }) {
-  if (count > 30) {
-    return (
-      <Text style={styles.tallyText}>
-        {count}
-        {total != null ? ` / ${total}` : ''}
-      </Text>
-    );
-  }
-  const groups: number[] = [];
-  let left = count;
-  while (left > 0) {
-    groups.push(Math.min(5, left));
-    left -= 5;
-  }
+/** Handwritten "3 of 12" — always legible, unlike a lone tally stroke. */
+export function PageCount({ count, total }: { count: number; total: number }) {
   return (
-    <View style={styles.tallyRow}>
-      {groups.map((n, g) => (
-        <View key={g} style={styles.tallyGroup}>
-          {Array.from({ length: Math.min(n, 4) }, (_, i) => (
-            <View key={i} style={styles.tallyStroke} />
-          ))}
-          {n === 5 ? <View style={styles.tallySlash} /> : null}
-        </View>
-      ))}
-      {count === 0 ? <Text style={styles.tallyText}>0</Text> : null}
-    </View>
+    <Text style={styles.pageCount}>
+      {count} <Text style={styles.pageCountOf}>of</Text> {total}
+    </Text>
   );
 }
 
@@ -183,43 +163,27 @@ const styles = StyleSheet.create({
     height: 14,
     justifyContent: 'center',
   },
+  penGuide: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1.5,
+    borderRadius: 1,
+    backgroundColor: 'rgba(39, 54, 43, 0.13)',
+  },
   penStroke: {
     borderRadius: 2,
     transform: [{ rotate: '-0.4deg' }],
   },
-  tallyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  tallyGroup: {
-    flexDirection: 'row',
-    gap: 2.5,
-    position: 'relative',
-    paddingHorizontal: 1,
-  },
-  tallyStroke: {
-    width: 2,
-    height: 13,
-    borderRadius: 1,
-    backgroundColor: colors.textDim,
-    transform: [{ rotate: '3deg' }],
-  },
-  tallySlash: {
-    position: 'absolute',
-    left: -1,
-    right: -1,
-    top: 5.5,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: colors.textDim,
-    transform: [{ rotate: '-24deg' }],
-  },
-  tallyText: {
+  pageCount: {
     fontFamily: font.hero,
-    fontSize: 14,
-    color: colors.textDim,
+    fontSize: 17,
+    color: colors.text,
     fontVariant: ['tabular-nums'],
+  },
+  pageCountOf: {
+    fontSize: 12,
+    color: colors.textFaint,
   },
   propCorner: {
     position: 'absolute',

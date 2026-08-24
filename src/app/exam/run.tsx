@@ -29,7 +29,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
 import { ExamSheet } from '@/components/ExamSheet';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
-import { DayTint, EmberDrift, PencilProgress, Tally } from '@/components/deskdress';
+import { DayTint, EmberDrift, PageCount, PencilProgress } from '@/components/deskdress';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
@@ -234,30 +234,26 @@ export default function ExamRunScreen() {
     return (
       <View style={[styles.screen, styles.center, { paddingTop: insets.top + 10 }]}>
         <RuledPaper />
-        <Animated.View entering={FadeInDown.springify().damping(15)} style={styles.briefCard}>
+        <Animated.View
+          entering={FadeInDown.duration(320).springify().damping(18)}
+          style={styles.briefCard}>
           <Tape />
-          <Animated.View entering={FadeIn.delay(150)}>
-            <Text style={styles.briefKicker}>NEW ON THIS PAPER</Text>
-          </Animated.View>
-          <Animated.View entering={ZoomIn.springify().damping(10).delay(250)}>
+          <Text style={styles.briefKicker}>NEW ON THIS PAPER</Text>
+          <Animated.View entering={ZoomIn.duration(280).springify().damping(14).delay(180)}>
             <FormatBadge format={item.format} size="lg" style={styles.briefFormat} />
           </Animated.View>
-          <Animated.View entering={FadeIn.delay(500)}>
+          <Animated.View entering={FadeIn.duration(400).delay(380)} style={styles.briefRest}>
             <Squiggle width={110} color={FORMAT_META[item.format].ink} style={styles.briefSquiggle} />
-          </Animated.View>
-          <Animated.View entering={FadeInDown.springify().damping(15).delay(600)}>
             <Text style={styles.briefBody}>{FORMAT_HOWTO[item.format]}</Text>
-          </Animated.View>
-          {spec.feedback === 'deferred' ? (
-            <Animated.View entering={FadeIn.delay(750)} style={styles.briefNoteRow}>
-              <Icon name="bell" size={15} color={colors.ink} fill={colors.goldWash} strokeWidth={2} />
-              <Text style={styles.briefNote}>
-                You won't be told if you're right until the whole paper is submitted.
-              </Text>
-            </Animated.View>
-          ) : null}
+            {spec.feedback === 'deferred' ? (
+              <View style={styles.briefNoteRow}>
+                <Icon name="bell" size={15} color={colors.ink} fill={colors.goldWash} strokeWidth={2} />
+                <Text style={styles.briefNote}>
+                  You won't be told if you're right until the whole paper is submitted.
+                </Text>
+              </View>
+            ) : null}
 
-          <Animated.View entering={FadeIn.delay(850)}>
             <Pressable
               onPress={() => setSkipChecked((v) => !v)}
               hitSlop={8}
@@ -267,10 +263,11 @@ export default function ExamRunScreen() {
                   <Icon name="check" size={12} color={colors.onAccent} strokeWidth={3} />
                 ) : null}
               </View>
-              <Text style={styles.skipText}>
-                Don't show this again — the ? up top always brings it back
-              </Text>
+              <Text style={styles.skipText}>Don't show this again</Text>
             </Pressable>
+            <Text style={styles.skipHint}>
+              Forgot how it works? The ? up top brings this back any time.
+            </Text>
 
             <ChunkyButton
               label="Got it"
@@ -337,7 +334,7 @@ export default function ExamRunScreen() {
           )}
 
           {spec.repetition === 'once' ? (
-            <Tally count={index + 1} total={items.length} />
+            <PageCount count={index + 1} total={items.length} />
           ) : (
             <Text style={styles.counter}>{counterText}</Text>
           )}
@@ -394,7 +391,15 @@ export default function ExamRunScreen() {
         <OfflineBanner message="Offline — running from device storage" style={styles.offline} />
 
         <View style={styles.formatRow}>
-          <FormatBadge format={item.format} />
+          <View style={[styles.formatChip, { backgroundColor: FORMAT_META[item.format].wash }]}>
+            <Icon
+              name={FORMAT_META[item.format].icon}
+              size={16}
+              color={colors.ink}
+              fill={colors.surface}
+              strokeWidth={2.2}
+            />
+          </View>
           <Text style={styles.deckName} numberOfLines={1}>
             {spec.name} · {deck?.name}
           </Text>
@@ -633,6 +638,16 @@ const styles = StyleSheet.create({
   offline: {
     marginTop: 10,
   },
+  formatChip: {
+    width: 30,
+    height: 30,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
+  },
   formatRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -663,6 +678,16 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     flex: 1,
+  },
+  briefRest: {
+    alignSelf: 'stretch',
+  },
+  skipHint: {
+    fontFamily: font.body,
+    fontSize: 11.5,
+    color: colors.textFaint,
+    marginTop: 4,
+    marginLeft: 29,
   },
   skipRow: {
     flexDirection: 'row',
