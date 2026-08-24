@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, FlatList, TextInput, Platform, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/Icon';
@@ -16,20 +16,17 @@ import { usePlannerStore } from '@/store/planner';
 import { useDecksStore } from '@/store/decks';
 import { useNotesStore } from '@/store/notes';
 
-function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
+function SectionHeading({ label }: { label: string }) {
   return (
     <View style={styles.sectionHead}>
-      <View style={styles.sectionBadge}>
-        <Icon name={icon} size={14} color={colors.ink} strokeWidth={2.4} />
-      </View>
       <Text style={styles.sectionLabel}>{label}</Text>
-      <View style={styles.sectionRule} />
     </View>
   );
 }
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
 
   const { decks, refresh } = useDecksStore();
   const { refresh: refreshPlanner, upcoming } = usePlannerStore();
@@ -40,12 +37,10 @@ export default function HomeScreen() {
     addSubject,
   } = useNotesStore();
 
-  // Prefetch the catalog so the Trivia screen opens with data ready.
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  // Notes change while you're away on the add flow, so re-read on focus.
   useFocusEffect(
     useCallback(() => {
       void refreshNotes();
@@ -60,9 +55,22 @@ export default function HomeScreen() {
 
   const [editing, setEditing] = useState<Deck | null>(null);
   const [naming, setNaming] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Subjects are made here, in the section that holds them — the notes
-  // flow only ever assigns notes to one that already exists.
+  const filteredDecks = useMemo(() => {
+    if (!searchQuery.trim()) return noteDecks;
+    return noteDecks.filter(d => d.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [noteDecks, searchQuery]);
+
+  const carouselRef = useRef<FlatList>(null);
+
+  const scrollLeft = () => {
+    carouselRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+  const scrollRight = () => {
+    carouselRef.current?.scrollToEnd({ animated: true });
+  };
+
   const handleCreateSubject = useCallback(
     (name: string) => {
       setNaming(false);
@@ -76,7 +84,6 @@ export default function HomeScreen() {
       await updateSubject(deckId, name, color, icon);
       setEditing(null);
       void refreshNotes();
-      // Plans label themselves with the subject name, so a rename shows there too.
       void refreshPlanner();
     },
     [refreshNotes, refreshPlanner]
@@ -102,6 +109,43 @@ export default function HomeScreen() {
     });
   }, [nextSession]);
 
+  const renderDeckCard = ({ item: deck, index }: { item: Deck; index: number }) => {
+    const isEven = index % 2 === 0;
+    return (
+      <Pressable
+        onPress={() => router.push({ pathname: '/exam/[deckId]', params: { deckId: deck.id } })}
+        onLongPress={() => setEditing(deck)}
+        style={({ pressed }) => [
+          styles.carouselCard,
+          isEven ? styles.carouselCardRotateLeft : styles.carouselCardRotateRight,
+          deck.color ? { backgroundColor: deck.color } : null,
+          pressed && styles.pressed,
+        ]}>
+        <View style={styles.carouselIconWrap}>
+          <Icon
+            name={(deck.icon as IconName | null) ?? 'derpBook'}
+            size={64}
+            color={colors.ink}
+            fill={colors.surface}
+            strokeWidth={1.5}
+          />
+        </View>
+        <Text style={styles.carouselTitle} numberOfLines={2}>
+          {deck.name}
+        </Text>
+        <Text style={styles.carouselBody}>
+          {deck.questionCount} q's
+        </Text>
+        <Pressable
+          hitSlop={10}
+          onPress={() => setEditing(deck)}
+          style={({ pressed }) => [styles.editBtnAbs, pressed && styles.pressed]}>
+          <Icon name="pencil" size={16} color={colors.textFaint} strokeWidth={1.9} />
+        </Pressable>
+      </Pressable>
+    );
+  };
+
   return (
     <View style={styles.screen}>
       <RuledPaper />
@@ -109,146 +153,123 @@ export default function HomeScreen() {
         style={styles.fill}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
         showsVerticalScrollIndicator={false}>
-      <View style={styles.headRow}>
-        <View style={styles.headText}>
-          <Text style={styles.kicker}>FLIPP</Text>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>Let's</Text>
-            <View style={styles.titleSticker}>
-              <Text style={styles.titleStickerText}>study!</Text>
+        
+        {/* HEADER */}
+        <View style={styles.headRow}>
+          <View style={styles.headText}>
+            <Text style={styles.kicker}>FLIPP</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Let's</Text>
+              <View style={styles.titleSticker}>
+                <Text style={styles.titleStickerText}>study!</Text>
+              </View>
+              <Icon name="derpBrain" size={38} color={colors.ink} fill={colors.accentWash} strokeWidth={1.5} />
             </View>
-          </View>
-          <Squiggle style={styles.squiggle} />
-          <Text style={styles.sub}>Your own notes, plus trivia to practice on.</Text>
-        </View>
-        <Pressable
-          onPress={() => router.push('/settings')}
-          hitSlop={10}
-          accessibilityLabel="Settings"
-          style={({ pressed }) => [styles.gearBtn, pressed && styles.pressed]}>
-          <Icon name="gear" size={21} color={colors.ink} fill={colors.surface2} strokeWidth={1.9} />
-        </Pressable>
-      </View>
-
-      <OfflineBanner message="Offline — everything saved still works" style={styles.banner} />
-
-      {nextSession ? (
-        <Pressable
-          onPress={() => router.push('/planner')}
-          style={({ pressed }) => [styles.nextCard, pressed && styles.pressed]}>
-          <Tape rotate="-3deg" />
-          <View style={styles.nextBadge}>
-            <Icon name="clock" size={24} color={colors.ink} fill={colors.goldWash} />
-          </View>
-          <View style={styles.cardText}>
-            <Text style={styles.nextKicker}>NEXT UP · {formatClock(nextSession.at)}</Text>
-            <Text style={styles.cardTitle}>
-              {joinDeckNames(nextSession.occurrences.map((o) => o.deckName))}
-            </Text>
-            <Text style={styles.cardBody}>{nextLabel}</Text>
-          </View>
-          <Icon name="play" size={16} color={colors.accentDeep} />
-        </Pressable>
-      ) : null}
-
-      <SectionHeading icon="book" label="MY SUBJECTS" />
-
-      {noteDecks.map((deck) => (
-        <Pressable
-          key={deck.id}
-          onPress={() =>
-            // Subjects open the exam builder; trivia keeps the plain quiz.
-            router.push({ pathname: '/exam/[deckId]', params: { deckId: deck.id } })
-          }
-          onLongPress={() => setEditing(deck)}
-          style={({ pressed }) => [styles.noteDeckCard, pressed && styles.pressed]}>
-          <View
-            style={[
-              styles.noteDeckBadge,
-              deck.color ? { backgroundColor: deck.color } : null,
-            ]}>
-            <Icon
-              name={(deck.icon as IconName | null) ?? 'book'}
-              size={24}
-              color={colors.ink}
-              fill={colors.surface}
-              strokeWidth={1.9}
-            />
-          </View>
-          <View style={styles.cardText}>
-            <Text style={styles.cardTitle} numberOfLines={1}>
-              {deck.name}
-            </Text>
-            <Text style={styles.cardBody}>
-              {deck.questionCount} question{deck.questionCount === 1 ? '' : 's'} · always offline
-            </Text>
+            <Squiggle style={styles.squiggle} />
+            <Text style={styles.sub}>Your own notes, plus trivia to practice on.</Text>
           </View>
           <Pressable
+            onPress={() => router.push('/settings')}
             hitSlop={10}
-            onPress={() => setEditing(deck)}
-            style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}>
-            <Icon name="pencil" size={16} color={colors.textFaint} strokeWidth={1.9} />
+            accessibilityLabel="Settings"
+            style={({ pressed }) => [styles.gearBtn, pressed && styles.pressed]}>
+            <Icon name="gear" size={21} color={colors.ink} fill={colors.surface2} strokeWidth={1.9} />
           </Pressable>
-          <Icon name="play" size={16} color={colors.accentDeep} />
-        </Pressable>
-      ))}
+        </View>
 
-      <Pressable
-        onPress={() => setNaming(true)}
-        style={({ pressed }) => [styles.newSubjectCard, pressed && styles.pressed]}>
-        <View style={styles.newSubjectBadge}>
-          <Icon name="plus" size={20} color={colors.accentDeep} strokeWidth={2.6} />
-        </View>
-        <View style={styles.cardText}>
-          <Text style={styles.newSubjectTitle}>New subject</Text>
-          <Text style={styles.cardBody}>
-            {noteDecks.length > 0
-              ? 'Start another one to keep your notes apart'
-              : "Biology, History, whatever you're studying"}
-          </Text>
-        </View>
-      </Pressable>
+        <OfflineBanner message="Offline — everything saved still works" style={styles.banner} />
 
-      <SectionHeading icon="note" label="ADD NOTES" />
+        {/* SEARCH BAR (Only if 10+ decks) */}
+        {noteDecks.length >= 10 && (
+          <View style={styles.searchWrapper}>
+            <Icon name="globe" size={18} color={colors.textFaint} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search subjects..."
+              placeholderTextColor={colors.textFaint}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+        )}
 
-      <Pressable
-        onPress={() => router.push('/notes/new')}
-        style={({ pressed }) => [styles.notesCard, pressed && styles.pressed]}>
-        <Tape />
-        <View style={styles.notesBadge}>
-          <Icon name="bulb" size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
-        </View>
-        <View style={styles.cardText}>
-          <Text style={styles.cardTitle}>
-            {noteDecks.length > 0 ? 'Add more notes' : 'Add your notes'}
-          </Text>
-          <Text style={styles.cardBody}>
-            Paste notes from class and we'll turn them into a quiz you can take anywhere.
-          </Text>
-        </View>
-      </Pressable>
+        {/* NEXT UP PLANNER */}
+        {nextSession ? (
+          <Pressable
+            onPress={() => router.push('/planner')}
+            style={({ pressed }) => [styles.nextCard, pressed && styles.pressed]}>
+            <Tape rotate="-3deg" />
+            <View style={styles.nextBadge}>
+              <Icon name="clock" size={24} color={colors.ink} fill={colors.goldWash} />
+            </View>
+            <View style={styles.cardText}>
+              <Text style={styles.nextKicker}>NEXT UP · {formatClock(nextSession.at)}</Text>
+              <Text style={styles.cardTitleLine}>
+                {joinDeckNames(nextSession.occurrences.map((o) => o.deckName))}
+              </Text>
+              <Text style={styles.cardBodyLine}>{nextLabel}</Text>
+            </View>
+            <Icon name="play" size={16} color={colors.accentDeep} />
+          </Pressable>
+        ) : null}
 
-      <SectionHeading icon="dice" label="TRIVIA" />
+        <SectionHeading label="MY DECKS" />
 
-      <Pressable
-        onPress={() => router.push('/trivia')}
-        style={({ pressed }) => [styles.triviaCard, pressed && styles.pressed]}>
-        <Tape rotate="3deg" />
-        <View style={styles.triviaBadge}>
-          <Icon name="dice" size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
+        {/* CAROUSEL */}
+        <View style={styles.carouselWrapper}>
+          {Platform.OS === 'web' && noteDecks.length > 2 && (
+            <Pressable onPress={scrollLeft} style={[styles.webArrow, styles.webArrowLeft]}>
+              <Text style={styles.arrowText}>{'<'}</Text>
+            </Pressable>
+          )}
+
+          <FlatList
+            ref={carouselRef}
+            horizontal
+            data={filteredDecks}
+            keyExtractor={d => d.id}
+            renderItem={renderDeckCard}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}
+            snapToInterval={180}
+            decelerationRate="fast"
+            ListEmptyComponent={
+              <View style={styles.emptyDeck}>
+                <Text style={styles.emptyText}>No subjects yet!</Text>
+              </View>
+            }
+          />
+
+          {Platform.OS === 'web' && noteDecks.length > 2 && (
+            <Pressable onPress={scrollRight} style={[styles.webArrow, styles.webArrowRight]}>
+              <Text style={styles.arrowText}>{'>'}</Text>
+            </Pressable>
+          )}
         </View>
-        <View style={styles.cardText}>
-          <Text style={styles.cardTitle}>Browse trivia</Text>
-          <Text style={styles.cardBody}>
-            {decks.length > 0
-              ? `${decks.length} practice decks${
-                  downloadedCount > 0 ? ` · ${downloadedCount} saved offline` : ''
-                }`
-              : 'Practice decks from Open Trivia DB'}
-          </Text>
+
+        {/* ACTION GRID */}
+        <View style={styles.actionGrid}>
+          <Pressable onPress={() => setNaming(true)} style={({ pressed }) => [styles.actionBtn, styles.actionBtnNew, pressed && styles.pressed]}>
+            <View style={[styles.actionIconWrap, styles.actionIconNew]}>
+              <Icon name="derpPlus" size={32} color={colors.accentDeep} strokeWidth={2.5} />
+            </View>
+            <Text style={styles.actionLabel}>New Subject</Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/notes/new')} style={({ pressed }) => [styles.actionBtn, styles.actionBtnNotes, pressed && styles.pressed]}>
+            <View style={[styles.actionIconWrap, styles.actionIconNotes]}>
+              <Icon name="derpBulb" size={32} color={colors.ink} fill={colors.surface} />
+            </View>
+            <Text style={styles.actionLabel}>Add Notes</Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/trivia')} style={({ pressed }) => [styles.actionBtn, styles.actionBtnTrivia, pressed && styles.pressed]}>
+            <View style={[styles.actionIconWrap, styles.actionIconTrivia]}>
+              <Icon name="derpDice" size={32} color={colors.ink} fill={colors.surface} />
+            </View>
+            <Text style={styles.actionLabel}>Play Trivia</Text>
+          </Pressable>
         </View>
-        <Icon name="play" size={16} color={colors.accentDeep} />
-      </Pressable>
 
       </ScrollView>
 
@@ -283,7 +304,10 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingBottom: tabClearance,
+    paddingBottom: tabClearance + 20,
+    maxWidth: 640,
+    alignSelf: 'center',
+    width: '100%',
   },
   squiggle: {
     marginTop: 2,
@@ -302,8 +326,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: font.hero,
-    fontSize: 32,
-    lineHeight: 42,
+    fontSize: 34,
+    lineHeight: 44,
     color: colors.text,
   },
   titleSticker: {
@@ -312,161 +336,178 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 2,
-    transform: [{ rotate: '-2.5deg' }],
+    transform: [{ rotate: '-3deg' }],
     ...shadow.card,
   },
   titleStickerText: {
     fontFamily: font.hero,
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 26,
+    lineHeight: 34,
     color: colors.ink,
   },
   sub: {
     fontFamily: font.bodySemibold,
     fontSize: 13,
     color: colors.textFaint,
-    marginTop: 1,
+    marginTop: 4,
   },
   banner: {
     marginTop: 10,
   },
-  sectionHead: {
+  searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 24,
-    marginBottom: 11,
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 16,
+    transform: [{ rotate: '0.4deg' }],
+    ...shadow.card,
   },
-  sectionBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    backgroundColor: colors.surface2,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-4deg' }],
+  searchInput: {
+    flex: 1,
+    fontFamily: font.bodySemibold,
+    fontSize: 15,
+    color: colors.text,
+    marginLeft: 8,
+    outlineStyle: 'none' as any,
+  },
+  sectionHead: {
+    marginTop: 24,
+    marginBottom: 8,
   },
   sectionLabel: {
     fontFamily: font.hero,
-    fontSize: 22,
+    fontSize: 24,
     color: colors.text,
   },
-  sectionRule: {
-    flex: 1,
-    height: 2,
-    borderRadius: 2,
-    backgroundColor: colors.lineSoft,
+  carouselWrapper: {
+    position: 'relative',
+    marginHorizontal: -16, 
   },
-  noteDeckCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  carouselContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 8,
+    gap: 16,
+  },
+  carouselCard: {
+    width: 164,
+    height: 220,
     backgroundColor: colors.surface,
     ...outline,
     ...derpRadius,
-    padding: 14,
-    marginBottom: 10,
-    transform: [{ rotate: '0.6deg' }],
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
     ...shadow.card,
   },
-  noteDeckBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-    backgroundColor: colors.accentWash,
+  carouselCardRotateLeft: { transform: [{ rotate: '-1.5deg' }] },
+  carouselCardRotateRight: { transform: [{ rotate: '1deg' }] },
+  carouselIconWrap: {
+    marginBottom: 16,
+  },
+  carouselTitle: {
+    fontFamily: font.hero,
+    fontSize: 24,
+    lineHeight: 28,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  carouselBody: {
+    fontFamily: font.bodySemibold,
+    fontSize: 14,
+    color: colors.textDim,
+  },
+  editBtnAbs: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.5)',
     borderWidth: 1.5,
     borderColor: colors.edge,
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ rotate: '-3deg' }],
   },
-  newSubjectCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  emptyDeck: {
+    width: 164,
+    height: 220,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: colors.edge,
     ...derpRadius,
-    padding: 13,
-    marginBottom: 2,
-    transform: [{ rotate: '-0.8deg' }],
-  },
-  newSubjectBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-    backgroundColor: colors.accentWash,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  newSubjectTitle: {
-    fontFamily: font.heading,
-    fontSize: 16.5,
-    lineHeight: 21,
-    color: colors.accentDeep,
+  emptyText: {
+    fontFamily: font.hero,
+    fontSize: 18,
+    color: colors.textFaint,
   },
-  notesCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.accentWash,
-    ...outline,
-    ...derpRadius,
-    padding: 14,
-    transform: [{ rotate: '-0.5deg' }],
-    ...shadow.card,
-  },
-  triviaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  webArrow: {
+    position: 'absolute',
+    top: '40%',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.surface,
     ...outline,
-    ...derpRadius,
-    padding: 14,
-    transform: [{ rotate: '0.9deg' }],
     ...shadow.card,
-  },
-  notesBadge: {
-    width: 48,
-    height: 48,
-    ...derpRadius,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ rotate: '-3deg' }],
+    zIndex: 10,
   },
-  triviaBadge: {
-    width: 48,
-    height: 48,
-    ...derpRadius,
-    backgroundColor: colors.surface2,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '3deg' }],
+  webArrowLeft: { left: 4 },
+  webArrowRight: { right: 4 },
+  arrowText: {
+    fontFamily: font.hero,
+    fontSize: 20,
+    color: colors.ink,
+    lineHeight: 20,
   },
-  cardText: {
+  actionGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  actionBtn: {
     flex: 1,
+    backgroundColor: colors.surface,
+    ...outline,
+    ...derpRadius,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.card,
   },
-  cardTitle: {
-    fontFamily: font.heading,
-    fontSize: 16.5,
-    lineHeight: 21,
+  actionBtnNew: { transform: [{ rotate: '1deg' }] },
+  actionBtnNotes: { transform: [{ rotate: '-1.5deg' }] },
+  actionBtnTrivia: { transform: [{ rotate: '0.5deg' }] },
+  actionIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  actionIconNew: { backgroundColor: colors.surface, borderStyle: 'dashed', borderColor: colors.accentDeep },
+  actionIconNotes: { backgroundColor: colors.accentWash },
+  actionIconTrivia: { backgroundColor: colors.surface2 },
+  actionLabel: {
+    fontFamily: font.hero,
+    fontSize: 18,
+    lineHeight: 22,
     color: colors.text,
-  },
-  cardBody: {
-    fontFamily: font.bodySemibold,
-    fontSize: 12.5,
-    lineHeight: 17,
-    color: colors.textDim,
-    marginTop: 1,
+    textAlign: 'center',
   },
   nextCard: {
     flexDirection: 'row',
@@ -491,21 +532,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ rotate: '-3deg' }],
   },
+  cardText: {
+    flex: 1,
+  },
   nextKicker: {
     fontFamily: font.bodyHeavy,
     fontSize: 10.5,
     letterSpacing: 1.3,
     color: colors.gold,
   },
-  editBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    backgroundColor: colors.surface2,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    alignItems: 'center',
-    justifyContent: 'center',
+  cardTitleLine: {
+    fontFamily: font.heading,
+    fontSize: 16.5,
+    lineHeight: 21,
+    color: colors.text,
+  },
+  cardBodyLine: {
+    fontFamily: font.bodySemibold,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: colors.textDim,
+    marginTop: 1,
   },
   headRow: {
     flexDirection: 'row',

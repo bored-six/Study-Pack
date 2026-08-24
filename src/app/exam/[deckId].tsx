@@ -85,7 +85,7 @@ function FormatChip({
   };
 
   return (
-    <Animated.View style={[animatedStyle, { width: '48%', flexGrow: 1 }]}>
+    <Animated.View style={[animatedStyle, { width: '48%' }]}>
       <Pressable
         disabled={off}
         onPress={handlePress}
@@ -93,7 +93,6 @@ function FormatChip({
         accessibilityState={{ checked: on, disabled: off }}
         style={({ pressed }) => [
           styles.chip,
-          { width: '100%' },
           on && styles.chipOn,
           off && styles.chipOff,
           pressed && styles.pressed,
@@ -460,10 +459,11 @@ export default function ExamSetupScreen() {
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
+      <View style={styles.contentWrapper}>
+        <ScrollView
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
         <Text style={styles.kicker}>WHICH TYPES?</Text>
         <View style={styles.grid}>
           {FORMAT_ORDER.map((format, i) => (
@@ -509,23 +509,24 @@ export default function ExamSetupScreen() {
             and again as true or false. Types are mixed and the order shuffled.
           </Text>
         </View>
-      </ScrollView>
+        </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <Text style={styles.total}>
-          {picked} question{picked === 1 ? '' : 's'}
-          {minutes > 0 ? ` · about ${minutes} min` : ''}
-        </Text>
-        {longExam ? (
-          <Text style={styles.longNote}>That’s a big sitting — you can always do less.</Text>
-        ) : null}
-        <ChunkyButton
-          label={picked === 0 ? 'Pick a type' : 'Start exam'}
-          icon="play"
-          size="lg"
-          disabled={picked === 0}
-          onPress={begin}
-        />
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+          <Text style={styles.total}>
+            {picked} question{picked === 1 ? '' : 's'}
+            {minutes > 0 ? ` · about ${minutes} min` : ''}
+          </Text>
+          {longExam ? (
+            <Text style={styles.longNote}>That’s a big sitting — you can always do less.</Text>
+          ) : null}
+          <ChunkyButton
+            label={picked === 0 ? 'Pick a type' : 'Start exam'}
+            icon="play"
+            size="lg"
+            disabled={picked === 0}
+            onPress={begin}
+          />
+        </View>
       </View>
     </View>
   );
@@ -535,6 +536,12 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
+    alignItems: 'center', // Center content on large screens
+  },
+  contentWrapper: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 600, // Constrain width on desktop web
     paddingHorizontal: 16,
   },
   center: {
@@ -603,6 +610,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   chip: {
+    width: '100%',
+    minHeight: 110, // Ensure height doesn't collapse on web
     backgroundColor: colors.surface,
     ...outline,
     ...derpRadius,
