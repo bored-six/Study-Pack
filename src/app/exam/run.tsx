@@ -35,6 +35,7 @@ import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { readSetting, writeSetting } from '@/lib/db';
+import { tapCorrect, tapThud, tapTier, tapWrong } from '@/lib/haptics';
 import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
 import { MODES, questionSeconds, SURVIVAL_STRIKES } from '@/lib/mode';
@@ -100,6 +101,8 @@ export default function ExamRunScreen() {
   const [idle, setIdle] = useState(false);
   const [emberNonce, setEmberNonce] = useState(0);
   const [wrongByItem, setWrongByItem] = useState<Record<string, number>>({});
+  const wrongByItemRef = useRef<Record<string, number>>({});
+  const [stars, setStars] = useState(0);
   const bestCombo = useRef<number | null>(null);
   const itemIdRef = useRef<string | null>(null);
   const glow = useSharedValue(0);
@@ -188,16 +191,32 @@ export default function ExamRunScreen() {
   }, [spec.clock, item, visits, waitingOnBriefing]);
 
   const finished = useCallback((next: 'next' | 'finished') => {
+    tapThud();
     if (next === 'finished') router.replace('/exam/results');
   }, []);
 
   const handleDone = useCallback(
     (correct: boolean) => {
-      setCombo((c) => (correct ? c + 1 : 0));
-      if (!correct && itemIdRef.current) {
-        // A wrong try leaves an eraser smudge on this page.
-        const id = itemIdRef.current;
-        setWrongByItem((m) => ({ ...m, [id]: (m[id] ?? 0) + 1 }));
+      const id = itemIdRef.current;
+      if (correct) {
+        tapCorrect();
+        setCombo((c) => {
+          tapTier(c + 1);
+          return c + 1;
+        });
+        // A page answered right on the first try earns a star sticker.
+        if (id && !wrongByItemRef.current[id]) setStars((s) => s + 1);
+      } else {
+        tapWrong();
+        setCombo(0);
+        if (id) {
+          // A wrong try leaves an eraser smudge on this page.
+          setWrongByItem((m) => {
+            const next = { ...m, [id]: (m[id] ?? 0) + 1 };
+            wrongByItemRef.current = next;
+            return next;
+          });
+        }
       }
       void store.answer(correct).then(finished, (e: unknown) => {
         console.warn('Could not record that answer', e);
@@ -448,6 +467,7 @@ export default function ExamRunScreen() {
               title={FORMAT_LABEL[item.format]}
               accent={FORMAT_META[item.format].ink}
               smudges={wrongByItem[item.id] ?? 0}
+              stars={stars}
               idle={idle}>
               <ExamItemView
                 item={item}

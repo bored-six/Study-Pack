@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
+  FadeInDown,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -16,6 +17,7 @@ import { CircledWord } from '@/components/CircledWord';
 import { InkSplat, PenStrike, PenTick, Stamp } from '@/components/penmarks';
 import { Icon } from '@/components/Icon';
 import { emptyDraft, type DraftValue } from '@/lib/draft';
+import { tapSelect } from '@/lib/haptics';
 import type {
   ChoiceItem,
   EnumerationItem,
@@ -151,10 +153,16 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
           const dud = revealed && !showGood && !showBad;
           const rank = String.fromCharCode(65 + i);
           return (
-            <Pressable
+            <Animated.View
               key={option}
+              entering={FadeInDown.springify().damping(15).delay(80 + i * 90)}
+              style={styles.dealSlot}>
+            <Pressable
               disabled={revealed}
-              onPress={() => setDraft({ kind: 'choice', picked: option })}
+              onPress={() => {
+                tapSelect();
+                setDraft({ kind: 'choice', picked: option });
+              }}
               style={({ pressed }) => [
                 styles.playCard,
                 { transform: [{ rotate: i % 2 === 0 ? '-1.2deg' : '1.2deg' }] },
@@ -187,6 +195,7 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
                 </View>
               ) : null}
             </Pressable>
+            </Animated.View>
           );
         })}
       </View>
@@ -226,10 +235,15 @@ function TrueFalse({ item, draft, setDraft, reveal, onDone }: Field<TrueFalseIte
           const chosen = picked === value;
           const isAnswer = item.isTrue === value;
           return (
-            <Pressable
+            <Animated.View
               key={String(value)}
+              entering={FadeInDown.springify().damping(15).delay(value ? 100 : 200)}>
+            <Pressable
               disabled={revealed}
-              onPress={() => setDraft({ kind: 'tf', picked: value })}
+              onPress={() => {
+                tapSelect();
+                setDraft({ kind: 'tf', picked: value });
+              }}
               style={({ pressed }) => [
                 styles.tfCard,
                 { transform: [{ rotate: value ? '-2deg' : '2deg' }] },
@@ -250,6 +264,7 @@ function TrueFalse({ item, draft, setDraft, reveal, onDone }: Field<TrueFalseIte
                 {value ? 'True' : 'False'}
               </Text>
             </Pressable>
+            </Animated.View>
           );
         })}
       </View>
@@ -794,9 +809,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
-  playCard: {
+  dealSlot: {
     width: '47.5%',
     flexGrow: 1,
+  },
+  playCard: {
     minHeight: 92,
     backgroundColor: colors.surface,
     borderWidth: 2,
