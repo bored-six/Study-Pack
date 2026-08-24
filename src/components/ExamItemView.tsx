@@ -583,40 +583,6 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
       </Text>
 
       <View style={styles.matchCols}>
-        {/* The pen lines, drawn under the chips. */}
-        {cols.left && cols.right ? (
-          <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
-            {Object.entries(pairs).map(([termKey, j]) => {
-              const i = Number(termKey);
-              const t = termBoxes[i];
-              const m = meaningBoxes[j];
-              if (!t || !m || !cols.left || !cols.right) return null;
-              const from = {
-                x: cols.left.x + t.x + t.w,
-                y: cols.left.y + t.y + t.h / 2,
-              };
-              const to = { x: cols.right.x + m.x, y: cols.right.y + m.y + m.h / 2 };
-              const good = checked && item.correctIndexFor[i] === j;
-              const stroke = checked
-                ? good
-                  ? colors.leaf
-                  : colors.coral
-                : toneFor(i).ink;
-              return (
-                <Path
-                  key={termKey}
-                  d={penPath(from, to)}
-                  stroke={stroke}
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeDasharray={checked && !good ? '5 6' : undefined}
-                  fill="none"
-                />
-              );
-            })}
-          </Svg>
-        ) : null}
-
         <View style={styles.matchCol} onLayout={(e) => setCols((c) => ({ ...c, left: box(e) }))}>
           {item.terms.map((term, i) => {
             const paired = pairs[i] != null;
@@ -681,6 +647,40 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
             );
           })}
         </View>
+        {/* The pen lines, drawn over the chips so mobile's narrow gap can't hide them. */}
+        {cols.left && cols.right ? (
+          <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
+            {Object.entries(pairs).map(([termKey, j]) => {
+              const i = Number(termKey);
+              const t = termBoxes[i];
+              const m = meaningBoxes[j];
+              if (!t || !m || !cols.left || !cols.right) return null;
+              const from = {
+                x: cols.left.x + t.x + t.w - 10,
+                y: cols.left.y + t.y + t.h / 2,
+              };
+              const to = { x: cols.right.x + m.x + 10, y: cols.right.y + m.y + m.h / 2 };
+              const good = checked && item.correctIndexFor[i] === j;
+              const stroke = checked
+                ? good
+                  ? colors.leaf
+                  : colors.coral
+                : toneFor(i).ink;
+              return (
+                <Path
+                  key={termKey}
+                  d={penPath(from, to)}
+                  stroke={stroke}
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  strokeDasharray={checked && !good ? '5 6' : undefined}
+                  fill="none"
+                />
+              );
+            })}
+          </Svg>
+        ) : null}
+
       </View>
 
       {checked ? (
@@ -1115,7 +1115,7 @@ const styles = StyleSheet.create({
   },
   matchCols: {
     flexDirection: 'row',
-    gap: 9,
+    gap: 26,
   },
   matchCol: {
     flex: 1,
