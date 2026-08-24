@@ -187,6 +187,14 @@ export default function ExamRunScreen() {
   }, [combo]);
 
   const [showHelp, setShowHelp] = useState(false);
+
+  // Each format announces its instruction card with its own little jingle.
+  const briefingOpen = !!item && (!briefed.includes(item.format) || showHelp);
+  useEffect(() => {
+    if (briefingOpen && item) playSfx(`brief_${item.format}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [briefingOpen, item?.format]);
+
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [reviewing, setReviewing] = useState(false);

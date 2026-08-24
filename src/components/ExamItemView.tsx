@@ -722,6 +722,7 @@ function Enumeration({ item, draft, setDraft, reveal, onDone }: Field<Enumeratio
                   })
                 }
                 editable={!checked}
+                onSubmitEditing={() => tapSelect()}
                 placeholder={checked ? item.items[i] : '…'}
                 placeholderTextColor={colors.textFaint}
                 style={[

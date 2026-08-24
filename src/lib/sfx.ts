@@ -14,9 +14,17 @@ const SOURCES = {
   combo: require('../../assets/sfx/combo.wav'),
   tear: require('../../assets/sfx/tear.wav'),
   stamp: require('../../assets/sfx/stamp.wav'),
+  tick: require('../../assets/sfx/tick.wav'),
   bell: require('../../assets/sfx/bell.wav'),
   star: require('../../assets/sfx/star.wav'),
   aplus: require('../../assets/sfx/aplus.wav'),
+  brief_multiple_choice: require('../../assets/sfx/brief_multiple_choice.wav'),
+  brief_true_false: require('../../assets/sfx/brief_true_false.wav'),
+  brief_modified_true_false: require('../../assets/sfx/brief_modified_true_false.wav'),
+  brief_identification: require('../../assets/sfx/brief_identification.wav'),
+  brief_fill_blank: require('../../assets/sfx/brief_fill_blank.wav'),
+  brief_matching: require('../../assets/sfx/brief_matching.wav'),
+  brief_enumeration: require('../../assets/sfx/brief_enumeration.wav'),
 } as const;
 
 export type SfxName = keyof typeof SOURCES;

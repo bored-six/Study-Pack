@@ -106,6 +106,7 @@ export function PenTick({ size = 22, color = colors.leaf }: { size?: number; col
   const progress = useSharedValue(reduced ? 0 : LEN);
 
   useEffect(() => {
+    playSfx('tick');
     if (!reduced) {
       progress.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.quad) });
     }
