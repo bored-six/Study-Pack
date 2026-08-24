@@ -11,6 +11,8 @@
  * topically related instead of obviously filler.
  */
 
+import { CLAIM_VERB, ILLUSTRATION_PREFIX } from './quizzable';
+
 export const LIMITS = {
   /** Roughly 4–5 pages. Not a perf limit — reviewing more than this is misery. */
   maxInputChars: 10_000,
@@ -545,22 +547,6 @@ interface EnumDraft {
   source: string;
 }
 
-/**
- * Sentences that show rather than tell. They exist to demonstrate the fact
- * stated somewhere near them, so quizzing their contents tests recall of the
- * illustration instead of the idea.
- */
-const ILLUSTRATION =
-  /^(?:examples?\s*[:—-]|for example\b|for instance\b|e\.?g\.?\b|i\.?e\.?\b|such as\b|as in\b|like\b.*:)/i;
-
-/**
- * Auxiliaries and copulas: the cheapest reliable sign that a line asserts
- * something rather than just naming a topic. Used to tell a heading from a
- * fact, and to keep true/false away from sentence fragments.
- */
-const CLAIM_VERB =
-  /\b(?:is|are|was|were|be|been|has|have|had|can|cannot|will|would|should|must|may|might|does|do|did|means|refers)\b/i;
-
 /** Instructions ("read chapter 4") are tasks to do, not facts to learn. */
 const TASK_LINE =
   /^(?:read|answer|do|study|watch|bring|submit|review|finish|complete|practice|memorise|memorize|revise|prepare|email|print|ask)\b/i;
@@ -784,7 +770,7 @@ export function parseNotes(input: string): ParseResult {
       // An illustration demonstrates a fact, it doesn't state one. Blanking a
       // word out of "Example: Peter picked a peck of pickled peppers" tests
       // whether you memorised a tongue twister, not what alliteration is.
-      if (ILLUSTRATION.test(sentence)) {
+      if (ILLUSTRATION_PREFIX.test(sentence)) {
         reason = 'illustration';
         continue;
       }

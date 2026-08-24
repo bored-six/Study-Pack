@@ -12,6 +12,7 @@
 
 import type { AnswerRecord } from './mastery';
 import { rankByNeed } from './pick';
+import { looksLikeIllustration, readsAsStatement } from './quizzable';
 import type { Question } from './types';
 
 export type ExamFormat =
@@ -149,7 +150,37 @@ function clozeBlankIndex(prompt: string): number {
   return words(prompt).findIndex((w) => w.startsWith('______'));
 }
 
+/**
+ * The last gate before a question reaches a student, in any format.
+ *
+ * The parser refuses illustrations and headings, but a deck built before it
+ * learned to still holds them, and a bad question is bad as multiple choice
+ * just as surely as it is as true/false. Refusing here covers every format
+ * at once and every deck, however old.
+ */
+export function isQuizzable(question: Question): boolean {
+  const prompt = question.prompt.trim();
+  const source = (question.sourceLine ?? '').trim();
+
+  // "Example: The wind ______ through the alley" tests the example.
+  if (looksLikeIllustration(prompt) || looksLikeIllustration(source)) return false;
+
+  // Enumerations are lists, not sentences — the statement test doesn't apply.
+  if (question.kind === 'enumeration') return question.answers.length > 0;
+
+  // A definition prompt is a question we wrote, so it always reads as one;
+  // a cloze is the student's own sentence and might be a heading.
+  if (question.kind === 'cloze') {
+    const sentence = source || prompt.replace(/_{3,}/, question.correctAnswer);
+    if (!readsAsStatement(sentence)) return false;
+  }
+
+  return true;
+}
+
 export function supportedFormats(question: Question): ExamFormat[] {
+  if (!isQuizzable(question)) return [];
+
   const formats: ExamFormat[] = ['multiple_choice'];
 
   if (question.kind === 'enumeration') {
