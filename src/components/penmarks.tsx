@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Ellipse, Path } from 'react-native-svg';
 
+import { markJuice } from '@/lib/juice';
 import { playSfx } from '@/lib/sfx';
 import { colors, font } from '@/theme/tokens';
 
@@ -100,17 +101,30 @@ export function PenCircle({
 }
 
 /** A big pen tick, drawn stroke by stroke. */
-export function PenTick({ size = 22, color = colors.leaf }: { size?: number; color?: string }) {
+export function PenTick({
+  size = 22,
+  color = colors.leaf,
+  delay = 0,
+}: {
+  size?: number;
+  color?: string;
+  /** Stagger for cascades — several ticks at once is one loud click. */
+  delay?: number;
+}) {
   const reduced = useReducedMotion();
   const LEN = 34;
   const progress = useSharedValue(reduced ? 0 : LEN);
 
   useEffect(() => {
-    playSfx('tick');
-    if (!reduced) {
-      progress.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.quad) });
-    }
-  }, [progress, reduced]);
+    const timer = setTimeout(() => {
+      playSfx('tick');
+      if (!reduced) {
+        progress.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.quad) });
+      }
+    }, delay);
+    if (reduced) progress.value = 0;
+    return () => clearTimeout(timer);
+  }, [delay, progress, reduced]);
 
   const animatedProps = useAnimatedProps(() => ({
     strokeDashoffset: progress.value,
@@ -148,6 +162,7 @@ export function Stamp({
 
   useEffect(() => {
     // The thud lands when the stamp makes contact, reduced motion or not.
+    markJuice('stamp');
     const timer = setTimeout(() => playSfx('stamp'), reduced ? 0 : 140);
     if (reduced) return () => clearTimeout(timer);
     opacity.value = withTiming(1, { duration: 90 });

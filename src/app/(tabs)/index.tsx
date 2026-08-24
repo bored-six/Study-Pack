@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/Icon';
@@ -9,7 +9,8 @@ import { SubjectSheet } from '@/components/SubjectSheet';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import type { Deck } from '@/lib/types';
-import { updateSubject } from '@/lib/db';
+import { readSetting, updateSubject, writeSetting } from '@/lib/db';
+import { setSfxEnabled } from '@/lib/sfx';
 import { colors, derpRadius, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
 import { formatClock, joinDeckNames } from '@/lib/schedule';
 import { usePlannerStore } from '@/store/planner';
@@ -30,6 +31,18 @@ function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const [soundsOn, setSoundsOn] = useState(true);
+
+  useEffect(() => {
+    void readSetting('sfx_muted').then((raw) => setSoundsOn(raw !== '1'));
+  }, []);
+
+  const toggleSounds = useCallback((on: boolean) => {
+    setSoundsOn(on);
+    setSfxEnabled(on);
+    void writeSetting('sfx_muted', on ? '0' : '1');
+  }, []);
+
   const { decks, refresh } = useDecksStore();
   const { refresh: refreshPlanner, upcoming } = usePlannerStore();
   const {
@@ -237,6 +250,30 @@ export default function HomeScreen() {
         </View>
         <Icon name="play" size={16} color={colors.accentDeep} />
       </Pressable>
+
+      <SectionHeading icon="bell" label="SETTINGS" />
+
+      <View style={styles.settingRow}>
+        <Icon
+          name="bell"
+          size={19}
+          color={colors.ink}
+          fill={soundsOn ? colors.goldWash : colors.surface2}
+          strokeWidth={2}
+        />
+        <View style={styles.settingText}>
+          <Text style={styles.settingTitle}>Exam sounds</Text>
+          <Text style={styles.settingBody}>
+            {soundsOn ? 'Blups, boings, and the sad trombone.' : 'The exam sits quietly.'}
+          </Text>
+        </View>
+        <Switch
+          value={soundsOn}
+          onValueChange={toggleSounds}
+          trackColor={{ true: colors.accent, false: colors.track }}
+          thumbColor={colors.surface}
+        />
+      </View>
       </ScrollView>
 
       <PromptModal
@@ -489,6 +526,26 @@ const styles = StyleSheet.create({
     borderColor: colors.edge,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  settingText: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontFamily: font.heading,
+    fontSize: 15,
+    color: colors.text,
+  },
+  settingBody: {
+    fontFamily: font.bodySemibold,
+    fontSize: 12,
+    color: colors.textFaint,
   },
   pressed: {
     opacity: 0.8,

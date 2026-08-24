@@ -715,7 +715,7 @@ function Enumeration({ item, draft, setDraft, reveal, onDone }: Field<Enumeratio
           return (
             <View key={i} style={styles.enumRow}>
               {outcome?.matched != null ? (
-                <PenTick size={18} />
+                <PenTick size={18} delay={250 + i * 90} />
               ) : checked ? (
                 <Icon name="cross" size={14} color={colors.coral} strokeWidth={2.8} />
               ) : (

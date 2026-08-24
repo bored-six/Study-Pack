@@ -255,7 +255,8 @@ export default function ExamRunScreen() {
         });
         // A page answered right on the first try earns a star sticker.
         if (id && !wrongByItemRef.current[id]) {
-          playSfx('star');
+          // The tear rips first; the star sparkles onto the next page.
+          setTimeout(() => playSfx('star'), 420);
           setStars((s) => s + 1);
         }
       } else {

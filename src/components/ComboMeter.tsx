@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Icon, type IconName } from '@/components/Icon';
+import { msSinceJuice } from '@/lib/juice';
 import { colors, font, shadow } from '@/theme/tokens';
 
 interface Props {
@@ -93,7 +94,9 @@ export function ComboMeter({ combo, idle = false }: Props) {
           withTiming(1.35, { duration: 110 }),
           withSpring(1, { damping: 9, stiffness: 220 })
         );
-        // The flare: the count leaps out over the page, then melts away.
+        // The flare: the count leaps out over the page, then melts away —
+        // unless a stamp just claimed the spotlight; two leaps is noise.
+        if (msSinceJuice('stamp') < 600) return;
         setFlare(combo);
         flareAnim.value = 0;
         flareAnim.value = withSequence(
