@@ -19,6 +19,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { IntroOverlay } from '@/components/IntroOverlay';
 import { initDb } from '@/lib/db';
+import { initPrefs } from '@/lib/prefs';
 import { colors, font } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync();
@@ -37,13 +38,28 @@ export default function RootLayout() {
     Nunito_800ExtraBold,
   });
   const [dbState, setDbState] = useState<DbState>('pending');
+  const [dbError, setDbError] = useState<string | null>(null);
   const [introDone, setIntroDone] = useState(false);
+  // Settled with the database, so the intro is never shown to someone who
+  // turned it off and then yanked away a frame later.
+  const [playIntro, setPlayIntro] = useState(true);
 
   useEffect(() => {
     initDb()
-      .then(() => setDbState('ready'))
+      .then(async () => {
+        // Preferences live in the database, so they can only be read once
+        // it is open. A failure here costs the defaults, not the launch.
+        try {
+          const prefs = await initPrefs();
+          setPlayIntro(prefs.intro);
+        } catch (e) {
+          console.warn('Could not read preferences', e);
+        }
+        setDbState('ready');
+      })
       .catch((e) => {
         console.error('Database init failed', e);
+        setDbError(String(e?.message ?? e));
         setDbState('error');
       });
   }, []);
@@ -68,6 +84,7 @@ export default function RootLayout() {
           Flipp couldn't open its local database. Restart the app; if it keeps
           happening, reinstall.
         </Text>
+        {dbError ? <Text style={styles.errorDetail}>{dbError}</Text> : null}
       </View>
     );
   }
@@ -81,7 +98,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.bg },
         }}
       />
-      {!introDone ? <IntroOverlay onDone={() => setIntroDone(true)} /> : null}
+      {playIntro && !introDone ? <IntroOverlay onDone={() => setIntroDone(true)} /> : null}
     </>
   );
 }
@@ -105,5 +122,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textDim,
     textAlign: 'center',
+  },
+  // Shown so a tester can screenshot the actual failure instead of relaying
+  // "it doesn't work" and leaving us to guess at the cause.
+  errorDetail: {
+    fontFamily: font.body,
+    fontSize: 11,
+    color: colors.textDim,
+    textAlign: 'center',
+    marginTop: 12,
+    opacity: 0.7,
   },
 });

@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/Icon';
@@ -9,8 +9,7 @@ import { SubjectSheet } from '@/components/SubjectSheet';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import type { Deck } from '@/lib/types';
-import { readSetting, updateSubject, writeSetting } from '@/lib/db';
-import { setSfxEnabled } from '@/lib/sfx';
+import { updateSubject } from '@/lib/db';
 import { colors, derpRadius, font, outline, radius, shadow, tabClearance } from '@/theme/tokens';
 import { formatClock, joinDeckNames } from '@/lib/schedule';
 import { usePlannerStore } from '@/store/planner';
@@ -31,17 +30,6 @@ function SectionHeading({ icon, label }: { icon: IconName; label: string }) {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const [soundsOn, setSoundsOn] = useState(true);
-
-  useEffect(() => {
-    void readSetting('sfx_muted').then((raw) => setSoundsOn(raw !== '1'));
-  }, []);
-
-  const toggleSounds = useCallback((on: boolean) => {
-    setSoundsOn(on);
-    setSfxEnabled(on);
-    void writeSetting('sfx_muted', on ? '0' : '1');
-  }, []);
 
   const { decks, refresh } = useDecksStore();
   const { refresh: refreshPlanner, upcoming } = usePlannerStore();
@@ -121,15 +109,26 @@ export default function HomeScreen() {
         style={styles.fill}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
         showsVerticalScrollIndicator={false}>
-      <Text style={styles.kicker}>FLIPP</Text>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>Let's</Text>
-        <View style={styles.titleSticker}>
-          <Text style={styles.titleStickerText}>study!</Text>
+      <View style={styles.headRow}>
+        <View style={styles.headText}>
+          <Text style={styles.kicker}>FLIPP</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>Let's</Text>
+            <View style={styles.titleSticker}>
+              <Text style={styles.titleStickerText}>study!</Text>
+            </View>
+          </View>
+          <Squiggle style={styles.squiggle} />
+          <Text style={styles.sub}>Your own notes, plus trivia to practice on.</Text>
         </View>
+        <Pressable
+          onPress={() => router.push('/settings')}
+          hitSlop={10}
+          accessibilityLabel="Settings"
+          style={({ pressed }) => [styles.gearBtn, pressed && styles.pressed]}>
+          <Icon name="gear" size={21} color={colors.ink} fill={colors.surface2} strokeWidth={1.9} />
+        </Pressable>
       </View>
-      <Squiggle style={styles.squiggle} />
-      <Text style={styles.sub}>Your own notes, plus trivia to practice on.</Text>
 
       <OfflineBanner message="Offline — everything saved still works" style={styles.banner} />
 
@@ -251,29 +250,6 @@ export default function HomeScreen() {
         <Icon name="play" size={16} color={colors.accentDeep} />
       </Pressable>
 
-      <SectionHeading icon="bell" label="SETTINGS" />
-
-      <View style={styles.settingRow}>
-        <Icon
-          name="bell"
-          size={19}
-          color={colors.ink}
-          fill={soundsOn ? colors.goldWash : colors.surface2}
-          strokeWidth={2}
-        />
-        <View style={styles.settingText}>
-          <Text style={styles.settingTitle}>Exam sounds</Text>
-          <Text style={styles.settingBody}>
-            {soundsOn ? 'Blups, boings, and the sad trombone.' : 'The exam sits quietly.'}
-          </Text>
-        </View>
-        <Switch
-          value={soundsOn}
-          onValueChange={toggleSounds}
-          trackColor={{ true: colors.accent, false: colors.track }}
-          thumbColor={colors.surface}
-        />
-      </View>
       </ScrollView>
 
       <PromptModal
@@ -527,25 +503,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settingRow: {
+  headRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 4,
   },
-  settingText: {
+  headText: {
     flex: 1,
   },
-  settingTitle: {
-    fontFamily: font.heading,
-    fontSize: 15,
-    color: colors.text,
-  },
-  settingBody: {
-    fontFamily: font.bodySemibold,
-    fontSize: 12,
-    color: colors.textFaint,
+  gearBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    ...outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    transform: [{ rotate: '-4deg' }],
+    ...shadow.card,
   },
   pressed: {
     opacity: 0.8,

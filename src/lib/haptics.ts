@@ -10,8 +10,18 @@ import { playSfx } from './sfx';
 
 const ON = Platform.OS === 'android' || Platform.OS === 'ios';
 
+let enabled = true;
+
+/**
+ * Only the buzz. Sound has its own switch, so a student can keep the
+ * blups and lose the vibration, or the other way round.
+ */
+export function setHapticsEnabled(on: boolean): void {
+  enabled = on;
+}
+
 function quiet(run: () => Promise<void>): void {
-  if (!ON) return;
+  if (!ON || !enabled) return;
   run().catch(() => {
     /* a missing vibrator is not an error */
   });

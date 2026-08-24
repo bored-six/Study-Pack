@@ -693,3 +693,111 @@ export async function updateSubject(
     deckId
   );
 }
+
+export async function deleteSetting(key: string): Promise<void> {
+  await getDb().runAsync('DELETE FROM settings WHERE key = ?', key);
+}
+
+export interface StorageSummary {
+  subjects: number;
+  /** Questions inside subjects — the student's own material. */
+  noteQuestions: number;
+  /** Trivia decks currently held offline, and what they cost. */
+  triviaDecks: number;
+  triviaQuestions: number;
+  sittings: number;
+  answers: number;
+  plans: number;
+}
+
+/**
+ * What this phone is holding. There is no cloud to check against, so the
+ * settings screen is the only place a student can see what "everything is
+ * stored here" actually amounts to.
+ */
+export async function storageSummary(): Promise<StorageSummary> {
+  const db = getDb();
+  const [decks, questions, sittings, answers, plans] = await Promise.all([
+    db.getFirstAsync<{ subjects: number; trivia: number }>(
+      `SELECT
+         SUM(CASE WHEN source = 'notes' THEN 1 ELSE 0 END) AS subjects,
+         SUM(CASE WHEN source != 'notes' AND downloaded_at IS NOT NULL THEN 1 ELSE 0 END) AS trivia
+       FROM decks`
+    ),
+    db.getFirstAsync<{ notes: number; trivia: number }>(
+      `SELECT
+         SUM(CASE WHEN d.source = 'notes' THEN 1 ELSE 0 END) AS notes,
+         SUM(CASE WHEN d.source != 'notes' THEN 1 ELSE 0 END) AS trivia
+       FROM questions q JOIN decks d ON d.id = q.deck_id`
+    ),
+    db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM attempts'),
+    db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM answers'),
+    db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM schedules'),
+  ]);
+  return {
+    subjects: decks?.subjects ?? 0,
+    noteQuestions: questions?.notes ?? 0,
+    triviaDecks: decks?.trivia ?? 0,
+    triviaQuestions: questions?.trivia ?? 0,
+    sittings: sittings?.n ?? 0,
+    answers: answers?.n ?? 0,
+    plans: plans?.n ?? 0,
+  };
+}
+
+/**
+ * Settings rows that are a record of what happened rather than a choice
+ * the student made. Clearing history drops these; preferences survive.
+ */
+const HISTORY_KEYS = [
+  'moments_log',
+  'achievements_unlocked',
+  'plans_kept_total',
+  'exam_in_progress',
+];
+
+/**
+ * Erases every record of studying — sittings, per-question answers, the
+ * streak, mastery, moments, achievements — and keeps the notes themselves.
+ * Deliberately separate from deleting subjects: wanting a clean slate to
+ * measure from is not the same as wanting your material gone.
+ */
+export async function clearPracticeHistory(): Promise<void> {
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM answers');
+    await db.runAsync('DELETE FROM attempts');
+    const holes = HISTORY_KEYS.map(() => '?').join(', ');
+    await db.runAsync(`DELETE FROM settings WHERE key IN (${holes})`, ...HISTORY_KEYS);
+    await db.runAsync("DELETE FROM settings WHERE key LIKE 'combo_best:%'");
+  });
+}
+
+/** Drops the offline copies of trivia decks; the catalog stays browsable. */
+export async function clearTriviaDownloads(): Promise<void> {
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `DELETE FROM questions WHERE deck_id IN (SELECT id FROM decks WHERE source != 'notes')`
+    );
+    await db.runAsync(
+      `UPDATE decks SET downloaded_at = NULL WHERE source != 'notes'`
+    );
+  });
+}
+
+/**
+ * Factory reset. Everything the app has ever written, gone — there is no
+ * server holding a copy, which is exactly why this asks twice upstream.
+ */
+export async function eraseEverything(): Promise<void> {
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM answers');
+    await db.runAsync('DELETE FROM attempts');
+    await db.runAsync('DELETE FROM schedules');
+    await db.runAsync('DELETE FROM questions');
+    await db.runAsync('DELETE FROM decks');
+    await db.runAsync('DELETE FROM settings');
+  });
+}
