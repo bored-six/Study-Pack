@@ -60,14 +60,14 @@ export const FIRE_TIERS: FireTier[] = [
   {
     from: 50,
     name: 'Wildfire',
-    icon: 'flameTall',
+    icon: 'flameBig',
     color: '#A2322A',
     greeting: 'Fifty days. It spreads to everything you touch.',
   },
   {
     from: 100,
     name: 'Blue flame',
-    icon: 'flameTall',
+    icon: 'flameBig',
     color: '#2E6FA3',
     greeting: 'A hundred days. The fire went blue — that is the hottest part.',
   },
