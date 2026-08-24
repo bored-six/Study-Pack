@@ -39,10 +39,9 @@ function mount(element: ReactElement) {
 
 const FULL: Debrief = {
   headline: 'You know more than that says.',
-  subhead: '3 of the misses were left blank.',
-  wrong: [{ id: 'blank', icon: 'note', text: '3 went down blank.' }],
-  strengths: [{ id: 'fixed', icon: 'sprout', text: '2 came back right today.' }],
-  weaknesses: [{ id: 'repeat', icon: 'question', text: '2 have caught you twice.' }],
+  wrong: [{ id: 'blank', weight: 3, text: '3 went down blank.' }],
+  strengths: [{ id: 'fixed', weight: 2, text: '2 came back right today.' }],
+  weaknesses: [{ id: 'repeat', weight: 2, text: '2 have caught you twice.' }],
   next: {
     title: 'Drill the ones that keep coming back',
     body: 'Weak spots pulls exactly those.',
@@ -53,26 +52,44 @@ const FULL: Debrief = {
 };
 
 describe('ExamDebrief', () => {
-  it('reads out the note and what to do about it', () => {
+  it('reads out one line each and what to do about it', () => {
     const { texts } = mount(<ExamDebrief debrief={FULL} onAction={() => {}} />);
     const shown = texts();
 
-    expect(shown).toContain('3 of the misses were left blank.');
-    expect(shown).toContain('WHERE THE MARKS WENT');
-    expect(shown).toContain("WHAT'S WORKING");
-    expect(shown).toContain('WHAT NEEDS WORK');
-    expect(shown).toContain('Drill the ones that keep coming back');
-    expect(shown).toContain('Drill weak spots');
+    expect(shown).toEqual([
+      'LOST',
+      '3 went down blank.',
+      'WORKING',
+      '2 came back right today.',
+      'WEAK',
+      '2 have caught you twice.',
+      'DO THIS NEXT',
+      'Drill the ones that keep coming back',
+      'Weak spots pulls exactly those.',
+      'Drill weak spots',
+    ]);
   });
 
-  it('hides a section it has nothing true to put in', () => {
+  it('hides a line it has nothing true to put in', () => {
     const quiet: Debrief = { ...FULL, wrong: [], weaknesses: [] };
     const { texts } = mount(<ExamDebrief debrief={quiet} onAction={() => {}} />);
     const shown = texts();
 
-    expect(shown).not.toContain('WHERE THE MARKS WENT');
-    expect(shown).not.toContain('WHAT NEEDS WORK');
-    expect(shown).toContain("WHAT'S WORKING");
+    expect(shown).not.toContain('LOST');
+    expect(shown).not.toContain('WEAK');
+    expect(shown).toContain('WORKING');
+  });
+
+  it('drops the note entirely when the paper said nothing at all', () => {
+    const silent: Debrief = { ...FULL, wrong: [], strengths: [], weaknesses: [] };
+    const { texts } = mount(<ExamDebrief debrief={silent} onAction={() => {}} />);
+
+    expect(texts()).toEqual([
+      'DO THIS NEXT',
+      'Drill the ones that keep coming back',
+      'Weak spots pulls exactly those.',
+      'Drill weak spots',
+    ]);
   });
 
   it('offers no button when the advice is not something to launch', () => {

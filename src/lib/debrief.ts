@@ -20,8 +20,6 @@
  * screen, a database, or a sitting.
  */
 
-import type { IconName } from '@/components/Icon';
-
 import { hasAnswer, type DraftValue } from './draft';
 import { FORMAT_LABEL, type ExamFormat, type ExamItem } from './exam';
 import { checkAnswer, checkEnumeration } from './grade';
@@ -100,8 +98,9 @@ export function classifyMiss(
 /** One line of the note. */
 export interface DebriefNote {
   id: string;
-  icon: IconName;
   text: string;
+  /** Ranks it against the other candidates for the same line. */
+  weight: number;
 }
 
 /** What the button under "do this next" should start. */
@@ -116,11 +115,17 @@ export interface NextStep {
   actionLabel: string | null;
 }
 
+/**
+ * One line each, and often none.
+ *
+ * An earlier version said everything it could prove — three lines a section,
+ * nine in all — and the whole thing stopped being read. A student finishing
+ * a paper will read one line about what went wrong, one about what didn't,
+ * and one instruction. So each section keeps only its strongest line.
+ */
 export interface Debrief {
   /** The line at the top. Earned, never a participation trophy. */
   headline: string;
-  /** One honest sentence under it. */
-  subhead: string;
   /** How the marks were lost. */
   wrong: DebriefNote[];
   /** What held up. */
@@ -264,13 +269,12 @@ function share(results: readonly SittingResult[]): number {
 
 const EMPTY_DEBRIEF: Debrief = {
   headline: 'Nothing to mark.',
-  subhead: 'No answers were recorded for this sitting.',
   wrong: [],
   strengths: [],
   weaknesses: [],
   next: {
     title: 'Sit one properly',
-    body: 'Pick a mode and answer a few questions — then there is something to read back.',
+    body: 'Answer a few and there will be something to read back.',
     action: 'none',
     format: null,
     actionLabel: null,
@@ -321,66 +325,66 @@ export function buildDebrief(input: DebriefInput): Debrief {
 
   const wrong: DebriefNote[] = [];
 
+  // Going that fast is the story of the paper, whatever else the misses say.
+  if (spec.clock === 'none' && total >= 6 && secondsEach < RUSHED_SECONDS && pct < 65) {
+    wrong.push({
+      id: 'rushed',
+      weight: misses,
+      text: `About ${Math.round(secondsEach)}s a question, with no clock running.`,
+    });
+  }
   if (slips.timeout > 0) {
     wrong.push({
       id: 'timeout',
-      icon: 'clock',
-      text: `${slips.timeout} ran out of time. Not knowing it and not reaching it look identical on the score — they are not the same problem.`,
+      weight: slips.timeout,
+      text: `${slips.timeout} ran out of time rather than went wrong.`,
     });
   }
   if (slips.blank > 0) {
     wrong.push({
       id: 'blank',
-      icon: 'note',
-      text: `${slips.blank} went down blank. Put something — a wrong answer scores exactly what an empty line does, and it tells you what you half-remembered.`,
+      weight: slips.blank,
+      text: `${slips.blank} went down blank — a guess cannot score less.`,
     });
   }
   if (slips.spelling > 0) {
     wrong.push({
       id: 'spelling',
-      icon: 'pencil',
-      text: `${slips.spelling} ${plural(slips.spelling, 'was', 'were')} a letter or two off. You had ${plural(slips.spelling, 'that one', 'those')} — the spelling took the mark, not the knowing.`,
+      weight: slips.spelling,
+      text: `${slips.spelling} ${plural(slips.spelling, 'was', 'were')} a letter or two off.`,
     });
   }
   if (slips.partial > 0) {
     wrong.push({
       id: 'partial',
-      icon: 'cards',
-      text: `${slips.partial} list ${plural(slips.partial, 'question', 'questions')} came out part-right. Half a list scores nothing, so learn them as a set, in one order, every time.`,
+      weight: slips.partial,
+      text: `${slips.partial} list ${plural(slips.partial, 'question', 'questions')} came out part-right.`,
     });
   }
   if (slips.halfway > 0) {
     wrong.push({
       id: 'halfway',
-      icon: 'alert',
-      text: `${slips.halfway} ${plural(slips.halfway, 'time', 'times')} you spotted the statement was false but not the word that made it. Read those slowly — the swap is usually the most specific word in the line.`,
+      weight: slips.halfway,
+      text: `${slips.halfway} caught the false statement but not the word.`,
     });
   }
+
   // A first look at questions never asked before is not a reading problem,
   // so the two never appear together — one of them would be wrong.
   const mostlyFresh = against.freshMissed >= 3 && against.freshMissed >= misses / 2;
   // Nor is anything a knowledge read when the misses were never answered.
   const mostlyUnanswered = slips.timeout + slips.blank >= misses / 2;
 
+  // Weight zero: both of these say "nothing more specific than that", so
+  // they only ever get the line when nothing more specific happened.
   if (!mostlyFresh && misses >= 3 && slips.wrong >= misses / 2) {
-    wrong.push({
-      id: 'gaps',
-      icon: 'book',
-      text: `Most of the misses were straight gaps rather than slips. That is a reading problem, not a careless one — go back to the notes for those before sitting another paper.`,
-    });
+    wrong.push({ id: 'gaps', weight: 0, text: 'Most of the misses were gaps, not slips.' });
   }
   if (mostlyFresh && !mostlyUnanswered) {
     wrong.push({
       id: 'fresh',
-      icon: 'sprout',
-      text: `${against.freshMissed} of them you had never been asked before. New ground, not lost ground — a first pass is meant to look like this.`,
-    });
-  }
-  if (spec.clock === 'none' && total >= 6 && secondsEach < RUSHED_SECONDS && pct < 65) {
-    wrong.push({
-      id: 'rushed',
-      icon: 'bolt',
-      text: `About ${Math.round(secondsEach)}s a question, with no clock running. Nothing was chasing you — the next one is worth reading twice.`,
+      weight: 0,
+      text: `${against.freshMissed} you had never been asked before.`,
     });
   }
 
@@ -391,28 +395,28 @@ export function buildDebrief(input: DebriefInput): Debrief {
   if (best && best.total >= MIN_FORMAT_SAMPLE && best.share >= STRONG_FORMAT) {
     strengths.push({
       id: `format:${best.format}`,
-      icon: 'check',
-      text: `${FORMAT_LABEL[best.format]}: ${best.right}/${best.total}. That format is not what is costing you.`,
+      weight: best.total,
+      text: `${FORMAT_LABEL[best.format]}: ${best.right}/${best.total}.`,
     });
   }
   if (against.fixed > 0) {
     strengths.push({
       id: 'fixed',
-      icon: 'sprout',
-      text: `${against.fixed} ${plural(against.fixed, 'question', 'questions')} you had missed before came back right today. That is the part that actually counts as learning.`,
+      weight: against.fixed,
+      text: `${against.fixed} you had missed before came back right.`,
     });
   }
   if (against.freshRight >= 2) {
     strengths.push({
       id: 'freshRight',
-      icon: 'star',
-      text: `${against.freshRight} you had never seen before, right first go.`,
+      weight: against.freshRight,
+      text: `${against.freshRight} new ones right first go.`,
     });
   }
   if (strengths.length === 0 && best && best.total >= 2 && best.share >= 0.6) {
     strengths.push({
       id: `format-soft:${best.format}`,
-      icon: 'check',
+      weight: best.total,
       text: `${FORMAT_LABEL[best.format]} held up best: ${best.right}/${best.total}.`,
     });
   }
@@ -421,6 +425,16 @@ export function buildDebrief(input: DebriefInput): Debrief {
 
   const weaknesses: DebriefNote[] = [];
 
+  // Declared worst-first for the mode it belongs to: on a pile that repeats,
+  // how many passes it took is the whole story of the sitting.
+  if (spec.repetition === 'until_retired' && total > items.length) {
+    const extra = total - items.length;
+    weaknesses.push({
+      id: 'extra',
+      weight: extra,
+      text: `${extra} extra ${plural(extra, 'pass', 'passes')} to clear the pile.`,
+    });
+  }
   if (
     worst &&
     worst !== best &&
@@ -429,46 +443,40 @@ export function buildDebrief(input: DebriefInput): Debrief {
   ) {
     weaknesses.push({
       id: `format:${worst.format}`,
-      icon: 'alert',
-      text: `${FORMAT_LABEL[worst.format]}: ${worst.right}/${worst.total}. More of the lost marks are here than anywhere else.`,
+      weight: worst.total,
+      text: `${FORMAT_LABEL[worst.format]}: ${worst.right}/${worst.total} — where most marks went.`,
     });
   }
   if (against.repeat > 0) {
     weaknesses.push({
       id: 'repeat',
-      icon: 'question',
-      text: `${against.repeat} ${plural(against.repeat, 'question has', 'questions have')} now caught you more than once. Repeating the same sitting will not fix ${plural(against.repeat, 'it', 'them')} — the answer has to go in first.`,
+      weight: against.repeat,
+      text: `${against.repeat} ${plural(against.repeat, 'has', 'have')} now caught you more than once.`,
     });
   }
   if (against.slipped > 0) {
     weaknesses.push({
       id: 'slipped',
-      icon: 'bulb',
-      text: `${against.slipped} you had right last time went wrong today. Fading, not missing — those are the cheapest marks to win back.`,
+      weight: against.slipped,
+      text: `${against.slipped} you had right last time went wrong.`,
     });
   }
   if (fade) {
     weaknesses.push({
       id: 'fade',
-      icon: 'clock',
-      text: `The back half of the paper went ${fade.back.filter((r) => r.correct).length}/${fade.back.length} against ${fade.front.filter((r) => r.correct).length}/${fade.front.length} at the front. Concentration, not knowledge — shorter sittings hold it better.`,
-    });
-  }
-  if (spec.repetition === 'until_retired' && total > items.length) {
-    const extra = total - items.length;
-    weaknesses.push({
-      id: 'extra',
-      icon: 'sprout',
-      text: `It took ${extra} extra ${plural(extra, 'pass', 'passes')} to clear the pile. Those are the ones to look at again tomorrow.`,
+      weight: fade.front.length,
+      text: `Back half ${fade.back.filter((r) => r.correct).length}/${fade.back.length}, against ${fade.front.filter((r) => r.correct).length}/${fade.front.length} at the front.`,
     });
   }
 
   return {
-    ...headlineFor({ mode, pct, score, total, items, against, slips, misses }),
-    wrong: wrong.slice(0, 3),
-    strengths: strengths.slice(0, 3),
-    weaknesses: weaknesses.slice(0, 3),
-    next: nextStep({ mode, pct, misses, against, slips, worst, best, formats: tallies.length }),
+    headline: headlineFor({ mode, pct, score, total, against, slips, misses }),
+    // The loudest thing that went wrong; the rest keep their declared order,
+    // which is already worst-first for the mode.
+    wrong: [...wrong].sort((a, b) => b.weight - a.weight).slice(0, 1),
+    strengths: strengths.slice(0, 1),
+    weaknesses: weaknesses.slice(0, 1),
+    next: nextStep({ mode, pct, misses, against, slips, worst, formats: tallies.length }),
   };
 }
 
@@ -479,47 +487,34 @@ interface HeadlineInput {
   pct: number;
   score: number;
   total: number;
-  items: readonly ExamItem[];
   against: Against;
   slips: Record<SlipKind, number>;
   misses: number;
 }
 
 /**
- * The motivational line, and one honest sentence under it.
+ * The motivational line.
  *
  * Motivational does not mean untrue. A bad paper gets a line that is worth
  * reading on a bad day — never "Great effort!", which any student can tell
  * was written before they sat down.
  */
-function headlineFor(input: HeadlineInput): { headline: string; subhead: string } {
-  const { mode, pct, score, total, items, against, slips, misses } = input;
+function headlineFor(input: HeadlineInput): string {
+  const { mode, pct, score, total, against, slips, misses } = input;
   const spec = MODES[mode];
   const slipped = slips.blank + slips.timeout + slips.spelling + slips.partial + slips.halfway;
 
   if (spec.repetition === 'until_out') {
-    const headline =
-      total >= 25
-        ? 'That was a long run.'
-        : total >= 12
-          ? 'You held on a while.'
-          : 'Short one. Go again.';
-    return { headline, subhead: `${score} right before the third miss.` };
+    return total >= 25
+      ? 'That was a long run.'
+      : total >= 12
+        ? 'You held on a while.'
+        : 'Short one. Go again.';
   }
 
-  if (spec.repetition === 'until_retired') {
-    const extra = Math.max(0, total - items.length);
-    return {
-      headline: 'The pile is empty.',
-      subhead:
-        extra === 0
-          ? `${items.length} questions, cleared without a single repeat.`
-          : `${items.length} questions cleared, ${extra} extra ${plural(extra, 'pass', 'passes')} to get there.`,
-    };
-  }
+  if (spec.repetition === 'until_retired') return 'The pile is empty.';
 
-  const headline =
-    score === total && total >= 5
+  return score === total && total >= 5
       ? 'Nothing left to mark.'
       : pct >= 85
         ? 'You knew this one.'
@@ -536,27 +531,9 @@ function headlineFor(input: HeadlineInput): { headline: string; subhead: string 
               : slipped >= Math.max(2, misses / 2)
                 ? 'You know more than that says.'
                 : 'Now you know where the gaps are.';
-
-  // The shape of the misses first: what went right is about to be said
-  // again under "what's working", and saying it twice wastes the one line
-  // that gets read for sure.
-  const subhead =
-    misses === 0
-      ? `All ${total}, first time through.`
-      : against.repeat > 0
-        ? `${against.repeat} of them ${plural(against.repeat, 'is', 'are')} still catching you.`
-        : slips.timeout > 0
-          ? `${slips.timeout} of the misses went to the clock.`
-          : slips.blank > 0
-            ? `${slips.blank} of the misses were left blank.`
-            : slips.spelling > 0
-              ? `${slips.spelling} of the misses were spelling alone.`
-              : against.fixed > 0
-                ? `${against.fixed} you used to miss came back right.`
-                : `${score} right, ${misses} to go back over.`;
-
-  return { headline, subhead };
 }
+
+
 
 // --- the one thing to do next -------------------------------------------
 
@@ -567,7 +544,6 @@ interface NextInput {
   against: Against;
   slips: Record<SlipKind, number>;
   worst: FormatTally | undefined;
-  best: FormatTally | undefined;
   /** How many formats were actually sat. */
   formats: number;
 }
@@ -577,14 +553,14 @@ interface NextInput {
  * nobody starts; the point is to make the next twenty minutes obvious.
  */
 function nextStep(input: NextInput): NextStep {
-  const { mode, pct, misses, against, slips, worst, best, formats } = input;
+  const { mode, pct, misses, against, slips, worst, formats } = input;
 
   // Already drilled them and they still went wrong — another round of the
   // same drill is exactly the wrong advice.
   if (mode === 'weak_spots' && against.repeat > 0) {
     return {
       title: 'Take these back to the notes',
-      body: `You drilled ${plural(against.repeat, 'this one', 'these')} and ${plural(against.repeat, 'it', 'they')} still went wrong. Read the answer for each of ${plural(against.repeat, 'it', 'them')} above before the next sitting — more attempts on their own will not put it in.`,
+      body: `Drilled and still wrong — read the ${plural(against.repeat, 'answer', 'answers')} above before another go.`,
       action: 'none',
       format: null,
       actionLabel: null,
@@ -594,7 +570,7 @@ function nextStep(input: NextInput): NextStep {
   if (against.repeat >= 2) {
     return {
       title: 'Drill the ones that keep coming back',
-      body: `${against.repeat} questions have now caught you more than once. Weak spots pulls exactly those and nothing else.`,
+      body: `${against.repeat} have caught you more than once. Weak spots pulls exactly those.`,
       action: 'weak_spots',
       format: null,
       actionLabel: 'Drill weak spots',
@@ -604,7 +580,7 @@ function nextStep(input: NextInput): NextStep {
   if (slips.timeout + slips.blank >= 3) {
     return {
       title: 'Sit it again with no clock',
-      body: `${slips.timeout + slips.blank} of the misses were never really answered. Take your time mode removes the clock, so what comes back is what you actually know.`,
+      body: `${slips.timeout + slips.blank} of the misses were never really answered.`,
       action: 'relaxed',
       format: null,
       actionLabel: 'Sit it untimed',
@@ -616,7 +592,7 @@ function nextStep(input: NextInput): NextStep {
   if (formats >= 2 && worst && worst.total >= MIN_FORMAT_SAMPLE && worst.share <= WEAK_FORMAT) {
     return {
       title: `Do a set of just ${FORMAT_LABEL[worst.format].toLowerCase()}`,
-      body: `${worst.right}/${worst.total} today. It is the format costing you, not the subject — a short set of only these is the fastest thing you can fix.`,
+      body: `${worst.right}/${worst.total} today — the format, not the subject.`,
       action: 'format',
       format: worst.format,
       actionLabel: `${FORMAT_LABEL[worst.format]} only`,
@@ -626,7 +602,7 @@ function nextStep(input: NextInput): NextStep {
   if (slips.spelling >= 2) {
     return {
       title: 'Write the answers, do not just read them',
-      body: `${slips.spelling} answers were a letter or two out. Reading a term makes it familiar; writing it is what makes it spellable under pressure.`,
+      body: 'Reading a term makes it familiar; writing it is what makes it stick.',
       action: 'none',
       format: null,
       actionLabel: null,
@@ -636,7 +612,7 @@ function nextStep(input: NextInput): NextStep {
   if (misses === 0 || pct >= 85) {
     return {
       title: 'Leave it a day',
-      body: 'You have got today. Coming back after a gap is what turns it into something you still have next week — a rerun this evening proves nothing.',
+      body: 'Coming back after a gap is what makes it stick. A rerun tonight proves nothing.',
       action: 'none',
       format: null,
       actionLabel: null,
@@ -646,17 +622,7 @@ function nextStep(input: NextInput): NextStep {
   if (against.slipped >= 2) {
     return {
       title: 'Win back the ones that faded',
-      body: `${against.slipped} you had right before slipped today. Weak spots picks them up first — those are the cheapest marks on the paper.`,
-      action: 'weak_spots',
-      format: null,
-      actionLabel: 'Drill weak spots',
-    };
-  }
-
-  if (best && best.share >= STRONG_FORMAT && best.total >= MIN_FORMAT_SAMPLE) {
-    return {
-      title: 'Go again on what you missed',
-      body: `The formats you are good at will not move the number much further. Weak spots goes at the ${misses} you dropped instead.`,
+      body: 'The cheapest marks on the paper.',
       action: 'weak_spots',
       format: null,
       actionLabel: 'Drill weak spots',
@@ -665,7 +631,7 @@ function nextStep(input: NextInput): NextStep {
 
   return {
     title: 'Go again on what you missed',
-    body: `${misses} to pick up. Weak spots puts the worst of them in front of you first.`,
+    body: `${misses} to pick up, worst first.`,
     action: 'weak_spots',
     format: null,
     actionLabel: 'Drill weak spots',

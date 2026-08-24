@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
-import { Icon } from '@/components/Icon';
 import { Tape } from '@/components/notebook';
 import type { Debrief, DebriefNote, NextStep } from '@/lib/debrief';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
@@ -9,43 +8,19 @@ import { colors, font, outline, radius, shadow } from '@/theme/tokens';
 /**
  * The marker's note under the score.
  *
- * Laid out as one taped-on note rather than three separate cards, because
- * it is meant to be read straight through — how the marks went, what held
- * up, what didn't — and then acted on once at the bottom.
+ * Three labelled lines and one instruction. It was three lines a section
+ * once, and a paragraph of feedback after a paper is a paragraph nobody
+ * reads — the lib keeps only the strongest line, and this shows it flat.
  */
 
-function Note({ note, ink, wash }: { note: DebriefNote; ink: string; wash: string }) {
+function Line({ label, notes, ink }: { label: string; notes: DebriefNote[]; ink: string }) {
+  // Nothing true to put here means nothing goes here.
+  const note = notes[0];
+  if (!note) return null;
   return (
-    <View style={styles.note}>
-      <View style={[styles.noteIcon, { backgroundColor: wash }]}>
-        <Icon name={note.icon} size={13} color={ink} fill={wash} strokeWidth={2.2} />
-      </View>
-      <Text style={styles.noteText}>{note.text}</Text>
-    </View>
-  );
-}
-
-function Section({
-  label,
-  notes,
-  ink,
-  wash,
-}: {
-  label: string;
-  notes: DebriefNote[];
-  ink: string;
-  wash: string;
-}) {
-  // Silence beats a padded-out section: an empty one means this paper had
-  // nothing to say there, and saying it anyway is how the whole note stops
-  // being worth reading.
-  if (notes.length === 0) return null;
-  return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionLabel, { color: ink }]}>{label}</Text>
-      {notes.map((note) => (
-        <Note key={note.id} note={note} ink={ink} wash={wash} />
-      ))}
+    <View style={styles.row}>
+      <Text style={[styles.label, { color: ink }]}>{label}</Text>
+      <Text style={styles.text}>{note.text}</Text>
     </View>
   );
 }
@@ -57,33 +32,19 @@ export function ExamDebrief({
   debrief: Debrief;
   onAction: (next: NextStep) => void;
 }) {
-  const { subhead, wrong, strengths, weaknesses, next } = debrief;
+  const { wrong, strengths, weaknesses, next } = debrief;
+  const anything = wrong.length + strengths.length + weaknesses.length > 0;
 
   return (
     <>
-      <View style={styles.card}>
-        <Tape rotate="3deg" />
-        <Text style={styles.subhead}>{subhead}</Text>
-
-        <Section
-          label="WHERE THE MARKS WENT"
-          notes={wrong}
-          ink={colors.textDim}
-          wash={colors.surface2}
-        />
-        <Section
-          label="WHAT'S WORKING"
-          notes={strengths}
-          ink={colors.leaf}
-          wash={colors.leafWash}
-        />
-        <Section
-          label="WHAT NEEDS WORK"
-          notes={weaknesses}
-          ink={colors.coral}
-          wash={colors.coralWash}
-        />
-      </View>
+      {anything ? (
+        <View style={styles.card}>
+          <Tape rotate="3deg" />
+          <Line label="LOST" notes={wrong} ink={colors.textDim} />
+          <Line label="WORKING" notes={strengths} ink={colors.leaf} />
+          <Line label="WEAK" notes={weaknesses} ink={colors.coral} />
+        </View>
+      ) : null}
 
       <View style={styles.nextCard}>
         <Text style={styles.nextLabel}>DO THIS NEXT</Text>
@@ -104,74 +65,60 @@ export function ExamDebrief({
 
 const styles = StyleSheet.create({
   card: {
+    marginTop: 14,
     backgroundColor: colors.surface,
     ...outline,
     borderRadius: radius.card,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingTop: 20,
-    paddingBottom: 16,
-    gap: 14,
+    paddingBottom: 14,
+    gap: 10,
     ...shadow.card,
   },
-  subhead: {
-    fontFamily: font.hero,
-    fontSize: 19,
-    lineHeight: 24,
-    color: colors.text,
-  },
-  section: {
-    gap: 9,
-  },
-  sectionLabel: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 10.5,
-    letterSpacing: 1.3,
-  },
-  note: {
+  row: {
     flexDirection: 'row',
-    gap: 9,
     alignItems: 'flex-start',
+    gap: 10,
   },
-  noteIcon: {
-    width: 23,
-    height: 23,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
+  label: {
+    width: 62,
+    fontFamily: font.bodyHeavy,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    lineHeight: 18,
   },
-  noteText: {
+  text: {
     flex: 1,
-    fontFamily: font.body,
+    fontFamily: font.bodySemibold,
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 18,
     color: colors.text,
   },
   nextCard: {
-    marginTop: 12,
+    marginTop: 10,
     backgroundColor: colors.accentWash,
     ...outline,
     borderRadius: radius.card,
-    padding: 16,
-    gap: 6,
+    padding: 15,
+    gap: 4,
     ...shadow.card,
   },
   nextLabel: {
     fontFamily: font.bodyHeavy,
-    fontSize: 10.5,
-    letterSpacing: 1.3,
+    fontSize: 10,
+    letterSpacing: 1.1,
     color: colors.accentDeep,
   },
   nextTitle: {
     fontFamily: font.heading,
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 16.5,
+    lineHeight: 21,
     color: colors.text,
   },
   nextBody: {
     fontFamily: font.body,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12.5,
+    lineHeight: 18,
     color: colors.textDim,
   },
   nextBtn: {

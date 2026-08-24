@@ -125,7 +125,6 @@ export default function ExamResultsScreen() {
           <Text style={styles.saved}>Saved to Progress on this device</Text>
         </View>
 
-        <Text style={styles.breakdownLabel}>WHAT THIS PAPER SAYS</Text>
         <ExamDebrief debrief={debrief} onAction={goNext} />
 
         {spec.feedback === 'deferred' ? (

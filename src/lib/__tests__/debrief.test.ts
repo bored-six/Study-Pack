@@ -209,7 +209,7 @@ describe('buildDebrief', () => {
     expect(debrief.next.format).toBe('identification');
   });
 
-  it('counts how the marks were lost rather than just how many', () => {
+  it('leads with the mistake that cost the most, not the first one it finds', () => {
     const items = [typed('a'), typed('b'), typed('c'), typed('d')];
     const debrief = read({
       items,
@@ -221,9 +221,11 @@ describe('buildDebrief', () => {
       ],
     });
 
-    const spelling = debrief.wrong.find((n) => n.id === 'spelling');
-    expect(spelling?.text).toContain('2');
-    expect(debrief.wrong.map((n) => n.id)).toContain('blank');
+    // Two spellings outrank one blank — and both outrank "they were new",
+    // which is context rather than a mistake to fix.
+    expect(debrief.wrong).toHaveLength(1);
+    expect(debrief.wrong[0].id).toBe('spelling');
+    expect(debrief.wrong[0].text).toContain('2');
     // Two spelling slips is advice about writing, not about drilling.
     expect(debrief.next.title).toBe('Write the answers, do not just read them');
   });
@@ -242,7 +244,7 @@ describe('buildDebrief', () => {
       ],
     });
 
-    expect(debrief.subhead).toContain('clock');
+    expect(debrief.wrong[0].id).toBe('timeout');
     expect(debrief.next.action).toBe('relaxed');
   });
 
@@ -260,9 +262,8 @@ describe('buildDebrief', () => {
       history,
     });
 
-    expect(debrief.strengths.find((n) => n.id === 'fixed')?.text).toContain('1');
-    expect(debrief.weaknesses.find((n) => n.id === 'repeat')?.text).toContain('2');
-    expect(debrief.weaknesses.map((n) => n.id)).toContain('slipped');
+    expect(debrief.strengths[0].text).toBe('1 you had missed before came back right.');
+    expect(debrief.weaknesses[0].text).toContain('2 have now caught you');
     expect(debrief.next.action).toBe('weak_spots');
   });
 
@@ -279,7 +280,7 @@ describe('buildDebrief', () => {
     });
 
     expect(debrief.strengths.find((n) => n.id === 'fixed')).toBeUndefined();
-    expect(debrief.weaknesses.find((n) => n.id === 'repeat')).toBeDefined();
+    expect(JSON.stringify(debrief)).not.toContain('came back right');
   });
 
   it('spots a paper that fell apart at the back', () => {
@@ -293,8 +294,8 @@ describe('buildDebrief', () => {
     });
 
     const fade = debrief.weaknesses.find((n) => n.id === 'fade');
-    expect(fade?.text).toContain('1/5');
-    expect(fade?.text).toContain('5/5');
+    expect(fade?.text).toContain('Back half 1/5');
+    expect(fade?.text).toContain('5/5 at the front');
   });
 
   it('only calls it a fade when the front half held up', () => {
@@ -320,7 +321,7 @@ describe('buildDebrief', () => {
     });
 
     expect(debrief.weaknesses.find((n) => n.id === 'fade')).toBeUndefined();
-    expect(debrief.subhead).toContain('before the third miss');
+    expect(debrief.headline).toBe('Short one. Go again.');
   });
 
   it('counts the extra passes a mastery pile took to clear', () => {
@@ -338,7 +339,7 @@ describe('buildDebrief', () => {
     });
 
     expect(debrief.headline).toBe('The pile is empty.');
-    expect(debrief.weaknesses.find((n) => n.id === 'extra')?.text).toContain('3 extra');
+    expect(debrief.weaknesses[0].text).toBe('3 extra passes to clear the pile.');
   });
 
   it('stops recommending the drill the student has just failed', () => {
@@ -416,7 +417,7 @@ describe('buildDebrief', () => {
     expect(ids).not.toContain('fresh');
   });
 
-  it('never dumps more than three lines in a section', () => {
+  it('keeps every section to one line, however much it could say', () => {
     const items = Array.from({ length: 12 }, (_, i) => typed(`q${i}`));
     const history = items.map((item) => answered(item.questionId, false));
     const debrief = read({
@@ -428,8 +429,8 @@ describe('buildDebrief', () => {
       durationMs: 12 * 2000,
     });
 
-    expect(debrief.wrong.length).toBeLessThanOrEqual(3);
-    expect(debrief.strengths.length).toBeLessThanOrEqual(3);
-    expect(debrief.weaknesses.length).toBeLessThanOrEqual(3);
+    expect(debrief.wrong.length).toBeLessThanOrEqual(1);
+    expect(debrief.strengths.length).toBeLessThanOrEqual(1);
+    expect(debrief.weaknesses.length).toBeLessThanOrEqual(1);
   });
 });
