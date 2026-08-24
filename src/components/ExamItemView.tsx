@@ -142,36 +142,48 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
   return (
     <View style={styles.body}>
       <Prompt text={item.prompt} />
-      <View style={styles.options}>
-        {item.options.map((option) => {
+      <View style={styles.hand}>
+        {item.options.map((option, i) => {
           const isCorrect = option === item.correctAnswer;
           const showGood = revealed && isCorrect;
           const showBad = revealed && option === picked && !isCorrect;
+          const dud = revealed && !showGood && !showBad;
+          const rank = String.fromCharCode(65 + i);
           return (
             <Pressable
               key={option}
               disabled={revealed}
               onPress={() => setDraft({ kind: 'choice', picked: option })}
               style={({ pressed }) => [
-                styles.option,
-                !reveal && picked === option && styles.optionPicked,
-                showGood && styles.optionGood,
-                showBad && styles.optionBad,
-                revealed && !showGood && !showBad && styles.optionFade,
-                pressed && !revealed && styles.pressed,
+                styles.playCard,
+                { transform: [{ rotate: i % 2 === 0 ? '-1.2deg' : '1.2deg' }] },
+                !reveal && picked === option && styles.playCardPicked,
+                showGood && styles.playCardGood,
+                showBad && styles.playCardBad,
+                dud && styles.playCardDud,
+                pressed && !revealed && styles.playCardLift,
               ]}>
-              <Text
-                style={[
-                  styles.optionText,
-                  showGood && styles.optionTextGood,
-                  showBad && styles.optionTextBad,
-                ]}>
-                {option}
+              <Text style={[styles.cardRank, showGood && styles.rankGood, showBad && styles.rankBad]}>
+                {rank}
               </Text>
-              {showGood ? <Icon name="check" size={14} color={colors.leaf} strokeWidth={2.8} /> : null}
-              {showBad ? <Icon name="cross" size={14} color={colors.coral} strokeWidth={2.8} /> : null}
-              {revealed && !showGood ? (
-                <PenStrike color={showBad ? colors.coral : colors.textFaint} />
+              <View style={styles.cardTextWrap}>
+                <Text
+                  style={[
+                    styles.cardText,
+                    showGood && styles.optionTextGood,
+                    showBad && styles.optionTextBad,
+                  ]}>
+                  {option}
+                </Text>
+                {dud || showBad ? (
+                  <PenStrike color={showBad ? colors.coral : colors.textFaint} />
+                ) : null}
+              </View>
+              <Text style={[styles.cardRank, styles.cardRankFlip]}>{rank}</Text>
+              {showGood ? (
+                <View style={styles.cardMark}>
+                  <Icon name="check" size={16} color={colors.leaf} strokeWidth={3} />
+                </View>
               ) : null}
             </Pressable>
           );
@@ -180,7 +192,7 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
       {revealed ? (
         <Verdict correct={correct} onNext={() => onDone(correct)} />
       ) : reveal ? (
-        <Text style={styles.hint}>Pick an answer</Text>
+        <Text style={styles.hint}>Play a card</Text>
       ) : (
         <Recorded answered={picked != null} />
       )}
@@ -208,7 +220,7 @@ function TrueFalse({ item, draft, setDraft, reveal, onDone }: Field<TrueFalseIte
           </>
         ) : null}
       </View>
-      <View style={styles.tfRow}>
+      <View style={styles.tfHand}>
         {[true, false].map((value) => {
           const chosen = picked === value;
           const isAnswer = item.isTrue === value;
@@ -218,14 +230,24 @@ function TrueFalse({ item, draft, setDraft, reveal, onDone }: Field<TrueFalseIte
               disabled={revealed}
               onPress={() => setDraft({ kind: 'tf', picked: value })}
               style={({ pressed }) => [
-                styles.tfBtn,
-                !reveal && chosen && styles.optionPicked,
-                revealed && isAnswer && styles.optionGood,
-                revealed && chosen && !isAnswer && styles.optionBad,
-                revealed && !isAnswer && !chosen && styles.optionFade,
-                pressed && !revealed && styles.pressed,
+                styles.tfCard,
+                { transform: [{ rotate: value ? '-2deg' : '2deg' }] },
+                value ? styles.tfCardTrue : styles.tfCardFalse,
+                !reveal && chosen && styles.playCardPicked,
+                revealed && isAnswer && styles.playCardGood,
+                revealed && chosen && !isAnswer && styles.playCardBad,
+                revealed && !isAnswer && !chosen && styles.playCardDud,
+                pressed && !revealed && styles.playCardLift,
               ]}>
-              <Text style={styles.tfText}>{value ? 'True' : 'False'}</Text>
+              <Icon
+                name={value ? 'check' : 'cross'}
+                size={30}
+                color={value ? colors.leaf : colors.coral}
+                strokeWidth={2.8}
+              />
+              <Text style={[styles.tfCardText, { color: value ? colors.leaf : colors.coral }]}>
+                {value ? 'True' : 'False'}
+              </Text>
             </Pressable>
           );
         })}
@@ -399,9 +421,22 @@ function Typed({ item, draft, setDraft, reveal, onDone }: Field<TypedItem, 'type
   const checked = reveal && draft.checked;
   const result = checkAnswer(draft.text, item.correctAnswer);
 
+  const blankParts =
+    item.format === 'fill_blank' ? item.prompt.split(/_{2,}/) : null;
+
   return (
     <View style={styles.body}>
-      <Prompt text={item.prompt} />
+      {checked && blankParts && blankParts.length > 1 ? (
+        <Text style={styles.prompt}>
+          {blankParts[0]}
+          <Text style={[styles.fillWord, !result.correct && { color: colors.coral }]}>
+            {item.correctAnswer}
+          </Text>
+          {blankParts.slice(1).join('_____')}
+        </Text>
+      ) : (
+        <Prompt text={item.prompt} />
+      )}
       {reveal && !checked && draft.text.trim().length === 0 ? <BlinkRing /> : null}
       <TextInput
         value={draft.text}
@@ -421,7 +456,12 @@ function Typed({ item, draft, setDraft, reveal, onDone }: Field<TypedItem, 'type
           reveal && draft.text.trim() && setDraft({ ...draft, checked: true })
         }
       />
-      {checked && result.correct ? <Squiggle width={120} color={colors.leaf} /> : null}
+      {checked && result.correct ? (
+        <View style={styles.goodRow}>
+          <PenTick size={20} />
+          <Squiggle width={120} color={colors.leaf} />
+        </View>
+      ) : null}
       {checked ? (
         <Verdict
           correct={result.correct}
@@ -494,10 +534,17 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
                   bad && styles.optionBad,
                   pressed && !checked && styles.pressed,
                 ]}>
-                <Text style={styles.matchText} numberOfLines={2}>
-                  {term}
-                </Text>
-                {paired ? <Text style={styles.matchNum}>{pairs[i] + 1}</Text> : null}
+                <View style={styles.matchTextWrap}>
+                  <Text style={styles.matchText} numberOfLines={2}>
+                    {term}
+                  </Text>
+                  {bad ? <PenStrike color={colors.coral} /> : null}
+                </View>
+                {good ? (
+                  <PenTick size={15} />
+                ) : paired ? (
+                  <Text style={styles.matchNum}>{pairs[i] + 1}</Text>
+                ) : null}
               </Pressable>
             );
           })}
@@ -565,6 +612,8 @@ function Enumeration({ item, draft, setDraft, reveal, onDone }: Field<Enumeratio
             <View key={i} style={styles.enumRow}>
               {outcome?.matched != null ? (
                 <PenTick size={18} />
+              ) : checked ? (
+                <Icon name="cross" size={14} color={colors.coral} strokeWidth={2.8} />
               ) : (
                 <Text style={styles.enumNum}>{i + 1}</Text>
               )}
@@ -662,6 +711,119 @@ export function ExamItemView({ item, value, onChange, reveal = true, onDone }: P
 }
 
 const styles = StyleSheet.create({
+  hand: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  playCard: {
+    width: '47.5%',
+    flexGrow: 1,
+    minHeight: 92,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.edge,
+    borderRadius: 16,
+    padding: 8,
+    justifyContent: 'center',
+    ...shadow.card,
+  },
+  playCardPicked: {
+    borderColor: colors.accentDeep,
+    backgroundColor: colors.accentWash,
+  },
+  playCardGood: {
+    backgroundColor: colors.leafWash,
+    borderColor: 'rgba(59, 117, 39, 0.45)',
+  },
+  playCardBad: {
+    backgroundColor: colors.coralWash,
+    borderColor: 'rgba(194, 78, 56, 0.45)',
+  },
+  playCardDud: {
+    opacity: 0.45,
+  },
+  playCardLift: {
+    transform: [{ translateY: -4 }, { scale: 1.02 }],
+  },
+  cardRank: {
+    position: 'absolute',
+    top: 5,
+    left: 9,
+    fontFamily: font.hero,
+    fontSize: 14,
+    color: colors.textFaint,
+  },
+  rankGood: { color: colors.leaf },
+  rankBad: { color: colors.coral },
+  cardRankFlip: {
+    top: undefined,
+    left: undefined,
+    bottom: 5,
+    right: 9,
+    transform: [{ rotate: '180deg' }],
+  },
+  cardTextWrap: {
+    alignSelf: 'center',
+    position: 'relative',
+    maxWidth: '92%',
+  },
+  cardText: {
+    fontFamily: font.heading,
+    fontSize: 14.5,
+    lineHeight: 19,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  cardMark: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+  },
+  tfHand: {
+    flexDirection: 'row',
+    gap: 14,
+    justifyContent: 'center',
+    paddingVertical: 6,
+  },
+  tfCard: {
+    flex: 1,
+    maxWidth: 150,
+    minHeight: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.edge,
+    borderRadius: 18,
+    ...shadow.card,
+  },
+  tfCardTrue: {},
+  tfCardFalse: {},
+  tfCardText: {
+    fontFamily: font.hero,
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  fillWord: {
+    fontFamily: font.hero,
+    fontSize: 18,
+    color: colors.leaf,
+  },
+  goodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  matchTextWrap: {
+    flex: 1,
+    position: 'relative',
+  },
+  fillWordWrap: {
+    position: 'relative',
+    alignSelf: 'flex-start',
+  },
   stampZone: {
     position: 'relative',
   },

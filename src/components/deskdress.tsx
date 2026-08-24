@@ -131,27 +131,22 @@ export function DeskProp({ format, idle }: { format: ExamFormat; idle: boolean }
   );
 }
 
-/** Evening warms the paper; late night pulls the desk lamp in. */
+/** Evening warms the whole stage; late night dims it like a desk lamp. */
 export function DayTint() {
   const hour = new Date().getHours();
-  if (hour >= 18 && hour < 22) {
-    return (
-      <View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255, 158, 62, 0.045)' }]}
-      />
-    );
-  }
-  if (hour >= 22 || hour < 5) {
-    return (
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(38, 43, 76, 0.055)' }} />
-        <View style={styles.lampEdgeTop} />
-        <View style={styles.lampEdgeBottom} />
-      </View>
-    );
-  }
-  return null;
+  const wash =
+    hour >= 18 && hour < 22
+      ? 'rgba(255, 158, 62, 0.05)'
+      : hour >= 22 || hour < 5
+        ? 'rgba(38, 43, 76, 0.07)'
+        : null;
+  if (!wash) return null;
+  return (
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { backgroundColor: wash, zIndex: 40 }]}
+    />
+  );
 }
 
 /** One ember sails across the screen when a best combo falls. */
@@ -257,22 +252,6 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: 'rgba(39, 54, 43, 0.18)',
-  },
-  lampEdgeTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 90,
-    backgroundColor: 'rgba(20, 24, 48, 0.05)',
-  },
-  lampEdgeBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 90,
-    backgroundColor: 'rgba(20, 24, 48, 0.05)',
   },
   ember: {
     position: 'absolute',

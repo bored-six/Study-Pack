@@ -16,20 +16,6 @@ interface Props {
 
 const RULE = 'rgba(46, 111, 163, 0.09)';
 const MARGIN = 'rgba(194, 78, 56, 0.14)';
-const GRID = 'rgba(46, 111, 163, 0.07)';
-
-/** Which paper each format is written on. The page IS the format. */
-type Paper = 'ruled' | 'index' | 'graph' | 'checklist';
-
-const PAPER: Record<ExamFormat, Paper> = {
-  multiple_choice: 'ruled',
-  true_false: 'index',
-  modified_true_false: 'index',
-  identification: 'index',
-  fill_blank: 'ruled',
-  matching: 'graph',
-  enumeration: 'checklist',
-};
 
 function Ruled() {
   return (
@@ -42,62 +28,12 @@ function Ruled() {
   );
 }
 
-function IndexCard() {
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[styles.hLine, { top: 40, height: 2, backgroundColor: MARGIN }]} />
-      {Array.from({ length: 22 }, (_, i) => (
-        <View key={i} style={[styles.hLine, { top: 72 + i * 28, backgroundColor: RULE }]} />
-      ))}
-    </View>
-  );
-}
-
-function Graph() {
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {Array.from({ length: 30 }, (_, i) => (
-        <View key={`h${i}`} style={[styles.hLine, { top: i * 24, backgroundColor: GRID }]} />
-      ))}
-      {Array.from({ length: 20 }, (_, i) => (
-        <View key={`v${i}`} style={[styles.vLine, { left: i * 24, backgroundColor: GRID }]} />
-      ))}
-    </View>
-  );
-}
-
-function Checklist() {
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {/* Torn-off top edge: a row of little teeth. */}
-      <View style={styles.teeth}>
-        {Array.from({ length: 16 }, (_, i) => (
-          <View key={i} style={styles.tooth} />
-        ))}
-      </View>
-      {Array.from({ length: 22 }, (_, i) => (
-        <View key={i} style={[styles.hLine, { top: 56 + i * 30, backgroundColor: RULE }]} />
-      ))}
-      <View style={[styles.vLine, { left: 34, backgroundColor: MARGIN, width: 1.5 }]} />
-    </View>
-  );
-}
-
-const DECOR: Record<Paper, () => React.JSX.Element> = {
-  ruled: Ruled,
-  index: IndexCard,
-  graph: Graph,
-  checklist: Checklist,
-};
-
 /**
  * The exam stage: the current question sits on the top sheet of a paper
- * pile, its paper style matching the format — ruled for choices, an index
- * card for identification, graph paper for matching, a torn checklist
- * strip for enumeration. A dog-eared corner marks it as the working page.
+ * pile of ruled paper — one consistent page for every format, with a
+ * dog-eared corner marking it as the working page.
  */
 export function ExamSheet({ format, children, smudges = 0, idle = false, style }: Props) {
-  const Decor = DECOR[PAPER[format]];
 
   return (
     <View style={[styles.desk, style]}>
@@ -106,7 +42,7 @@ export function ExamSheet({ format, children, smudges = 0, idle = false, style }
       <View style={[styles.under, styles.underNear]} />
 
       <View style={styles.sheet}>
-        <Decor />
+        <Ruled />
         {Array.from({ length: Math.min(smudges, 3) }, (_, i) => (
           <View key={i} style={[styles.smudge, SMUDGE_SPOTS[i]]} />
         ))}
@@ -182,21 +118,6 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 1,
-  },
-  teeth: {
-    position: 'absolute',
-    top: -5,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 6,
-  },
-  tooth: {
-    width: 10,
-    height: 10,
-    backgroundColor: colors.bg,
-    transform: [{ rotate: '45deg' }],
   },
   dogEar: {
     position: 'absolute',

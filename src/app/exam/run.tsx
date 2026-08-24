@@ -26,9 +26,11 @@ import { ComboMeter } from '@/components/ComboMeter';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
 import { ExamSheet } from '@/components/ExamSheet';
+import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
 import { DayTint, EmberDrift, PencilProgress, Tally } from '@/components/deskdress';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { readSetting, writeSetting } from '@/lib/db';
 import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL } from '@/lib/exam';
@@ -210,16 +212,20 @@ export default function ExamRunScreen() {
   if (waitingOnBriefing || showHelp) {
     return (
       <View style={[styles.screen, styles.center, { paddingTop: insets.top + 10 }]}>
+        <RuledPaper />
         <View style={styles.briefCard}>
-          <View style={styles.briefBadge}>
-            <Icon name="bulb" size={28} color={colors.ink} fill={colors.accentWash} strokeWidth={1.9} />
-          </View>
-          <Text style={styles.briefKicker}>{FORMAT_LABEL[item.format].toUpperCase()}</Text>
+          <Tape />
+          <Text style={styles.briefKicker}>NEW ON THIS PAPER</Text>
+          <FormatBadge format={item.format} size="lg" style={styles.briefFormat} />
+          <Squiggle width={110} color={FORMAT_META[item.format].ink} style={styles.briefSquiggle} />
           <Text style={styles.briefBody}>{FORMAT_HOWTO[item.format]}</Text>
           {spec.feedback === 'deferred' ? (
-            <Text style={styles.briefNote}>
-              You won’t be told if you’re right until the whole paper is submitted.
-            </Text>
+            <View style={styles.briefNoteRow}>
+              <Icon name="bell" size={15} color={colors.ink} fill={colors.goldWash} strokeWidth={2} />
+              <Text style={styles.briefNote}>
+                You won't be told if you're right until the whole paper is submitted.
+              </Text>
+            </View>
           ) : null}
           <ChunkyButton
             label="Got it"
@@ -335,7 +341,7 @@ export default function ExamRunScreen() {
         <OfflineBanner message="Offline — running from device storage" style={styles.offline} />
 
         <View style={styles.formatRow}>
-          <Text style={styles.formatLabel}>{FORMAT_LABEL[item.format]}</Text>
+          <FormatBadge format={item.format} />
           <Text style={styles.deckName} numberOfLines={1}>
             {spec.name} · {deck?.name}
           </Text>
@@ -603,6 +609,21 @@ const styles = StyleSheet.create({
   navBtn: {
     flex: 1,
   },
+  briefFormat: {
+    marginTop: 6,
+  },
+  briefSquiggle: {
+    marginTop: 6,
+  },
+  briefNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    backgroundColor: colors.goldWash,
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 4,
+  },
   briefCard: {
     alignSelf: 'stretch',
     backgroundColor: colors.surface,
@@ -632,11 +653,11 @@ const styles = StyleSheet.create({
     color: colors.accentDeep,
   },
   briefBody: {
-    fontFamily: font.body,
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: font.hero,
+    fontSize: 18,
+    lineHeight: 26,
     color: colors.textDim,
-    textAlign: 'center',
+    marginTop: 10,
   },
   briefNote: {
     fontFamily: font.bodyBold,

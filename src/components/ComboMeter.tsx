@@ -103,25 +103,37 @@ export function ComboMeter({ combo, idle = false }: Props) {
 
   const breathe = useSharedValue(1);
 
+  const rock = useSharedValue(0);
+
   useEffect(() => {
     if (idle && combo >= 3 && !reduced) {
       breathe.value = withRepeat(
         withSequence(
-          withTiming(1.07, { duration: 800 }),
-          withTiming(1, { duration: 800 })
+          withTiming(1.12, { duration: 700 }),
+          withTiming(1, { duration: 700 })
+        ),
+        -1,
+        false
+      );
+      rock.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 900 }),
+          withTiming(-1, { duration: 900 })
         ),
         -1,
         false
       );
     } else {
       breathe.value = withTiming(1, { duration: 200 });
+      rock.value = withTiming(0, { duration: 200 });
     }
-  }, [breathe, combo, idle, reduced]);
+  }, [breathe, combo, idle, reduced, rock]);
 
   const style = useAnimatedStyle(() => ({
     transform: [
       { scale: scale.value * breathe.value },
       { translateX: shift.value },
+      { rotate: `${-2 + rock.value * 3}deg` },
     ],
   }));
 
