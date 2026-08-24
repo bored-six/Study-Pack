@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   FadeOut,
+  ZoomIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -71,6 +72,8 @@ export function ComboMeter({ combo, idle = false }: Props) {
   const reduced = useReducedMotion();
   const prev = useRef(0);
   const [broke, setBroke] = useState(false);
+  const [backOn, setBackOn] = useState(false);
+  const hadBreak = useRef(false);
   const [burst, setBurst] = useState(0);
   const [flare, setFlare] = useState<number | null>(null);
   const scale = useSharedValue(1);
@@ -102,7 +105,15 @@ export function ComboMeter({ combo, idle = false }: Props) {
       }
     }
 
+    if (combo === 1 && was === 0 && hadBreak.current) {
+      hadBreak.current = false;
+      setBackOn(true);
+      const timer = setTimeout(() => setBackOn(false), 1500);
+      return () => clearTimeout(timer);
+    }
+
     if (combo === 0 && was >= 3) {
+      hadBreak.current = true;
       setBroke(true);
       if (!reduced) {
         shift.value = withSequence(
@@ -156,7 +167,18 @@ export function ComboMeter({ combo, idle = false }: Props) {
     };
   });
 
-  if (combo < 3 && !broke) return null;
+  if (combo < 3 && !broke) {
+    return backOn ? (
+      <Animated.View
+        pointerEvents="none"
+        entering={ZoomIn.springify().damping(10)}
+        exiting={FadeOut}
+        style={styles.backOn}>
+        <Icon name="check" size={13} color={colors.leaf} strokeWidth={3} />
+        <Text style={styles.backOnText}>back on it</Text>
+      </Animated.View>
+    ) : null;
+  }
 
   const tier = tierFor(broke ? Math.max(prev.current, 3) : combo);
 
@@ -221,6 +243,27 @@ const styles = StyleSheet.create({
     fontSize: 9,
     letterSpacing: 1,
     marginTop: -2,
+  },
+  backOn: {
+    position: 'absolute',
+    top: -12,
+    right: 6,
+    zIndex: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.leafWash,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    transform: [{ rotate: '4deg' }],
+  },
+  backOnText: {
+    fontFamily: font.hero,
+    fontSize: 14,
+    color: colors.leaf,
   },
   flare: {
     position: 'absolute',

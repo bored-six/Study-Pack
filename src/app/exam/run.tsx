@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import Animated, {
+  Easing,
   FadeIn,
   ZoomIn,
   FadeInDown,
@@ -190,10 +191,27 @@ export default function ExamRunScreen() {
     setItemDeadline(Date.now() + questionSeconds(item.format) * 1000);
   }, [spec.clock, item, visits, waitingOnBriefing]);
 
-  const finished = useCallback((next: 'next' | 'finished') => {
-    tapThud();
-    if (next === 'finished') router.replace('/exam/results');
-  }, []);
+  const flyOff = useSharedValue(0);
+
+  const finished = useCallback(
+    (next: 'next' | 'finished') => {
+      tapThud();
+      if (next === 'finished') {
+        // The last page tears off before the report card arrives.
+        flyOff.value = withTiming(1, { duration: 300, easing: Easing.in(Easing.quad) });
+        setTimeout(() => router.replace('/exam/results'), 320);
+      }
+    },
+    [flyOff]
+  );
+
+  const flyStyle = useAnimatedStyle(() => ({
+    opacity: 1 - flyOff.value,
+    transform: [
+      { translateY: flyOff.value * -700 },
+      { rotate: `${flyOff.value * -6}deg` },
+    ],
+  }));
 
   const handleDone = useCallback(
     (correct: boolean) => {
@@ -460,7 +478,8 @@ export default function ExamRunScreen() {
           <Animated.View
             key={`${item.id}:${visits}`}
             entering={FadeInDown.springify().damping(16)}
-            exiting={SlideOutUp.duration(220)}>
+            exiting={SlideOutUp.duration(220)}
+            style={flyStyle}>
             {scored ? <ComboMeter combo={combo} idle={idle} /> : null}
             <ExamSheet
               format={item.format}

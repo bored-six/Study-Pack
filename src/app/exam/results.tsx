@@ -4,6 +4,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
+import Animated, { ZoomIn } from 'react-native-reanimated';
+
 import { ExamDebrief } from '@/components/ExamDebrief';
 import { Icon } from '@/components/Icon';
 import { buildDebrief, missedQuestions, type NextStep } from '@/lib/debrief';
@@ -117,6 +119,46 @@ export default function ExamResultsScreen() {
         : { big: `${score}/${total}`, small: `${pct}% correct` };
 
   const cleared = retired >= items.length;
+
+  // First-try stars: an item earns one when its first recorded answer was
+  // right. Repeat modes ask again, so only the first meeting counts.
+  const stars = (() => {
+    const seen = new Set<string>();
+    let count = 0;
+    for (const result of results) {
+      if (seen.has(result.itemId)) continue;
+      seen.add(result.itemId);
+      if (result.correct) count++;
+    }
+    return count;
+  })();
+
+  const grade =
+    spec.repetition === 'until_out'
+      ? total >= 25
+        ? 'A'
+        : total >= 18
+          ? 'B'
+          : total >= 12
+            ? 'C'
+            : total >= 6
+              ? 'D'
+              : 'F'
+      : spec.repetition === 'until_retired'
+        ? cleared
+          ? 'A'
+          : retired / Math.max(1, items.length) >= 0.6
+            ? 'B'
+            : 'C'
+        : pct >= 90
+          ? 'A'
+          : pct >= 80
+            ? 'B'
+            : pct >= 70
+              ? 'C'
+              : pct >= 55
+                ? 'D'
+                : 'F';
   // The tone still colours the card; the words on it come from the debrief,
   // so the line at the top is about this paper rather than this bracket.
   const tone =
@@ -159,15 +201,40 @@ export default function ExamResultsScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 20 }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.card}>
-          <View style={[styles.badge, { backgroundColor: tone.wash }]}>
-            <Text style={[styles.badgeText, { color: tone.color }]}>{debrief.headline}</Text>
+          <View style={styles.reportRule} />
+          <Text style={styles.reportKicker}>REPORT CARD</Text>
+
+          <View style={styles.reportRow}>
+            <View style={styles.reportLeft}>
+              <Text style={styles.score}>{hero.big}</Text>
+              <Text style={styles.pct}>{hero.small}</Text>
+            </View>
+            <Animated.View
+              entering={ZoomIn.springify().damping(9).delay(250)}
+              style={[styles.gradeStamp, { borderColor: tone.color }]}>
+              <Text style={[styles.gradeText, { color: tone.color }]}>{grade}</Text>
+            </Animated.View>
           </View>
-          <Text style={styles.score}>{hero.big}</Text>
-          <Text style={styles.pct}>{hero.small}</Text>
+
+          <Text style={styles.teacherNote}>"{debrief.headline}"</Text>
+
           <Text style={styles.meta}>
             {spec.name} · {deck.name} · {formatDuration(durationMs)}
           </Text>
           <Text style={styles.saved}>Saved to Progress on this device</Text>
+
+          {stars > 0 ? (
+            <View style={styles.starRow}>
+              {Array.from({ length: Math.min(stars, 7) }, (_, i) => (
+                <View key={i} style={{ transform: [{ rotate: `${(i % 3) * 7 - 7}deg` }] }}>
+                  <Icon name="star" size={16} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+                </View>
+              ))}
+              <Text style={styles.starText}>
+                {stars > 7 ? `+${stars - 7} ` : ''}first try
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <ExamDebrief debrief={debrief} onAction={goNext} />
@@ -257,6 +324,66 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 16,
+  },
+  reportRule: {
+    alignSelf: 'stretch',
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(194, 78, 56, 0.35)',
+    marginBottom: 2,
+  },
+  reportKicker: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 10.5,
+    letterSpacing: 1.8,
+    color: colors.textFaint,
+  },
+  reportRow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    marginTop: 4,
+  },
+  reportLeft: {
+    alignItems: 'flex-start',
+  },
+  gradeStamp: {
+    borderWidth: 3.5,
+    borderRadius: 12,
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '8deg' }],
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  gradeText: {
+    fontFamily: font.hero,
+    fontSize: 40,
+    lineHeight: 48,
+  },
+  teacherNote: {
+    fontFamily: font.hero,
+    fontSize: 17,
+    lineHeight: 23,
+    color: colors.coral,
+    textAlign: 'center',
+    marginTop: 8,
+    transform: [{ rotate: '-1deg' }],
+  },
+  starRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 10,
+  },
+  starText: {
+    fontFamily: font.hero,
+    fontSize: 13,
+    color: colors.gold,
+    marginLeft: 3,
   },
   card: {
     backgroundColor: colors.surface,
