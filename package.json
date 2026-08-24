@@ -10,6 +10,7 @@
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-community/netinfo": "11.4.1",
     "expo": "~54.0.37",
+    "expo-audio": "~1.1.1",
     "expo-constants": "~18.0.14",
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
@@ -47,7 +48,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
-    "qa": "jest --config qa/jest.config.js"
+    "qa": "jest --config qa/jest.config.js",
+    "deploy:web": "bash scripts/deploy-web.sh"
   },
   "private": true,
   "jest": {

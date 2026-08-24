@@ -39,6 +39,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { readSetting, writeSetting } from '@/lib/db';
 import { tapCorrect, tapThud, tapTier, tapWrong } from '@/lib/haptics';
+import { playSfx } from '@/lib/sfx';
 import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
 import { MODES, questionSeconds, SURVIVAL_STRIKES } from '@/lib/mode';
@@ -246,7 +247,10 @@ export default function ExamRunScreen() {
           return c + 1;
         });
         // A page answered right on the first try earns a star sticker.
-        if (id && !wrongByItemRef.current[id]) setStars((s) => s + 1);
+        if (id && !wrongByItemRef.current[id]) {
+          playSfx('star');
+          setStars((s) => s + 1);
+        }
       } else {
         tapWrong();
         setCombo(0);
@@ -410,7 +414,10 @@ export default function ExamRunScreen() {
 
   // The bell: one small ring before the final page of a straight sitting.
   const showBell = lastItem && spec.repetition === 'once' && items.length > 3;
-  if (showBell && bellShownAt.current !== index) bellShownAt.current = index;
+  if (showBell && bellShownAt.current !== index) {
+    bellShownAt.current = index;
+    playSfx('bell');
+  }
 
   return (
     <KeyboardAvoidingView

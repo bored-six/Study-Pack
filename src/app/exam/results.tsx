@@ -17,6 +17,7 @@ import Animated, {
 import { ExamDebrief } from '@/components/ExamDebrief';
 import { Icon } from '@/components/Icon';
 import { buildDebrief, missedQuestions, type NextStep } from '@/lib/debrief';
+import { playSfx } from '@/lib/sfx';
 import { correctText, draftText, itemPrompt, type DraftValue } from '@/lib/draft';
 import { FORMAT_LABEL, type ExamFormat, type ExamItem } from '@/lib/exam';
 import { MODES } from '@/lib/mode';
@@ -139,6 +140,17 @@ export default function ExamResultsScreen() {
   );
 
   const missed = useMemo(() => missedQuestions(items, results), [items, results]);
+
+  // The A+ fanfare, once, the moment a perfect paper's card appears.
+  useEffect(() => {
+    if (status !== 'finished') return;
+    const isPerfect =
+      MODES[mode].repetition === 'once' &&
+      results.length >= 5 &&
+      results.every((r) => r.correct);
+    if (isPerfect) playSfx('aplus');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   if (status !== 'finished' || !deck) {
     return <Redirect href="/" />;

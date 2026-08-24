@@ -6,6 +6,8 @@
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
+import { playSfx } from './sfx';
+
 const ON = Platform.OS === 'android' || Platform.OS === 'ios';
 
 function quiet(run: () => Promise<void>): void {
@@ -17,26 +19,31 @@ function quiet(run: () => Promise<void>): void {
 
 /** Picking up / playing a card. */
 export function tapSelect(): void {
+  playSfx('tap');
   quiet(() => Haptics.selectionAsync());
 }
 
 /** A correct answer. */
 export function tapCorrect(): void {
+  playSfx('correct');
   quiet(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
 }
 
 /** A wrong answer — unmistakably different from a right one. */
 export function tapWrong(): void {
+  playSfx('wrong');
   quiet(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error));
 }
 
 /** The stamp coming down, a page tearing off. */
 export function tapThud(): void {
+  playSfx('tear');
   quiet(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy));
 }
 
 /** Combo tier reached — bigger tiers, bigger buzz. */
 export function tapTier(combo: number): void {
+  if (combo === 3 || combo === 5 || combo === 10 || combo === 20) playSfx('combo');
   if (combo >= 20 || combo === 10) {
     quiet(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
   } else if (combo === 5 || combo === 3) {
