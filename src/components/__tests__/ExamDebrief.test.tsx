@@ -43,11 +43,11 @@ const FULL: Debrief = {
   strengths: [{ id: 'fixed', weight: 2, text: '2 came back right today.' }],
   weaknesses: [{ id: 'repeat', weight: 2, text: '2 have caught you twice.' }],
   next: {
-    title: 'Drill the ones that keep coming back',
-    body: 'Weak spots pulls exactly those.',
-    action: 'weak_spots',
+    title: 'Go again on the ones that keep coming back',
+    body: 'A new sitting leans on the shaky ones.',
+    action: 'relaxed',
     format: null,
-    actionLabel: 'Drill weak spots',
+    actionLabel: 'Sit it again',
   },
 };
 
@@ -64,9 +64,9 @@ describe('ExamDebrief', () => {
       'WEAK',
       '2 have caught you twice.',
       'DO THIS NEXT',
-      'Drill the ones that keep coming back',
-      'Weak spots pulls exactly those.',
-      'Drill weak spots',
+      'Go again on the ones that keep coming back',
+      'A new sitting leans on the shaky ones.',
+      'Sit it again',
     ]);
   });
 
@@ -86,9 +86,9 @@ describe('ExamDebrief', () => {
 
     expect(texts()).toEqual([
       'DO THIS NEXT',
-      'Drill the ones that keep coming back',
-      'Weak spots pulls exactly those.',
-      'Drill weak spots',
+      'Go again on the ones that keep coming back',
+      'A new sitting leans on the shaky ones.',
+      'Sit it again',
     ]);
   });
 
@@ -106,14 +106,14 @@ describe('ExamDebrief', () => {
     const { texts } = mount(<ExamDebrief debrief={advice} onAction={() => {}} />);
 
     expect(texts()).toContain('Leave it a day');
-    expect(texts()).not.toContain('Drill weak spots');
+    expect(texts()).not.toContain('Sit it again');
   });
 
   it('hands the step back when the button is pressed', () => {
     const onAction = jest.fn();
     const { press } = mount(<ExamDebrief debrief={FULL} onAction={onAction} />);
 
-    press('Drill weak spots');
+    press('Sit it again');
     expect(onAction).toHaveBeenCalledWith(FULL.next);
   });
 });

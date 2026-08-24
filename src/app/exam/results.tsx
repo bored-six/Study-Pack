@@ -6,9 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { ExamDebrief } from '@/components/ExamDebrief';
 import { Icon } from '@/components/Icon';
-import { buildDebrief, type NextStep } from '@/lib/debrief';
-import { correctText, draftText, itemPrompt } from '@/lib/draft';
-import { FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
+import { buildDebrief, missedQuestions, type NextStep } from '@/lib/debrief';
+import { correctText, draftText, itemPrompt, type DraftValue } from '@/lib/draft';
+import { FORMAT_LABEL, type ExamFormat, type ExamItem } from '@/lib/exam';
 import { MODES } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
@@ -16,6 +16,49 @@ import { colors, font, outline, radius, shadow } from '@/theme/tokens';
 function formatDuration(ms: number): string {
   const total = Math.round(ms / 1000);
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** How many misses are worth listing before it turns back into a wall. */
+const MISS_LIMIT = 8;
+
+/** One marked question: what was asked, what you put, what it was. */
+function MarkedRow({
+  item,
+  draft,
+  ok,
+  number,
+}: {
+  item: ExamItem;
+  draft: DraftValue | null;
+  ok: boolean;
+  number?: number;
+}) {
+  return (
+    <View style={styles.paperRow}>
+      <View style={[styles.paperMark, ok ? styles.markGood : styles.markBad]}>
+        <Icon
+          name={ok ? 'check' : 'cross'}
+          size={11}
+          color={ok ? colors.leaf : colors.coral}
+          strokeWidth={3}
+        />
+      </View>
+      <View style={styles.paperText}>
+        <Text style={styles.paperPrompt} numberOfLines={3}>
+          {number ? `${number}. ` : ''}
+          {itemPrompt(item)}
+        </Text>
+        <Text style={styles.paperYours} numberOfLines={2}>
+          You put: {draftText(item, draft)}
+        </Text>
+        {ok ? null : (
+          <Text style={styles.paperRight} numberOfLines={3}>
+            Answer: {correctText(item)}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
 }
 
 export default function ExamResultsScreen() {
@@ -51,6 +94,8 @@ export default function ExamResultsScreen() {
     () => buildDebrief({ mode, items, results, history: deckAnswers, durationMs }),
     [mode, items, results, deckAnswers, durationMs]
   );
+
+  const missed = useMemo(() => missedQuestions(items, results), [items, results]);
 
   if (status !== 'finished' || !deck) {
     return <Redirect href="/" />;
@@ -131,34 +176,29 @@ export default function ExamResultsScreen() {
           <>
             <Text style={styles.breakdownLabel}>YOUR PAPER, MARKED</Text>
             <View style={styles.paper}>
-              {items.map((item, i) => {
-                const ok = results.find((r) => r.itemId === item.id)?.correct ?? false;
-                return (
-                  <View key={item.id} style={styles.paperRow}>
-                    <View style={[styles.paperMark, ok ? styles.markGood : styles.markBad]}>
-                      <Icon
-                        name={ok ? 'check' : 'cross'}
-                        size={11}
-                        color={ok ? colors.leaf : colors.coral}
-                        strokeWidth={3}
-                      />
-                    </View>
-                    <View style={styles.paperText}>
-                      <Text style={styles.paperPrompt} numberOfLines={3}>
-                        {i + 1}. {itemPrompt(item)}
-                      </Text>
-                      <Text style={styles.paperYours} numberOfLines={2}>
-                        You put: {draftText(item, drafts[item.id] ?? null)}
-                      </Text>
-                      {ok ? null : (
-                        <Text style={styles.paperRight} numberOfLines={3}>
-                          Answer: {correctText(item)}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
+              {items.map((item, i) => (
+                <MarkedRow
+                  key={item.id}
+                  item={item}
+                  draft={drafts[item.id] ?? null}
+                  ok={results.find((r) => r.itemId === item.id)?.correct ?? false}
+                  number={i + 1}
+                />
+              ))}
+            </View>
+          </>
+        ) : missed.length > 0 ? (
+          <>
+            <Text style={styles.breakdownLabel}>WHAT TO GO BACK OVER</Text>
+            <View style={styles.paper}>
+              {missed.slice(0, MISS_LIMIT).map(({ item, draft }) => (
+                <MarkedRow key={item.id} item={item} draft={draft} ok={false} />
+              ))}
+              {missed.length > MISS_LIMIT ? (
+                <Text style={styles.more}>
+                  …and {missed.length - MISS_LIMIT} more you missed.
+                </Text>
+              ) : null}
             </View>
           </>
         ) : null}
@@ -319,6 +359,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     color: colors.leaf,
+  },
+  more: {
+    fontFamily: font.bodySemibold,
+    fontSize: 12,
+    color: colors.textFaint,
+    marginTop: 2,
   },
   breakdown: {
     backgroundColor: colors.surface,

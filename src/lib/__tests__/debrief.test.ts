@@ -1,4 +1,10 @@
-import { buildDebrief, classifyMiss, type SittingResult, type SlipKind } from '../debrief';
+import {
+  buildDebrief,
+  classifyMiss,
+  missedQuestions,
+  type SittingResult,
+  type SlipKind,
+} from '../debrief';
 import type { DraftValue } from '../draft';
 import type {
   ChoiceItem,
@@ -72,8 +78,13 @@ function mtf(id: string, questionId = id): ModifiedTrueFalseItem {
 
 // --- result builders ----------------------------------------------------
 
-function result(item: ExamItem, correct: boolean, slip: SlipKind | null = null): SittingResult {
-  return { itemId: item.id, format: item.format, correct, slip: correct ? null : slip };
+function result(
+  item: ExamItem,
+  correct: boolean,
+  slip: SlipKind | null = null,
+  draft: DraftValue | null = null
+): SittingResult {
+  return { itemId: item.id, format: item.format, correct, slip: correct ? null : slip, draft };
 }
 
 function sitting(
@@ -418,5 +429,52 @@ describe('buildDebrief', () => {
     expect(debrief.wrong.length).toBeLessThanOrEqual(1);
     expect(debrief.strengths.length).toBeLessThanOrEqual(1);
     expect(debrief.weaknesses.length).toBeLessThanOrEqual(1);
+  });
+});
+
+// --- what to go back over -----------------------------------------------
+
+describe('missedQuestions', () => {
+  const typedDraft = (text: string): DraftValue => ({ kind: 'typed', text, checked: true });
+
+  it('lists the misses, in the order they were met', () => {
+    const items = [typed('a'), typed('b'), typed('c')];
+    const missed = missedQuestions(items, [
+      result(items[0], true),
+      result(items[1], false, 'wrong', typedDraft('ribosome')),
+      result(items[2], false, 'blank', null),
+    ]);
+
+    expect(missed.map((m) => m.item.id)).toEqual(['b', 'c']);
+    expect(missed[0].draft).toEqual(typedDraft('ribosome'));
+  });
+
+  it('keeps the answer that lost the mark, not the one that finally worked', () => {
+    const item = typed('a');
+    // Mastery asks again until it is right. Reading the answer off the end
+    // of that would show the student their correct answer under a red cross.
+    const missed = missedQuestions([item], [
+      result(item, false, 'wrong', typedDraft('ribosome')),
+      result(item, true, null, typedDraft('mitochondria')),
+      result(item, true, null, typedDraft('mitochondria')),
+    ]);
+
+    expect(missed).toHaveLength(1);
+    expect(missed[0].draft).toEqual(typedDraft('ribosome'));
+  });
+
+  it('says nothing when everything went in first go', () => {
+    const items = [typed('a'), typed('b')];
+    expect(missedQuestions(items, [result(items[0], true), result(items[1], true)])).toEqual([]);
+  });
+
+  it('does not list a question twice when a mode asks it again', () => {
+    const item = typed('a');
+    const missed = missedQuestions([item], [
+      result(item, false, 'wrong', typedDraft('one')),
+      result(item, false, 'wrong', typedDraft('two')),
+    ]);
+
+    expect(missed).toHaveLength(1);
   });
 });
