@@ -165,7 +165,6 @@ function AmountRow({
   onChange: (next: number) => void;
   index: number;
 }) {
-}) {
   const [draft, setDraft] = useState(String(count));
   const baseRot = index % 2 === 0 ? 0.5 : -0.5;
   const rot = useSharedValue(baseRot);
