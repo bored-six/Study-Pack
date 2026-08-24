@@ -1,4 +1,4 @@
-import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 
 import { colors } from '@/theme/tokens';
 
@@ -453,6 +453,122 @@ const glyphs = {
       
       <Path d="M10.5 15.5v2c0 2 3 2 3 0v-2" fill={colors.coral} />
       <Path d="M12 15.5v2" />
+    </>
+  ),
+  derpBook: (f: string) => (
+    <>
+      <Path d="M4 6c0-1.5 2-2 7-1 0 0 1 0 1 1v13c0 1.5-2 1-7 0v-13z" fill={f} />
+      <Path d="M20 6c0-1.5-2-2-7-1 0 0-1 0-1 1v13c0 1.5 2 1 7 0v-13z" fill={f} />
+      <Circle cx={7} cy={11} r={0.5} fill={colors.ink} stroke="none" />
+      <Circle cx={9} cy={11} r={0.5} fill={colors.ink} stroke="none" />
+      <Path d="M7 13c0.5 1 1.5 1 2 0" />
+    </>
+  ),
+  derpPlus: (f: string) => (
+    <>
+      <Path d="M12 5 c-1 4 1 10 0 14" />
+      <Path d="M5 12 c4-1 10 1 14 0" />
+    </>
+  ),
+  derpBulb: (f: string) => (
+    <>
+      <Path d="M9 20h6 M10 22h4" />
+      <Path d="M12 2 c-3 0-6 2.5-6 6 c0 3 2 4 2 7 v2 c0 1 1.5 1.5 4 1.5 s4-0.5 4-1.5 v-2 c0-3 2-4 2-7 c0-3.5-3-6-6-6z" fill={f} />
+      <Path d="M11 9 c0 2 2 2 2 0" />
+    </>
+  ),
+  derpDice: (f: string) => (
+    <>
+      <Path d="M5 6 c0-2 1-2 3-2 h8 c2 0 3 0 3 2 v11 c0 2 -1 3 -3 3 h-9 c-2 0-2-1-2-3 z" fill={f} />
+      <Circle cx={9} cy={9} r={0.7} fill={colors.ink} stroke="none" />
+      <Circle cx={15} cy={15} r={0.7} fill={colors.ink} stroke="none" />
+    </>
+  ),
+  derpGhost: (f: string) => (
+    <>
+      <Path d="M5 11c0-4 3-7 7-7s7 3 7 7v9l-2-2-2 2-2-2-2 2-2-2-2 2v-9z" fill={f} />
+      <Circle cx={9} cy={10} r={1.5} fill={colors.ink} stroke="none" />
+      <Circle cx={15} cy={11.5} r={1} fill={colors.ink} stroke="none" />
+      <Path d="M12 14c0 1.5 2 1.5 2 0" fill={colors.coral} />
+    </>
+  ),
+  derpAtom: (f: string) => (
+    <>
+      <Circle cx={12} cy={12} r={3} fill={f} />
+      <Path d="M11 11.5c1 1 2 0 2 0" />
+      <Circle cx={11.5} cy={10.5} r={0.5} fill={colors.ink} stroke="none" />
+      <Circle cx={12.5} cy={11} r={0.5} fill={colors.ink} stroke="none" />
+      <Ellipse cx={12} cy={12} rx={4} ry={10} transform="rotate(45 12 12)" />
+      <Ellipse cx={12} cy={12} rx={4} ry={10} transform="rotate(-45 12 12)" />
+    </>
+  ),
+  derpPlanet: (f: string) => (
+    <>
+      <Circle cx={12} cy={12} r={6} fill={f} />
+      <Ellipse cx={12} cy={12} rx={10} ry={3} transform="rotate(-20 12 12)" />
+      <Circle cx={10} cy={10.5} r={1} fill={colors.ink} stroke="none" />
+      <Circle cx={14} cy={11.5} r={1.5} fill={colors.ink} stroke="none" />
+      <Path d="M11 14h2" />
+    </>
+  ),
+  derpCat: (f: string) => (
+    <>
+      <Path d="M6 16v-6l2-4 3 2 3-2 2 4v6c0 3-2 4-5 4s-5-1-5-4z" fill={f} />
+      <Circle cx={9} cy={11} r={0.8} fill={colors.ink} stroke="none" />
+      <Circle cx={13} cy={11} r={0.8} fill={colors.ink} stroke="none" />
+      <Path d="M10 13c0 2 2 2 2 0" fill={colors.coral} />
+      <Path d="M2 11l3 1 M2 13l3 -1 M22 11l-3 1 M22 13l-3 -1" />
+    </>
+  ),
+  derpFire: (f: string) => (
+    <>
+      <Path d="M12 2.5c.9 2.9-.4 4.6 1.8 7.1 1.7 2 3.7 3.6 3.7 6.2a5.5 5.5 0 0 1-11 0c0-1.8.8-3.4 1.9-4.9.5.9 1.1 1.4 2 1.6C10.8 9.4 10.4 5.8 12 2.5z" fill={f} />
+      <Circle cx={10} cy={14} r={1} fill={colors.ink} stroke="none" />
+      <Circle cx={14} cy={14} r={1} fill={colors.ink} stroke="none" />
+      <Path d="M11 16h2" />
+    </>
+  ),
+  derpCalc: (f: string) => (
+    <>
+      <Rect x={5} y={4} width={14} height={16} rx={2} fill={f} />
+      <Circle cx={9} cy={11} r={1} fill={colors.ink} stroke="none" />
+      <Circle cx={15} cy={12} r={1.5} fill={colors.ink} stroke="none" />
+      <Path d="M11 15h2" />
+      <Path d="M8 7h8" />
+    </>
+  ),
+  derpMusic: (f: string) => (
+    <>
+      <Path d="M9 16 A3 2 0 1 1 6 18 V6 L18 3 V15 A3 2 0 1 1 15 17 V7 L9 9 Z" fill={f} />
+      <Circle cx={6.5} cy={16.5} r={0.5} fill={colors.ink} stroke="none" />
+      <Circle cx={15.5} cy={15.5} r={0.5} fill={colors.ink} stroke="none" />
+      <Path d="M8 11h2 M14 9h2" />
+    </>
+  ),
+  derpArt: (f: string) => (
+    <>
+      <Path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-.8 2-1.7 0-.8-.5-1.3-.9-1.8-.4-.5-.8-1-.8-1.6 0-1.1.9-1.9 2.3-1.9h1.8a4.1 4.1 0 0 0 4.1-4.1c0-3.8-3.8-5.9-8.5-5.9z" fill={f} />
+      <Circle cx={7} cy={9} r={1} fill={colors.ink} stroke="none" />
+      <Circle cx={12} cy={12} r={1} fill={colors.ink} stroke="none" />
+      <Path d="M8 13c1 2 3 1 4 0" fill={colors.coral} />
+    </>
+  ),
+  derpTrophy: (f: string) => (
+    <>
+      <Path d="M8 4h8v6a4 4 0 0 1-8 0z" fill={f} />
+      <Path d="M8 6H5v1.5a3 3 0 0 0 3 3 M16 6h3v1.5a3 3 0 0 1-3 3 M12 14v3 M8.5 20h7 M10 17h4" />
+      <Circle cx={10} cy={7} r={0.8} fill={colors.ink} stroke="none" />
+      <Circle cx={14} cy={7} r={0.8} fill={colors.ink} stroke="none" />
+      <Path d="M11 9h2" />
+    </>
+  ),
+  derpApple: (f: string) => (
+    <>
+      <Path d="M12 6C9 4 5 6 5 11c0 5 4 8 7 8s7-3 7-8C19 6 15 4 12 6z" fill={f} />
+      <Path d="M12 6c1-3 3-4 4-2" />
+      <Circle cx={9} cy={11} r={1} fill={colors.ink} stroke="none" />
+      <Circle cx={15} cy={12} r={1.5} fill={colors.ink} stroke="none" />
+      <Path d="M11 15h2" />
     </>
   ),
 } as const;

@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
   },
   scribbleLine: {
     position: 'absolute',
-    bottom: -6,
+    bottom: 0,
     left: -4,
     transform: [{ rotate: '-2deg' }],
   },
