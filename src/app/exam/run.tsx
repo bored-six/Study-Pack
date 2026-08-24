@@ -199,7 +199,9 @@ export default function ExamRunScreen() {
         const id = itemIdRef.current;
         setWrongByItem((m) => ({ ...m, [id]: (m[id] ?? 0) + 1 }));
       }
-      void store.answer(correct).then(finished);
+      void store.answer(correct).then(finished, (e: unknown) => {
+        console.warn('Could not record that answer', e);
+      });
     },
     [store, finished]
   );
@@ -214,10 +216,18 @@ export default function ExamRunScreen() {
     void store.answer(false, true).then(finished);
   }, [now, itemDeadline, spec.clock, store, finished]);
 
-  // One attempt per mount, tracked so a failed resume doesn't loop.
+  // The sitting ended while this screen was still up. Its own navigation is
+  // already in flight; this is the backstop for the case where writing the
+  // attempt down fails, which used to leave the student on a spinner.
+  useEffect(() => {
+    if (status === 'finished') router.replace('/exam/results');
+  }, [status]);
+
+  // One attempt per mount, tracked so a failed resume doesn't loop. Only a
+  // cold store is worth recovering: a finished paper is not a lost one.
   const [recovery, setRecovery] = useState<'idle' | 'trying' | 'failed'>('idle');
   useEffect(() => {
-    if (status === 'active' || recovery !== 'idle') return;
+    if (status !== 'idle' || recovery !== 'idle') return;
     setRecovery('trying');
     void store.resume().then((restored) => {
       if (!restored) setRecovery('failed');

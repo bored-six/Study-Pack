@@ -3,14 +3,22 @@ import { RESUME_MAX_AGE_MS, clearSnapshot, readSnapshot, saveSnapshot } from '..
 // The settings table stands in as a plain map — this is about the rules
 // around a snapshot, not about SQLite.
 const mockStore = new Map<string, string>();
+// Writes queue in SQLite, so the next one can be made to land late.
+const mockDelay = { next: 0 };
 jest.mock('../db', () => ({
   readSetting: async (key: string) => mockStore.get(key) ?? null,
   writeSetting: async (key: string, value: string) => {
+    const delay = mockDelay.next;
+    mockDelay.next = 0;
+    if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
     mockStore.set(key, value);
   },
 }));
 
-beforeEach(() => mockStore.clear());
+beforeEach(() => {
+  mockStore.clear();
+  mockDelay.next = 0;
+});
 
 const NOW = new Date(2026, 7, 24, 12, 0, 0).getTime();
 
@@ -52,5 +60,28 @@ describe('exam snapshots', () => {
   it('rejects a snapshot with nothing in it', async () => {
     mockStore.set('exam_in_progress', JSON.stringify({ version: 1, deckId: '', savedAt: Date.now(), state: null }));
     expect(await readSnapshot(NOW)).toBeNull();
+  });
+});
+
+describe('write ordering', () => {
+  it('does not let a snapshot queued mid-answer outlive the paper', async () => {
+    // A checkpoint is taken on every keystroke, so the last one can still be
+    // in flight when the finished paper clears it. It landing afterwards put
+    // the sitting back, and the results screen then bounced to Home.
+    mockDelay.next = 20;
+    void saveSnapshot('note:1', 'Biology', { index: 3 });
+    await clearSnapshot();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(await readSnapshot(NOW)).toBeNull();
+  });
+
+  it('keeps the last thing asked for when writes pile up', async () => {
+    mockDelay.next = 20;
+    void saveSnapshot('note:1', 'Biology', { index: 1 });
+    void saveSnapshot('note:1', 'Biology', { index: 2 });
+    await saveSnapshot('note:1', 'Biology', { index: 3 });
+
+    expect((await readSnapshot(NOW))?.state).toEqual({ index: 3 });
   });
 });

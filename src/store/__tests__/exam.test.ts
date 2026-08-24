@@ -8,6 +8,7 @@ import {
 import { emptyDraft, gradeDraft, type DraftValue } from '@/lib/draft';
 import { SURVIVAL_STRIKES } from '@/lib/mode';
 import type { Deck, Question, QuestionKind } from '@/lib/types';
+import { saveSnapshot } from '@/lib/resume';
 import { useExamStore } from '@/store/exam';
 
 // The settings table stands in as a plain map, so what a sitting remembers
@@ -413,34 +414,67 @@ describe('picking a paper', () => {
     const state = useExamStore.getState();
     expect(state.counts.multiple_choice).toBe(0);
     expect(state.counts.true_false).toBe(10);
-    // Two taps, and the paper is the length it always was.
-    expect(state.total()).toBe(10);
+    expect(state.picks).toEqual(['true_false']);
   });
 
-  it('splits the same total when a second type is ticked', async () => {
+  it('leaves the amounts already set alone when another type is ticked', async () => {
     await openWith(BIG);
+    useExamStore.getState().setCount('multiple_choice', 25);
     useExamStore.getState().toggleFormat('true_false');
 
     const state = useExamStore.getState();
-    expect(state.counts.multiple_choice).toBe(5);
-    expect(state.counts.true_false).toBe(5);
-    expect(state.total()).toBe(10);
+    // The whole complaint: asking for true/false as well must not quietly
+    // halve the twenty-five multiple choice already asked for.
+    expect(state.counts.multiple_choice).toBe(25);
+    expect(state.counts.true_false).toBe(10);
+    expect(state.total()).toBe(35);
   });
 
-  it('takes one number for the whole paper', async () => {
+  it('sets each type to exactly what was asked for', async () => {
     await openWith(BIG);
-    useExamStore.getState().toggleFormat('identification');
-    useExamStore.getState().setTarget(20);
+    useExamStore.getState().setCount('multiple_choice', 10);
+    useExamStore.getState().setCount('true_false', 3);
 
     const state = useExamStore.getState();
-    expect(state.total()).toBe(20);
     expect(state.counts.multiple_choice).toBe(10);
-    expect(state.counts.identification).toBe(10);
+    expect(state.counts.true_false).toBe(3);
+    expect(state.picks).toEqual(['multiple_choice', 'true_false']);
+    expect(state.total()).toBe(13);
+  });
+
+  it('never asks for more of a type than the notes hold', async () => {
+    const state = await openWith(BIG);
+    useExamStore.getState().setCount('matching', 99);
+    expect(useExamStore.getState().counts.matching).toBe(state.available.matching);
+  });
+
+  it('takes a type back off the paper at zero', async () => {
+    await openWith(BIG);
+    useExamStore.getState().setCount('multiple_choice', 0);
+    expect(useExamStore.getState().picks).toEqual([]);
+    expect(useExamStore.getState().total()).toBe(0);
+  });
+
+  it('evens the ticked types out only when asked', async () => {
+    await openWith(BIG);
+    useExamStore.getState().setCount('multiple_choice', 15);
+    useExamStore.getState().setCount('true_false', 5);
+    useExamStore.getState().evenSplit();
+
+    const state = useExamStore.getState();
+    expect(state.counts.multiple_choice).toBe(10);
+    expect(state.counts.true_false).toBe(10);
+    expect(state.total()).toBe(20);
+  });
+
+  it('has nothing to even out with a single type', async () => {
+    await openWith(BIG);
+    useExamStore.getState().setCount('multiple_choice', 7);
+    useExamStore.getState().evenSplit();
+    expect(useExamStore.getState().counts.multiple_choice).toBe(7);
   });
 
   it('ignores a type the notes cannot fill', async () => {
-    const state = await openWith(BIG);
-    expect(state.available.matching).toBeGreaterThan(0);
     const thin = await openWith([definition(1), definition(2)]);
     expect(thin.available.matching).toBe(0);
 
@@ -450,69 +484,46 @@ describe('picking a paper', () => {
 
   it('hands the whole paper to one format for a drill', async () => {
     await openWith(BIG);
+    useExamStore.getState().setCount('identification', 6);
     useExamStore.getState().setOnly('true_false', 12);
 
     const state = useExamStore.getState();
     expect(state.picks).toEqual(['true_false']);
-    expect(state.counts.true_false).toBe(12);
     expect(state.total()).toBe(12);
-  });
-
-  it('lets exact amounts override the even split', async () => {
-    await openWith(BIG);
-    useExamStore.getState().setCount('true_false', 3);
-    useExamStore.getState().setCount('multiple_choice', 7);
-
-    const state = useExamStore.getState();
-    expect(state.custom).toBe(true);
-    expect(state.picks).toEqual(['multiple_choice', 'true_false']);
-    expect(state.total()).toBe(10);
-  });
-
-  it('keeps a hand-set paper the length it is when another type is ticked', async () => {
-    await openWith(BIG);
-    useExamStore.getState().setCount('multiple_choice', 9);
-    useExamStore.getState().toggleFormat('identification');
-
-    const state = useExamStore.getState();
-    expect(state.custom).toBe(false);
-    expect(state.total()).toBe(9);
   });
 });
 
 describe('remembering the paper', () => {
   const BIG = Array.from({ length: 30 }, (_, i) => definition(i + 1));
 
-  async function openWith(questions: Question[]) {
-    mocked.getDeckById.mockResolvedValue(DECK);
+  async function openWith(questions: Question[], deckId = DECK.id) {
+    mocked.getDeckById.mockResolvedValue({ ...DECK, id: deckId });
     mocked.listQuestions.mockResolvedValue(questions);
     mocked.listAnswersForDeck.mockResolvedValue([]);
-    await useExamStore.getState().load(DECK.id);
+    await useExamStore.getState().load(deckId);
     return useExamStore.getState();
   }
 
-  it('opens the next sitting on what was sat last time', async () => {
+  it('opens the next sitting on the amounts that were sat last time', async () => {
     await openWith(BIG);
     useExamStore.getState().setMode('rapid');
-    useExamStore.getState().toggleFormat('multiple_choice');
-    useExamStore.getState().toggleFormat('true_false');
-    useExamStore.getState().setTarget(20);
+    useExamStore.getState().setCount('multiple_choice', 12);
+    useExamStore.getState().setCount('true_false', 4);
     useExamStore.getState().start();
 
     const again = await openWith(BIG);
-    expect(again.picks).toEqual(['true_false']);
-    expect(again.total()).toBe(20);
+    expect(again.counts.multiple_choice).toBe(12);
+    expect(again.counts.true_false).toBe(4);
     expect(again.lastMode).toBe('rapid');
   });
 
   it('trims a remembered paper to what the notes can still produce', async () => {
     await openWith(BIG);
-    useExamStore.getState().setTarget(25);
+    useExamStore.getState().setCount('multiple_choice', 25);
     useExamStore.getState().start();
 
     const thin = await openWith([1, 2, 3, 4].map(definition));
-    expect(thin.picks).toEqual(['multiple_choice']);
-    expect(thin.total()).toBe(thin.available.multiple_choice);
+    expect(thin.counts.multiple_choice).toBe(thin.available.multiple_choice);
   });
 
   it('remembers each subject separately', async () => {
@@ -521,10 +532,52 @@ describe('remembering the paper', () => {
     useExamStore.getState().toggleFormat('identification');
     useExamStore.getState().start();
 
-    mocked.getDeckById.mockResolvedValue({ ...DECK, id: 'note:2' });
-    mocked.listQuestions.mockResolvedValue(BIG);
-    mocked.listAnswersForDeck.mockResolvedValue([]);
-    await useExamStore.getState().load('note:2');
-    expect(useExamStore.getState().picks).toEqual(['multiple_choice']);
+    const other = await openWith(BIG, 'note:2');
+    expect(other.picks).toEqual(['multiple_choice']);
+  });
+});
+
+describe('recovering a sitting', () => {
+  it('will not restore a snapshot over a paper that just finished', async () => {
+    await open();
+    const store = useExamStore.getState();
+    store.setMode('relaxed');
+    store.setCount('multiple_choice', 2);
+    store.start();
+    await useExamStore.getState().answer(true);
+    await useExamStore.getState().answer(false);
+    expect(useExamStore.getState().status).toBe('finished');
+
+    // A checkpoint from mid-paper landing late used to be read straight back
+    // as an unfinished sitting, which sent the results screen to Home.
+    await saveSnapshot(DECK.id, DECK.name, {
+      mode: 'relaxed',
+      items: useExamStore.getState().items,
+      index: 1,
+      results: [],
+    });
+
+    expect(await useExamStore.getState().resume()).toBe(false);
+    const after = useExamStore.getState();
+    expect(after.status).toBe('finished');
+    expect(after.results).toHaveLength(2);
+  });
+
+  it('will not restore one over a sitting already under way', async () => {
+    await open();
+    useExamStore.getState().setMode('relaxed');
+    useExamStore.getState().setCount('multiple_choice', 3);
+    useExamStore.getState().start();
+    await useExamStore.getState().answer(true);
+
+    await saveSnapshot(DECK.id, DECK.name, {
+      mode: 'relaxed',
+      items: useExamStore.getState().items,
+      index: 0,
+      results: [],
+    });
+
+    expect(await useExamStore.getState().resume()).toBe(false);
+    expect(useExamStore.getState().index).toBe(1);
   });
 });

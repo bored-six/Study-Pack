@@ -29,6 +29,36 @@ export interface ExamSnapshot {
   state: unknown;
 }
 
+/**
+ * One writer, latest wins.
+ *
+ * A checkpoint is taken on every change, so a typed answer queues a write
+ * per keystroke — and the last of those could still be in flight when the
+ * finished paper cleared the snapshot, putting a finished sitting straight
+ * back. Every write goes through here instead: one in flight at a time, and
+ * whatever was asked for last is what ends up on disk.
+ */
+let writing: Promise<void> | null = null;
+let pending: string | null = null;
+
+function write(value: string): Promise<void> {
+  pending = value;
+  if (writing) return writing;
+
+  writing = (async () => {
+    try {
+      while (pending !== null) {
+        const next = pending;
+        pending = null;
+        await writeSetting(KEY, next);
+      }
+    } finally {
+      writing = null;
+    }
+  })();
+  return writing;
+}
+
 export async function saveSnapshot(
   deckId: string,
   deckName: string,
@@ -42,7 +72,7 @@ export async function saveSnapshot(
     state,
   };
   try {
-    await writeSetting(KEY, JSON.stringify(snapshot));
+    await write(JSON.stringify(snapshot));
   } catch {
     // A sitting that can't be checkpointed still has to be playable.
   }
@@ -50,7 +80,7 @@ export async function saveSnapshot(
 
 export async function clearSnapshot(): Promise<void> {
   try {
-    await writeSetting(KEY, '');
+    await write('');
   } catch {
     // Nothing to do — a stale snapshot is caught by the age check on read.
   }
