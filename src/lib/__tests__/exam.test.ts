@@ -383,4 +383,28 @@ describe('buildExam reuse decay', () => {
   it('rarely asks one question a third time in a single exam', () => {
     expect(survey(deckOf(20)).overWorked).toBeLessThan(1);
   });
+
+  it('uses the whole deck before asking anything twice', () => {
+    // 30 slots over 20 questions: repeats are unavoidable, but none of them
+    // should land before every question has been asked once.
+    const deck = deckOf(20);
+    const items = buildExam(
+      deck,
+      [
+        { format: 'multiple_choice', count: 15 },
+        { format: 'true_false', count: 15 },
+      ],
+      'oversubscribed',
+      historyFor(deck)
+    );
+
+    const uses = new Map<string, number>();
+    items.forEach((item) => {
+      uses.set(item.questionId, (uses.get(item.questionId) ?? 0) + 1);
+    });
+
+    expect(items).toHaveLength(30);
+    expect(uses.size).toBeGreaterThanOrEqual(19);
+    expect(Math.max(...uses.values())).toBeLessThanOrEqual(2);
+  });
 });
