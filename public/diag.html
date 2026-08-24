@@ -1,0 +1,84 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Flipp storage diagnostic</title>
+<style>
+body{font:16px/1.6 system-ui,sans-serif;background:#FAF3E1;color:#2b3a2f;margin:0;padding:40px}
+h1{font-size:22px;margin:0 0 20px}
+table{border-collapse:collapse;width:100%;max-width:760px}
+td{padding:8px 12px;border-bottom:1px solid #e2d9c0;vertical-align:top}
+td:first-child{font-weight:600;white-space:nowrap}
+.ok{color:#1e7a3c;font-weight:700}.bad{color:#b3261e;font-weight:700}
+#verdict{margin-top:24px;padding:16px;border-radius:10px;background:#fff;max-width:760px}
+code{background:#f0e8d2;padding:1px 5px;border-radius:4px}
+</style></head><body>
+<h1>Flipp storage diagnostic</h1>
+<table id="t"></table>
+<div id="verdict">Running...</div>
+<script>
+const rows = [];
+function add(k, v, ok) {
+  rows.push('<tr><td>' + k + '</td><td class="' + (ok === null ? '' : ok ? 'ok' : 'bad') + '">' + v + '</td></tr>');
+}
+const coi = self.crossOriginIsolated === true;
+const sab = typeof SharedArrayBuffer === 'function';
+const opfs = !!(navigator.storage && navigator.storage.getDirectory);
+add('Browser', navigator.userAgent, null);
+add('crossOriginIsolated', String(coi), coi);
+add('SharedArrayBuffer', sab ? 'available' : 'MISSING', sab);
+add('OPFS (navigator.storage.getDirectory)', opfs ? 'available' : 'MISSING', opfs);
+
+(async () => {
+  // createSyncAccessHandle only exists on FileSystemFileHandle inside a
+  // dedicated worker. Probing it on the main thread reports MISSING on every
+  // browser, working ones included.
+  const workerSrc = `
+    self.onmessage = async () => {
+      try {
+        const dir = await navigator.storage.getDirectory();
+        const fh = await dir.getFileHandle('__flipp_probe', { create: true });
+        const h = await fh.createSyncAccessHandle();
+        h.close();
+        await dir.removeEntry('__flipp_probe').catch(() => {});
+        postMessage({ ok: true });
+      } catch (e) {
+        postMessage({ ok: false, err: String((e && e.message) || e) });
+      }
+    };
+  `;
+  const probe = await new Promise((resolve) => {
+    let w;
+    try {
+      w = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })));
+    } catch (e) {
+      return resolve({ ok: false, err: 'worker blocked: ' + String((e && e.message) || e) });
+    }
+    const timer = setTimeout(() => resolve({ ok: false, err: 'worker timed out' }), 10000);
+    w.onmessage = (ev) => { clearTimeout(timer); resolve(ev.data); };
+    w.onerror = (ev) => { clearTimeout(timer); resolve({ ok: false, err: 'worker error: ' + (ev.message || 'unknown') }); };
+    w.postMessage('go');
+  });
+  add('OPFS sync access handles (in worker)', probe.ok ? 'available' : 'MISSING (' + probe.err + ')', probe.ok);
+
+  let wasmOk = false, wasmErr = '';
+  try {
+    const r = await fetch('/assets/vendor/expo-sqlite/web/wa-sqlite/wa-sqlite.783a2e11efab57e42036efde040ea8fd.wasm');
+    wasmOk = r.ok;
+    wasmErr = r.ok ? '' : 'HTTP ' + r.status;
+  } catch (e) { wasmErr = String((e && e.message) || e); }
+  add('SQLite wasm file', wasmOk ? 'loads' : 'FAILED (' + wasmErr + ')', wasmOk);
+
+  let persisted = 'unknown';
+  try { persisted = String(await navigator.storage.persisted()); } catch (e) {}
+  add('Storage persisted', persisted, null);
+
+  document.getElementById('t').innerHTML = rows.join('');
+  const missing = [];
+  if (!coi) missing.push('cross-origin isolation');
+  if (!sab) missing.push('SharedArrayBuffer');
+  if (!opfs) missing.push('OPFS');
+  if (!probe.ok) missing.push('OPFS sync access handles: ' + probe.err);
+  if (!wasmOk) missing.push('SQLite wasm: ' + wasmErr);
+  document.getElementById('verdict').innerHTML = missing.length
+    ? '<b class="bad">Storage cannot work here.</b><br>Missing: ' + missing.join('; ') + '.<br>Send this whole page to Shuaib.'
+    : '<b class="ok">All storage requirements met.</b> If Flipp still shows "Storage failed to start", hard-reload with <code>Cmd/Ctrl + Shift + R</code> and send the new error line under the message.';
+})();
+</script></body></html>
