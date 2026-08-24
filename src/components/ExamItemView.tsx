@@ -17,7 +17,7 @@ import { CircledWord } from '@/components/CircledWord';
 import { InkSplat, PenStrike, PenTick, Stamp } from '@/components/penmarks';
 import { Icon } from '@/components/Icon';
 import { emptyDraft, type DraftValue } from '@/lib/draft';
-import { tapSelect } from '@/lib/haptics';
+import { tapCorrect, tapSelect, tapWrong } from '@/lib/haptics';
 import type {
   ChoiceItem,
   EnumerationItem,
@@ -72,6 +72,14 @@ function Verdict({
   detail?: string;
   onNext: () => void;
 }) {
+  // The moment the verdict appears is the moment that deserves the sound —
+  // every format funnels through here, so no type is ever silent.
+  useEffect(() => {
+    if (correct) tapCorrect();
+    else tapWrong();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <View style={styles.verdictWrap}>
       <View style={[styles.verdict, correct ? styles.verdictGood : styles.verdictBad]}>

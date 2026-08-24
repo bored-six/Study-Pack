@@ -44,23 +44,42 @@ async function init(): Promise<void> {
   } catch {
     /* audio config is best-effort */
   }
+  // Warm every player so the first real play is instant, not a load race.
+  for (const name of Object.keys(SOURCES) as SfxName[]) {
+    try {
+      playerFor(name);
+    } catch {
+      /* a player that fails to build just stays silent */
+    }
+  }
 }
 
 export function setSfxEnabled(on: boolean): void {
   enabled = on;
 }
 
+function playerFor(name: SfxName): AudioPlayer {
+  let player = players[name];
+  if (!player) {
+    player = createAudioPlayer(SOURCES[name]);
+    player.volume = 0.55;
+    players[name] = player;
+  }
+  return player;
+}
+
 export function playSfx(name: SfxName): void {
   void init();
   if (!enabled) return;
   try {
-    let player = players[name];
-    if (!player) {
-      player = createAudioPlayer(SOURCES[name]);
-      player.volume = 0.55;
-      players[name] = player;
+    const player = playerFor(name);
+    // A fresh player plays as soon as it loads; only a replay needs the
+    // rewind. Waiting on seekTo before the first play left the whole app
+    // silent when the seek never resolved on an unloaded player.
+    if (player.currentTime > 0) {
+      void player.seekTo(0);
     }
-    void player.seekTo(0).then(() => player.play());
+    player.play();
   } catch {
     /* no sound is never an error */
   }

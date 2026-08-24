@@ -38,7 +38,7 @@ import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { readSetting, writeSetting } from '@/lib/db';
-import { tapCorrect, tapThud, tapTier, tapWrong } from '@/lib/haptics';
+import { tapThud, tapTier } from '@/lib/haptics';
 import { playSfx } from '@/lib/sfx';
 import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
@@ -249,7 +249,6 @@ export default function ExamRunScreen() {
     (correct: boolean) => {
       const id = itemIdRef.current;
       if (correct) {
-        tapCorrect();
         setCombo((c) => {
           tapTier(c + 1);
           return c + 1;
@@ -260,7 +259,6 @@ export default function ExamRunScreen() {
           setStars((s) => s + 1);
         }
       } else {
-        tapWrong();
         setCombo(0);
         setLastWrongAt(Date.now());
         if (id) {
