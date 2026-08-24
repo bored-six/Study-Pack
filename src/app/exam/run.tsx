@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import Animated, {
+  FadeIn,
+  ZoomIn,
   FadeInDown,
   SlideOutUp,
   useAnimatedStyle,
@@ -33,7 +35,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { readSetting, writeSetting } from '@/lib/db';
 import { emptyDraft, hasAnswer } from '@/lib/draft';
-import { FORMAT_HOWTO, FORMAT_LABEL } from '@/lib/exam';
+import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
 import { MODES, questionSeconds, SURVIVAL_STRIKES } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
@@ -92,6 +94,8 @@ export default function ExamRunScreen() {
   // telling you the answer through the meter.
   const scored = spec.feedback === 'instant';
   const [combo, setCombo] = useState(0);
+  const [skipBriefings, setSkipBriefings] = useState<ExamFormat[]>([]);
+  const [skipChecked, setSkipChecked] = useState(false);
   const [idle, setIdle] = useState(false);
   const [emberNonce, setEmberNonce] = useState(0);
   const [wrongByItem, setWrongByItem] = useState<Record<string, number>>({});
@@ -110,6 +114,23 @@ export default function ExamRunScreen() {
     }
   }, [combo, glow]);
   const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.55 }));
+
+  // Formats the student asked never to be briefed on again. The ? button
+  // in the header still reopens the instructions any time — skipping the
+  // auto-show never locks the help away.
+  useEffect(() => {
+    void readSetting('briefing_skip').then((raw) => {
+      if (!raw) return;
+      try {
+        const skips = JSON.parse(raw) as ExamFormat[];
+        setSkipBriefings(skips);
+        for (const format of skips) store.markBriefed(format);
+      } catch {
+        /* corrupt setting: fall back to showing briefings */
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ~8s without progress and the desk starts fidgeting.
   const idleKey = `${index}:${combo}:${Object.keys(drafts).length}`;
@@ -213,30 +234,61 @@ export default function ExamRunScreen() {
     return (
       <View style={[styles.screen, styles.center, { paddingTop: insets.top + 10 }]}>
         <RuledPaper />
-        <View style={styles.briefCard}>
+        <Animated.View entering={FadeInDown.springify().damping(15)} style={styles.briefCard}>
           <Tape />
-          <Text style={styles.briefKicker}>NEW ON THIS PAPER</Text>
-          <FormatBadge format={item.format} size="lg" style={styles.briefFormat} />
-          <Squiggle width={110} color={FORMAT_META[item.format].ink} style={styles.briefSquiggle} />
-          <Text style={styles.briefBody}>{FORMAT_HOWTO[item.format]}</Text>
+          <Animated.View entering={FadeIn.delay(150)}>
+            <Text style={styles.briefKicker}>NEW ON THIS PAPER</Text>
+          </Animated.View>
+          <Animated.View entering={ZoomIn.springify().damping(10).delay(250)}>
+            <FormatBadge format={item.format} size="lg" style={styles.briefFormat} />
+          </Animated.View>
+          <Animated.View entering={FadeIn.delay(500)}>
+            <Squiggle width={110} color={FORMAT_META[item.format].ink} style={styles.briefSquiggle} />
+          </Animated.View>
+          <Animated.View entering={FadeInDown.springify().damping(15).delay(600)}>
+            <Text style={styles.briefBody}>{FORMAT_HOWTO[item.format]}</Text>
+          </Animated.View>
           {spec.feedback === 'deferred' ? (
-            <View style={styles.briefNoteRow}>
+            <Animated.View entering={FadeIn.delay(750)} style={styles.briefNoteRow}>
               <Icon name="bell" size={15} color={colors.ink} fill={colors.goldWash} strokeWidth={2} />
               <Text style={styles.briefNote}>
                 You won't be told if you're right until the whole paper is submitted.
               </Text>
-            </View>
+            </Animated.View>
           ) : null}
-          <ChunkyButton
-            label="Got it"
-            size="lg"
-            onPress={() => {
-              store.markBriefed(item.format);
-              setShowHelp(false);
-            }}
-            style={styles.briefBtn}
-          />
-        </View>
+
+          <Animated.View entering={FadeIn.delay(850)}>
+            <Pressable
+              onPress={() => setSkipChecked((v) => !v)}
+              hitSlop={8}
+              style={styles.skipRow}>
+              <View style={[styles.skipBox, skipChecked && styles.skipBoxOn]}>
+                {skipChecked ? (
+                  <Icon name="check" size={12} color={colors.onAccent} strokeWidth={3} />
+                ) : null}
+              </View>
+              <Text style={styles.skipText}>
+                Don't show this again — the ? up top always brings it back
+              </Text>
+            </Pressable>
+
+            <ChunkyButton
+              label="Got it"
+              size="lg"
+              onPress={() => {
+                store.markBriefed(item.format);
+                setShowHelp(false);
+                if (skipChecked && !skipBriefings.includes(item.format)) {
+                  const next = [...skipBriefings, item.format];
+                  setSkipBriefings(next);
+                  void writeSetting('briefing_skip', JSON.stringify(next));
+                }
+                setSkipChecked(false);
+              }}
+              style={styles.briefBtn}
+            />
+          </Animated.View>
+        </Animated.View>
       </View>
     );
   }
@@ -269,6 +321,7 @@ export default function ExamRunScreen() {
       style={styles.fill}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
+        <RuledPaper />
         <View style={styles.header}>
           <Pressable
             onPress={() => setConfirmQuit(true)}
@@ -358,6 +411,8 @@ export default function ExamRunScreen() {
             exiting={SlideOutUp.duration(220)}>
             <ExamSheet
               format={item.format}
+              title={FORMAT_LABEL[item.format]}
+              accent={FORMAT_META[item.format].ink}
               smudges={wrongByItem[item.id] ?? 0}
               idle={idle}>
               <ExamItemView
@@ -608,6 +663,33 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     flex: 1,
+  },
+  skipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginTop: 14,
+  },
+  skipBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipBoxOn: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accentDeep,
+  },
+  skipText: {
+    flex: 1,
+    fontFamily: font.bodySemibold,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.textFaint,
   },
   briefFormat: {
     marginTop: 6,
