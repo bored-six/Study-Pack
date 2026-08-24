@@ -9,6 +9,15 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
@@ -16,6 +25,7 @@ import { DerpArrow, DerpCheck, DerpMinus, DerpPlus, DerpScribbleLine } from '@/c
 import { Icon } from '@/components/Icon';
 import { FORMAT_HOWTO, FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib/exam';
 import { MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
+import { playSfx } from '@/lib/sfx';
 import { useExamStore } from '@/store/exam';
 import { colors, derpRadius, font, outline, radius, shadow } from '@/theme/tokens';
 
@@ -40,32 +50,104 @@ function FormatChip({
   index: number;
 }) {
   const off = max === 0;
+
+  const scale = useSharedValue(1);
+  const baseRot = index % 2 === 0 ? -2.5 : 1.5;
+  const rot = useSharedValue(baseRot);
+
+  useEffect(() => {
+    rot.value = withDelay(
+      index * 200,
+      withRepeat(
+        withSequence(
+          withTiming(baseRot + 1, { duration: 2000 }),
+          withTiming(baseRot - 1, { duration: 2000 })
+        ),
+        -1,
+        true
+      )
+    );
+  }, [baseRot, index, rot]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }, { rotate: `${rot.value}deg` }],
+  }));
+
+  const handlePress = () => {
+    if (off) return;
+    playSfx('derp_pop');
+    scale.value = withSequence(withSpring(1.08), withSpring(1));
+    onPress();
+  };
+
   return (
-    <Pressable
-      disabled={off}
-      onPress={onPress}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: on, disabled: off }}
-      style={({ pressed }) => [
-        styles.chip,
-        { transform: [{ rotate: index % 2 === 0 ? '-2.5deg' : '1.5deg' }] },
-        on && styles.chipOn,
-        off && styles.chipOff,
-        pressed && styles.pressed,
-      ]}>
-      <View style={[styles.tape, { transform: [{ rotate: index % 2 === 0 ? '-4deg' : '2deg' }] }]} />
-      <View style={styles.tickboxContainer}>
-        <DerpCheck checked={on} style={styles.derpCheckSvg} />
-      </View>
-      <Text
-        style={[styles.chipName, on && styles.chipNameOn, off && styles.chipTextOff]}
-        numberOfLines={2}>
-        {FORMAT_LABEL[format]}
-      </Text>
-      <Text style={[styles.chipRoom, off && styles.chipTextOff]}>
-        {off ? 'not in these notes' : `${max} ready`}
-      </Text>
-    </Pressable>
+    <Animated.View style={[animatedStyle, { width: '48%', flexGrow: 1 }]}>
+      <Pressable
+        disabled={off}
+        onPress={handlePress}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: on, disabled: off }}
+        style={({ pressed }) => [
+          styles.chip,
+          { width: '100%' },
+          on && styles.chipOn,
+          off && styles.chipOff,
+          pressed && styles.pressed,
+        ]}>
+        <View style={[styles.tape, { transform: [{ rotate: index % 2 === 0 ? '-4deg' : '2deg' }] }]} />
+        <View style={styles.tickboxContainer}>
+          <DerpCheck checked={on} style={styles.derpCheckSvg} />
+        </View>
+        <Text
+          style={[styles.chipName, on && styles.chipNameOn, off && styles.chipTextOff]}
+          numberOfLines={2}>
+          {FORMAT_LABEL[format]}
+        </Text>
+        <Text style={[styles.chipRoom, off && styles.chipTextOff]}>
+          {off ? 'not in these notes' : `${max} ready`}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function StepBtn({
+  delta,
+  count,
+  max,
+  onPress,
+  children,
+}: {
+  delta: number;
+  count: number;
+  max: number;
+  onPress: (delta: number) => void;
+  children: React.ReactNode;
+}) {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const disabled = delta > 0 ? count >= max : count <= 1;
+
+  const handlePress = () => {
+    if (disabled) return;
+    scale.value = withSequence(withSpring(0.85), withSpring(1));
+    onPress(delta);
+  };
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        onPress={handlePress}
+        disabled={disabled}
+        hitSlop={6}
+        style={({ pressed }) => [
+          styles.stepBtn,
+          disabled && styles.stepBtnOff,
+          pressed && styles.pressed,
+        ]}>
+        <View style={{ opacity: disabled ? 0.3 : 1 }}>{children}</View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -83,20 +165,57 @@ function AmountRow({
   onChange: (next: number) => void;
   index: number;
 }) {
+}) {
   const [draft, setDraft] = useState(String(count));
+  const baseRot = index % 2 === 0 ? 0.5 : -0.5;
+  const rot = useSharedValue(baseRot);
+  const numScale = useSharedValue(1);
+
+  useEffect(() => {
+    rot.value = withDelay(
+      index * 300,
+      withRepeat(
+        withSequence(
+          withTiming(baseRot + 0.5, { duration: 2500 }),
+          withTiming(baseRot - 0.5, { duration: 2500 })
+        ),
+        -1,
+        true
+      )
+    );
+  }, [baseRot, index, rot]);
 
   // Keep the field in step when − + or Max changes the number underneath it.
   useEffect(() => {
     setDraft(String(count));
-  }, [count]);
+    numScale.value = withSequence(withSpring(1.3), withSpring(1));
+  }, [count, numScale]);
 
   const commit = () => {
     const parsed = parseInt(draft.replace(/[^0-9]/g, ''), 10);
     onChange(Number.isNaN(parsed) ? 0 : parsed);
   };
 
+  const animatedRowStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rot.value}deg` }],
+  }));
+
+  const animatedNumStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: numScale.value }, { rotate: '-3deg' }],
+  }));
+
+  const handleMax = () => {
+    playSfx('derp_boing');
+    onChange(max);
+  };
+
+  const handleStep = (delta: number) => {
+    playSfx('tap');
+    onChange(count + delta);
+  };
+
   return (
-    <View style={[styles.amountRow, { transform: [{ rotate: index % 2 === 0 ? '0.5deg' : '-0.5deg' }] }]}>
+    <Animated.View style={[styles.amountRow, animatedRowStyle]}>
       <View style={[styles.tape, { left: -10, top: '50%', marginTop: -8, width: 30, transform: [{ rotate: '85deg' }] }]} />
       <View style={styles.rowText}>
         <Text style={styles.rowTitle}>{FORMAT_LABEL[format]}</Text>
@@ -104,56 +223,36 @@ function AmountRow({
           {FORMAT_HOWTO[format]}
         </Text>
         <Pressable
-          onPress={() => onChange(max)}
+          onPress={handleMax}
           hitSlop={6}
           style={({ pressed }) => [styles.maxBtn, pressed && styles.pressed]}>
           <Text style={styles.maxText}>Max {max}</Text>
         </Pressable>
       </View>
 
-      <Pressable
-        onPress={() => onChange(count - STEP)}
-        disabled={count <= 1}
-        hitSlop={6}
-        accessibilityLabel={`Fewer ${FORMAT_LABEL[format]}`}
-        style={({ pressed }) => [
-          styles.stepBtn,
-          count <= 1 && styles.stepBtnOff,
-          pressed && styles.pressed,
-        ]}>
-        <View style={{ opacity: count <= 1 ? 0.3 : 1 }}>
-          <DerpMinus width={42} height={42} />
-        </View>
-      </Pressable>
+      <StepBtn delta={-STEP} count={count} max={max} onPress={handleStep}>
+        <DerpMinus width={42} height={42} />
+      </StepBtn>
 
-      <TextInput
-        value={draft}
-        onChangeText={setDraft}
-        onBlur={commit}
-        onSubmitEditing={commit}
-        keyboardType="number-pad"
-        returnKeyType="done"
-        selectTextOnFocus
-        maxLength={3}
-        accessibilityLabel={`How many ${FORMAT_LABEL[format]}`}
-        style={styles.countInput}
-      />
+      <Animated.View style={animatedNumStyle}>
+        <TextInput
+          value={draft}
+          onChangeText={setDraft}
+          onBlur={commit}
+          onSubmitEditing={commit}
+          keyboardType="number-pad"
+          returnKeyType="done"
+          selectTextOnFocus
+          maxLength={3}
+          accessibilityLabel={`How many ${FORMAT_LABEL[format]}`}
+          style={[styles.countInput, { transform: [] }]}
+        />
+      </Animated.View>
 
-      <Pressable
-        onPress={() => onChange(count + STEP)}
-        disabled={count >= max}
-        hitSlop={6}
-        accessibilityLabel={`More ${FORMAT_LABEL[format]}`}
-        style={({ pressed }) => [
-          styles.stepBtn,
-          count >= max && styles.stepBtnOff,
-          pressed && styles.pressed,
-        ]}>
-        <View style={{ opacity: count >= max ? 0.3 : 1 }}>
-          <DerpPlus width={42} height={42} />
-        </View>
-      </Pressable>
-    </View>
+      <StepBtn delta={STEP} count={count} max={max} onPress={handleStep}>
+        <DerpPlus width={42} height={42} />
+      </StepBtn>
+    </Animated.View>
   );
 }
 
@@ -505,8 +604,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   chip: {
-    width: '48%',
-    flexGrow: 1,
     backgroundColor: colors.surface,
     ...outline,
     ...derpRadius,
