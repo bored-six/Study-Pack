@@ -10,8 +10,6 @@
 import type { IconName } from '@/components/Icon';
 
 import { availability, type ExamFormat, type ExamItem, type ExamRequest } from './exam';
-import { byQuestion, type AnswerRecord } from './mastery';
-import { weightFor } from './pick';
 import type { Question } from './types';
 
 export type ExamMode =
@@ -19,7 +17,6 @@ export type ExamMode =
   | 'mastery'
   | 'rapid'
   | 'simulation'
-  | 'weak_spots'
   | 'survival';
 
 /** Nothing, one timer for the whole paper, or a timer per question. */
@@ -95,18 +92,6 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     repetition: 'once',
     autoBuild: false,
   },
-  weak_spots: {
-    id: 'weak_spots',
-    name: 'Weak spots',
-    tagline: 'Only the ones you keep getting wrong.',
-    icon: 'alert',
-    wash: '#FBD5CC',
-    ink: '#B24A38',
-    clock: 'none',
-    feedback: 'instant',
-    repetition: 'once',
-    autoBuild: true,
-  },
   survival: {
     id: 'survival',
     name: 'Survival',
@@ -125,7 +110,6 @@ export const MODES: Record<ExamMode, ModeSpec> = {
 export const MODE_ORDER: ExamMode[] = [
   'relaxed',
   'mastery',
-  'weak_spots',
   'rapid',
   'simulation',
   'survival',
@@ -209,34 +193,4 @@ export function fullRequests(questions: readonly Question[]): ExamRequest[] {
   return (Object.keys(counts) as ExamFormat[])
     .filter((format) => counts[format] > 0)
     .map((format) => ({ format, count: counts[format] }));
-}
-
-// --- weak spots ---------------------------------------------------------
-
-export const WEAK_SPOT_LIMIT = 15;
-
-/**
- * The questions most worth drilling, worst first.
- *
- * Same notion of need as an ordinary session — `weightFor` already knows
- * that a question just missed beats one never tried, which beats one you
- * know cold. The difference is the ordering: a session samples by weight so
- * it stays varied, while this mode was chosen precisely to be punishing, so
- * it sorts. Ties keep deck order, which makes the drill reproducible.
- */
-export function weakestQuestions(
-  questions: readonly Question[],
-  answers: readonly AnswerRecord[],
-  limit = WEAK_SPOT_LIMIT,
-  now = Date.now()
-): Question[] {
-  const grouped = byQuestion(answers);
-  return [...questions]
-    .map((question) => ({
-      question,
-      weight: weightFor(grouped.get(question.id) ?? [], now),
-    }))
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, limit)
-    .map((entry) => entry.question);
 }

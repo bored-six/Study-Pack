@@ -2,8 +2,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,7 +17,6 @@ import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
 import {
   MODE_ORDER,
   MODES,
-  WEAK_SPOT_LIMIT,
   type ExamMode,
   type ModeSpec,
 } from '@/lib/mode';
@@ -141,7 +138,6 @@ export default function ExamSetupScreen() {
   const {
     status,
     deck,
-    questions,
     available,
     counts,
     mode,
@@ -217,7 +213,7 @@ export default function ExamSetupScreen() {
     return (
       <View style={[styles.screen, styles.center, { padding: 24 }]}>
         <View style={styles.errorCard}>
-          <Text style={styles.errorTitle}>Can't start an exam</Text>
+          <Text style={styles.errorTitle}>Can’t start an exam</Text>
           <Text style={styles.errorBody}>{error}</Text>
           <ChunkyButton label="Back" size="md" onPress={() => router.back()} />
         </View>
@@ -226,10 +222,8 @@ export default function ExamSetupScreen() {
   }
 
   if (step === 'mode') {
-    const drilling = Math.min(WEAK_SPOT_LIMIT, questions.length);
     const detail: Partial<Record<ExamMode, string>> = {
       mastery: 'Ends when the pile is empty',
-      weak_spots: `${drilling} question${drilling === 1 ? '' : 's'}, worst first`,
       rapid: 'Seconds per question',
       simulation: 'Flag, revisit, submit',
       survival: 'Endless · three lives',

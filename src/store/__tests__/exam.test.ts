@@ -112,7 +112,7 @@ describe('take your time', () => {
     expect(mocked.saveAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ deckId: DECK.id, total, score: 2 })
     );
-    // Every answer reaches mastery, which is what weak spots later reads.
+    // Every answer reaches mastery, which is what later papers draw on.
     expect(mocked.saveAnswers).toHaveBeenCalledWith(77, DECK.id, expect.any(Array));
     expect(mocked.saveAnswers.mock.calls[0][2]).toHaveLength(total);
   });
@@ -305,41 +305,6 @@ describe('exam simulation', () => {
     useExamStore.getState().results.forEach((result, i) => {
       expect(result.correct).toBe(gradeDraft(items[i], drafts[items[i].id]));
     });
-  });
-});
-
-describe('weak spots', () => {
-  it('drills what you have been getting wrong, worst first, with no setup', async () => {
-    // Answered today: mastery fades with age, so an old win would read as
-    // a weak spot and the ordering under test would be about time instead.
-    const t = Date.now();
-    await open([
-      { deckId: DECK.id, questionId: 'q5', correct: false, answeredAt: t - 6 },
-      { deckId: DECK.id, questionId: 'q5', correct: false, answeredAt: t - 5 },
-      { deckId: DECK.id, questionId: 'q2', correct: true, answeredAt: t - 4 },
-      { deckId: DECK.id, questionId: 'q2', correct: true, answeredAt: t - 3 },
-      { deckId: DECK.id, questionId: 'q2', correct: true, answeredAt: t - 2 },
-      { deckId: DECK.id, questionId: 'q2', correct: true, answeredAt: t - 1 },
-    ]);
-
-    // No counts touched at all — the mode picks its own paper.
-    useExamStore.getState().setMode('weak_spots');
-    useExamStore.getState().start();
-
-    const state = useExamStore.getState();
-    expect(state.status).toBe('active');
-    expect(state.items[0].questionId).toBe('q5');
-    // One item per question, and the one you know is last.
-    expect(new Set(state.items.map((i) => i.questionId)).size).toBe(state.items.length);
-    expect(state.items[state.items.length - 1].questionId).toBe('q2');
-  });
-
-  it('still works on a subject that has never been sat', async () => {
-    await open();
-    useExamStore.getState().setMode('weak_spots');
-    useExamStore.getState().start();
-    expect(useExamStore.getState().status).toBe('active');
-    expect(useExamStore.getState().items.length).toBe(QUESTIONS.length);
   });
 });
 

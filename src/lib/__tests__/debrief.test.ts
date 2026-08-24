@@ -264,7 +264,7 @@ describe('buildDebrief', () => {
 
     expect(debrief.strengths[0].text).toBe('1 you had missed before came back right.');
     expect(debrief.weaknesses[0].text).toContain('2 have now caught you');
-    expect(debrief.next.action).toBe('weak_spots');
+    expect(debrief.next.action).toBe('relaxed');
   });
 
   it('judges a repeated question on the first answer, not the one it ends on', () => {
@@ -340,20 +340,6 @@ describe('buildDebrief', () => {
 
     expect(debrief.headline).toBe('The pile is empty.');
     expect(debrief.weaknesses[0].text).toBe('3 extra passes to clear the pile.');
-  });
-
-  it('stops recommending the drill the student has just failed', () => {
-    const items = [choice('a'), choice('b'), choice('c')];
-    const history = [answered('a', false), answered('b', false), answered('c', false)];
-    const debrief = read({
-      mode: 'weak_spots',
-      items,
-      results: sitting(items, [false, false, true]),
-      history,
-    });
-
-    expect(debrief.next.action).toBe('none');
-    expect(debrief.next.title).toBe('Take these back to the notes');
   });
 
   it('reads a low score on new questions as a first pass, not a failure', () => {

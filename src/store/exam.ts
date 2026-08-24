@@ -13,7 +13,6 @@ import { gradeDraft, hasAnswer, type DraftValue } from '@/lib/draft';
 import {
   availability,
   buildExam,
-  buildOnePerQuestion,
   type ExamFormat,
   type ExamItem,
   type ExamRequest,
@@ -27,11 +26,10 @@ import {
   paperSeconds,
   startQueue,
   SURVIVAL_STRIKES,
-  weakestQuestions,
-  WEAK_SPOT_LIMIT,
   type ExamMode,
   type QueueEntry,
 } from '@/lib/mode';
+import { clearSnapshot, readSnapshot, saveSnapshot } from '@/lib/resume';
 import type { Deck, Question } from '@/lib/types';
 
 export type ExamStatus = 'idle' | 'loading' | 'setup' | 'active' | 'finished' | 'error';
@@ -46,6 +44,8 @@ export interface ItemResult {
    * until it's right, and by then the draft that missed is long overwritten.
    */
   slip: SlipKind | null;
+  /** What was put down for this answer, kept for the same reason. */
+  draft: DraftValue | null;
 }
 
 interface ExamState {
@@ -104,6 +104,8 @@ interface ExamState {
   answer: (correct: boolean, timedOut?: boolean) => Promise<'next' | 'finished'>;
   /** Grades every draft at once — how a withheld paper ends. */
   submitPaper: () => Promise<void>;
+  /** Picks an interrupted sitting back up, if there is one worth resuming. */
+  resume: () => Promise<boolean>;
   reset: () => void;
 }
 
@@ -162,6 +164,8 @@ export const useExamStore = create<ExamState>((set, get) => {
     const score = results.filter((r) => r.correct).length;
 
     set({ results, answerLog, status: 'finished', durationMs, paperDeadline: null });
+    // The paper is done; a leftover snapshot would offer to resume it.
+    await clearSnapshot();
     if (!deck) return;
 
     const attemptId = await saveAttempt({
@@ -171,9 +175,36 @@ export const useExamStore = create<ExamState>((set, get) => {
       durationMs,
       completedAt,
     });
-    // Which questions were missed is what mastery and weak spots read;
-    // the score alone could never tell them apart.
+    // Which questions were missed is what mastery and the need-weighted
+    // picker read; the score alone could never tell them apart.
     await saveAnswers(attemptId, deck.id, answerLog);
+  };
+
+  /**
+   * Writes the sitting down mid-flight. Everything the student has actually
+   * done lives here; the deck and question list are re-read on resume rather
+   * than stored twice.
+   */
+  const checkpoint = () => {
+    const s = get();
+    if (s.status !== 'active' || !s.deck) return;
+    void saveSnapshot(s.deck.id, s.deck.name, {
+      mode: s.mode,
+      items: s.items,
+      index: s.index,
+      queue: s.queue,
+      retired: s.retired,
+      strikes: s.strikes,
+      round: s.round,
+      visits: s.visits,
+      drafts: s.drafts,
+      flagged: s.flagged,
+      results: s.results,
+      answerLog: s.answerLog,
+      briefed: s.briefed,
+      startedAt: s.startedAt,
+      paperDeadline: s.paperDeadline,
+    });
   };
 
   return {
@@ -237,12 +268,7 @@ export const useExamStore = create<ExamState>((set, get) => {
       const seedText = `${deck?.id ?? 'exam'}:${mode}:${Date.now()}`;
 
       let items: ExamItem[];
-      if (mode === 'weak_spots') {
-        items = buildOnePerQuestion(
-          weakestQuestions(questions, deckAnswers, WEAK_SPOT_LIMIT),
-          seedText
-        );
-      } else if (mode === 'survival') {
+      if (mode === 'survival') {
         items = survivalRound(questions, deckAnswers, seedText, 0);
       } else {
         // The answer log decides which of the deck's questions fill the
@@ -265,6 +291,7 @@ export const useExamStore = create<ExamState>((set, get) => {
         paperDeadline:
           spec.clock === 'whole' ? startedAt + paperSeconds(items) * 1000 : null,
       });
+      checkpoint();
     },
 
     current: () => {
@@ -280,7 +307,10 @@ export const useExamStore = create<ExamState>((set, get) => {
       set((s) => (s.briefed.includes(format) ? s : { briefed: [...s.briefed, format] }));
     },
 
-    setDraft: (itemId, value) => set((s) => ({ drafts: { ...s.drafts, [itemId]: value } })),
+    setDraft: (itemId, value) => {
+      set((s) => ({ drafts: { ...s.drafts, [itemId]: value } }));
+      checkpoint();
+    },
 
     toggleFlag: (itemId) =>
       set((s) => ({
@@ -300,15 +330,15 @@ export const useExamStore = create<ExamState>((set, get) => {
       const item = get().current();
       if (!item) return 'finished';
 
+      const draft = state.drafts[item.id] ?? null;
       const results = [
         ...state.results,
         {
           itemId: item.id,
           format: item.format,
           correct,
-          slip: correct
-            ? null
-            : classifyMiss(item, state.drafts[item.id] ?? null, timedOut),
+          slip: correct ? null : classifyMiss(item, draft, timedOut),
+          draft,
         },
       ];
       // A question the clock took off you is not evidence about what you
@@ -331,6 +361,7 @@ export const useExamStore = create<ExamState>((set, get) => {
           return 'finished';
         }
         set({ results, answerLog, queue, retired, visits: state.visits + 1 });
+        checkpoint();
         return 'next';
       }
 
@@ -365,11 +396,13 @@ export const useExamStore = create<ExamState>((set, get) => {
           index: state.index + 1,
           visits: state.visits + 1,
         });
+        checkpoint();
         return 'next';
       }
 
       if (state.index + 1 < state.items.length) {
         set({ results, answerLog, index: state.index + 1, visits: state.visits + 1 });
+        checkpoint();
         return 'next';
       }
 
@@ -389,6 +422,7 @@ export const useExamStore = create<ExamState>((set, get) => {
           format: item.format,
           correct,
           slip: correct ? null : classifyMiss(item, draft),
+          draft,
         };
       });
       // A blank scores as wrong, the same as on a real paper — but it says
@@ -404,7 +438,8 @@ export const useExamStore = create<ExamState>((set, get) => {
       await finishWith(results, answerLog);
     },
 
-    reset: () =>
+    reset: () => {
+      void clearSnapshot();
       set({
         status: 'idle',
         deck: null,
@@ -413,6 +448,51 @@ export const useExamStore = create<ExamState>((set, get) => {
         mode: DEFAULT_MODE,
         error: null,
         ...FRESH,
-      }),
+      });
+    },
+
+    /**
+     * Restores an unfinished sitting. The deck and its questions are re-read
+     * from the database — only what the student did is taken from the
+     * snapshot, so a resumed paper can't disagree with their notes.
+     */
+    resume: async () => {
+      const snapshot = await readSnapshot();
+      if (!snapshot) return false;
+
+      try {
+        const [deck, questions, deckAnswers] = await Promise.all([
+          getDeckById(snapshot.deckId),
+          listQuestions(snapshot.deckId),
+          listAnswersForDeck(snapshot.deckId),
+        ]);
+        if (!deck || questions.length === 0) {
+          await clearSnapshot();
+          return false;
+        }
+
+        const saved = snapshot.state as Record<string, unknown>;
+        const items = saved.items as ExamItem[] | undefined;
+        if (!Array.isArray(items) || items.length === 0) {
+          await clearSnapshot();
+          return false;
+        }
+
+        set({
+          status: 'active',
+          deck,
+          questions,
+          deckAnswers,
+          available: availability(questions),
+          error: null,
+          ...FRESH,
+          ...saved,
+        } as Partial<ExamState> as ExamState);
+        return true;
+      } catch {
+        await clearSnapshot();
+        return false;
+      }
+    },
   };
 });

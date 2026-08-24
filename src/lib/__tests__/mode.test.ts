@@ -1,4 +1,4 @@
-import { buildOnePerQuestion, type ExamItem } from '../exam';
+import type { ExamItem } from '../exam';
 import type { AnswerRecord } from '../mastery';
 import {
   advanceQueue,
@@ -10,7 +10,6 @@ import {
   RETIRE_AT,
   startQueue,
   SURVIVAL_STRIKES,
-  weakestQuestions,
   type QueueEntry,
 } from '../mode';
 import type { Question, QuestionKind } from '../types';
@@ -56,7 +55,7 @@ describe('mode specs', () => {
   it('only lets a mode skip the format form when it picks its own questions', () => {
     for (const spec of Object.values(MODES)) {
       if (spec.autoBuild) {
-        expect(['weak_spots', 'survival']).toContain(spec.id);
+        expect(spec.id).toBe('survival');
       }
     }
   });
@@ -167,54 +166,5 @@ describe('survival', () => {
 
   it('asks for nothing from an empty deck rather than throwing', () => {
     expect(fullRequests([])).toEqual([]);
-  });
-});
-
-describe('weakest questions', () => {
-  const pool = ['a', 'b', 'c'].map((id) => ({ ...DEFINITION(), id }));
-
-  it('puts a question you keep missing ahead of one you have never tried', () => {
-    const answers = [
-      answered('a', false),
-      answered('a', false),
-      answered('c', true),
-      answered('c', true),
-      answered('c', true),
-      answered('c', true),
-    ];
-    expect(weakestQuestions(pool, answers, 3, NOW).map((q) => q.id)).toEqual(['a', 'b', 'c']);
-  });
-
-  it('puts an untried question ahead of one already known', () => {
-    const known = [answered('c', true), answered('c', true), answered('c', true), answered('c', true)];
-    const order = weakestQuestions([pool[1], pool[2]], known, 2, NOW).map((q) => q.id);
-    expect(order).toEqual(['b', 'c']);
-  });
-
-  it('honours the limit', () => {
-    expect(weakestQuestions(pool, [], 2, NOW)).toHaveLength(2);
-  });
-
-  it('still returns something on a deck that has never been sat', () => {
-    expect(weakestQuestions(pool, [], 15, NOW)).toHaveLength(3);
-  });
-
-  it('builds exactly one item per question it picks', () => {
-    const chosen = weakestQuestions(pool, [], 3, NOW);
-    const items = buildOnePerQuestion(chosen, 'seed');
-    expect(items).toHaveLength(3);
-    expect(new Set(items.map((i) => i.questionId)).size).toBe(3);
-  });
-
-  it('keeps the worst-first order it was given', () => {
-    const answers = [answered('c', false), answered('c', false)];
-    const chosen = weakestQuestions(pool, answers, 3, NOW);
-    const items = buildOnePerQuestion(chosen, 'seed');
-    expect(items[0].questionId).toBe('c');
-  });
-
-  it('prefers recall over recognition when a question supports both', () => {
-    const items = buildOnePerQuestion([DEFINITION()], 'seed');
-    expect(items[0].format).toBe('identification');
   });
 });

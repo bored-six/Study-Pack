@@ -365,6 +365,75 @@ export function availability(questions: Question[]): Record<ExamFormat, number> 
   return counts;
 }
 
+/** The order formats are shown in, and filled in — the familiar ones first. */
+export const FORMAT_ORDER: ExamFormat[] = [
+  'multiple_choice',
+  'true_false',
+  'modified_true_false',
+  'identification',
+  'fill_blank',
+  'matching',
+  'enumeration',
+];
+
+/** A count for every format, all zero. */
+export function emptyCounts(): Record<ExamFormat, number> {
+  return {
+    multiple_choice: 0,
+    true_false: 0,
+    modified_true_false: 0,
+    identification: 0,
+    fill_blank: 0,
+    matching: 0,
+    enumeration: 0,
+  };
+}
+
+export function totalOf(counts: Record<ExamFormat, number>): number {
+  return FORMAT_ORDER.reduce((sum, format) => sum + counts[format], 0);
+}
+
+/** The most questions the chosen formats can produce between them. */
+export function capacityFor(
+  picks: readonly ExamFormat[],
+  available: Record<ExamFormat, number>
+): number {
+  return picks.reduce((sum, format) => sum + (available[format] ?? 0), 0);
+}
+
+/**
+ * Splits a wanted total across the formats the student ticked.
+ *
+ * Even rather than proportional: asking for twenty questions of true/false
+ * and identification should give ten of each, however lopsided the notes
+ * happen to be. A format that runs out hands its share back to the others,
+ * and every ticked format takes one before any takes a second, so a type
+ * you asked for never quietly comes back empty.
+ */
+export function spreadCounts(
+  picks: readonly ExamFormat[],
+  target: number,
+  available: Record<ExamFormat, number>
+): Record<ExamFormat, number> {
+  const counts = emptyCounts();
+  let open = FORMAT_ORDER.filter((format) => picks.includes(format) && available[format] > 0);
+  const wanted = Number.isFinite(target) ? Math.max(0, Math.trunc(target)) : 0;
+  let left = Math.min(wanted, capacityFor(open, available));
+
+  while (left > 0 && open.length > 0) {
+    const share = Math.max(1, Math.floor(left / open.length));
+    const next: ExamFormat[] = [];
+    for (const format of open) {
+      const give = Math.min(share, available[format] - counts[format], left);
+      counts[format] += give;
+      left -= give;
+      if (counts[format] < available[format]) next.push(format);
+    }
+    open = next;
+  }
+  return counts;
+}
+
 /**
  * Builds the exam.
  *
@@ -471,63 +540,4 @@ export function buildExam(
   }
 
   return shuffleWith(items, rand);
-}
-
-/**
- * Preference when a mode wants exactly one item per question. Typed recall
- * beats recognition, so the formats that make you produce the answer come
- * first and multiple choice is the fallback.
- */
-const ONE_EACH_PREFERENCE: ExamFormat[] = [
-  'enumeration',
-  'fill_blank',
-  'identification',
-  'modified_true_false',
-  'multiple_choice',
-  'true_false',
-];
-
-/**
- * One item per question, in the most demanding format that question
- * supports. Order is preserved — a drill that hands you the worst question
- * first should not shuffle that away. Matching is skipped because one grid
- * consumes several questions at once.
- */
-export function buildOnePerQuestion(questions: Question[], seedText = 'drill'): ExamItem[] {
-  const rand = seed(seedText + questions.length);
-  const items: ExamItem[] = [];
-
-  for (const question of questions) {
-    const supported = supportedFormats(question);
-    for (const format of ONE_EACH_PREFERENCE) {
-      if (!supported.includes(format)) continue;
-
-      let item: ExamItem | null = null;
-      switch (format) {
-        case 'multiple_choice':
-          item = buildChoice(question, rand);
-          break;
-        case 'true_false':
-          item = buildTrueFalse(question, rand);
-          break;
-        case 'modified_true_false':
-          item = buildModifiedTrueFalse(question, rand);
-          break;
-        case 'identification':
-        case 'fill_blank':
-          item = buildTyped(question);
-          break;
-        case 'enumeration':
-          item = buildEnumeration(question);
-          break;
-      }
-
-      if (item) {
-        items.push(item);
-        break;
-      }
-    }
-  }
-
-  return items;
 }

@@ -104,7 +104,7 @@ export interface DebriefNote {
 }
 
 /** What the button under "do this next" should start. */
-export type NextAction = 'weak_spots' | 'format' | 'relaxed' | 'none';
+export type NextAction = 'format' | 'relaxed' | 'none';
 
 export interface NextStep {
   title: string;
@@ -141,6 +141,42 @@ export interface SittingResult {
   format: ExamFormat;
   correct: boolean;
   slip: SlipKind | null;
+  /** What was put down at the time, when the store kept it. */
+  draft?: DraftValue | null;
+}
+
+/** A question to go back over, with the answer that lost it. */
+export interface MissedQuestion {
+  item: ExamItem;
+  draft: DraftValue | null;
+}
+
+/**
+ * What to actually go back over.
+ *
+ * One row per question, judged on the first time it came up: mastery asks
+ * again until it is right, so a list built from the final answers would come
+ * back empty every time — which is precisely when it is least true.
+ *
+ * The answer comes off the result rather than the drafts, for the same
+ * reason: by the end of that sitting the draft has been overwritten by the
+ * answer that finally worked.
+ */
+export function missedQuestions(
+  items: readonly ExamItem[],
+  results: readonly SittingResult[]
+): MissedQuestion[] {
+  const byItem = new Map(items.map((item) => [item.id, item]));
+  const seen = new Set<string>();
+  const out: MissedQuestion[] = [];
+
+  for (const answer of results) {
+    const item = byItem.get(answer.itemId);
+    if (!item || seen.has(item.questionId)) continue;
+    seen.add(item.questionId);
+    if (!answer.correct) out.push({ item, draft: answer.draft ?? null });
+  }
+  return out;
 }
 
 export interface DebriefInput {
@@ -476,7 +512,7 @@ export function buildDebrief(input: DebriefInput): Debrief {
     wrong: [...wrong].sort((a, b) => b.weight - a.weight).slice(0, 1),
     strengths: strengths.slice(0, 1),
     weaknesses: weaknesses.slice(0, 1),
-    next: nextStep({ mode, pct, misses, against, slips, worst, formats: tallies.length }),
+    next: nextStep({ pct, misses, against, slips, worst, formats: tallies.length }),
   };
 }
 
@@ -538,7 +574,6 @@ function headlineFor(input: HeadlineInput): string {
 // --- the one thing to do next -------------------------------------------
 
 interface NextInput {
-  mode: ExamMode;
   pct: number;
   misses: number;
   against: Against;
@@ -553,27 +588,15 @@ interface NextInput {
  * nobody starts; the point is to make the next twenty minutes obvious.
  */
 function nextStep(input: NextInput): NextStep {
-  const { mode, pct, misses, against, slips, worst, formats } = input;
-
-  // Already drilled them and they still went wrong — another round of the
-  // same drill is exactly the wrong advice.
-  if (mode === 'weak_spots' && against.repeat > 0) {
-    return {
-      title: 'Take these back to the notes',
-      body: `Drilled and still wrong — read the ${plural(against.repeat, 'answer', 'answers')} above before another go.`,
-      action: 'none',
-      format: null,
-      actionLabel: null,
-    };
-  }
+  const { pct, misses, against, slips, worst, formats } = input;
 
   if (against.repeat >= 2) {
     return {
-      title: 'Drill the ones that keep coming back',
-      body: `${against.repeat} have caught you more than once. Weak spots pulls exactly those.`,
-      action: 'weak_spots',
+      title: 'Go again on the ones that keep coming back',
+      body: `${against.repeat} have caught you more than once. A new sitting leans on the shaky ones.`,
+      action: 'relaxed',
       format: null,
-      actionLabel: 'Drill weak spots',
+      actionLabel: 'Sit it again',
     };
   }
 
@@ -623,17 +646,17 @@ function nextStep(input: NextInput): NextStep {
     return {
       title: 'Win back the ones that faded',
       body: 'The cheapest marks on the paper.',
-      action: 'weak_spots',
+      action: 'relaxed',
       format: null,
-      actionLabel: 'Drill weak spots',
+      actionLabel: 'Sit it again',
     };
   }
 
   return {
     title: 'Go again on what you missed',
-    body: `${misses} to pick up, worst first.`,
-    action: 'weak_spots',
+    body: `${misses} to pick up, and the builder puts the shaky ones first.`,
+    action: 'relaxed',
     format: null,
-    actionLabel: 'Drill weak spots',
+    actionLabel: 'Sit it again',
   };
 }
