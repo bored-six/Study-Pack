@@ -10,6 +10,10 @@ import { SURVIVAL_STRIKES } from '@/lib/mode';
 import type { Deck, Question, QuestionKind } from '@/lib/types';
 import { useExamStore } from '@/store/exam';
 
+// The settings table stands in as a plain map, so what a sitting remembers
+// can be read back the way the next sitting would read it.
+const mockSettings = new Map<string, string>();
+
 // Hoisted above the imports by babel, so the store never touches SQLite.
 jest.mock('@/lib/db', () => ({
   getDeckById: jest.fn(),
@@ -17,6 +21,10 @@ jest.mock('@/lib/db', () => ({
   listAnswersForDeck: jest.fn(),
   saveAttempt: jest.fn(async () => 77),
   saveAnswers: jest.fn(async () => undefined),
+  readSetting: async (key: string) => mockSettings.get(key) ?? null,
+  writeSetting: async (key: string, value: string) => {
+    mockSettings.set(key, value);
+  },
 }));
 
 
@@ -69,6 +77,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mocked.saveAttempt.mockResolvedValue(77);
   useExamStore.getState().reset();
+  mockSettings.clear();
 });
 
 describe('loading', () => {
@@ -374,5 +383,148 @@ describe('leaving and coming back', () => {
     expect(state.drafts).toEqual({});
     expect(state.flagged).toEqual([]);
     expect(state.mode).toBe('relaxed');
+  });
+});
+
+describe('picking a paper', () => {
+  /** Enough of everything that nothing here is clamped by a thin deck. */
+  const BIG = Array.from({ length: 30 }, (_, i) => definition(i + 1));
+
+  async function openWith(questions: Question[]) {
+    mocked.getDeckById.mockResolvedValue(DECK);
+    mocked.listQuestions.mockResolvedValue(questions);
+    mocked.listAnswersForDeck.mockResolvedValue([]);
+    await useExamStore.getState().load(DECK.id);
+    return useExamStore.getState();
+  }
+
+  it('opens a new subject on a short multiple-choice paper', async () => {
+    const state = await openWith(BIG);
+    expect(state.picks).toEqual(['multiple_choice']);
+    expect(state.total()).toBe(10);
+    expect(state.lastMode).toBeNull();
+  });
+
+  it('swaps one type for another without making you zero the old one', async () => {
+    await openWith(BIG);
+    useExamStore.getState().toggleFormat('true_false');
+    useExamStore.getState().toggleFormat('multiple_choice');
+
+    const state = useExamStore.getState();
+    expect(state.counts.multiple_choice).toBe(0);
+    expect(state.counts.true_false).toBe(10);
+    // Two taps, and the paper is the length it always was.
+    expect(state.total()).toBe(10);
+  });
+
+  it('splits the same total when a second type is ticked', async () => {
+    await openWith(BIG);
+    useExamStore.getState().toggleFormat('true_false');
+
+    const state = useExamStore.getState();
+    expect(state.counts.multiple_choice).toBe(5);
+    expect(state.counts.true_false).toBe(5);
+    expect(state.total()).toBe(10);
+  });
+
+  it('takes one number for the whole paper', async () => {
+    await openWith(BIG);
+    useExamStore.getState().toggleFormat('identification');
+    useExamStore.getState().setTarget(20);
+
+    const state = useExamStore.getState();
+    expect(state.total()).toBe(20);
+    expect(state.counts.multiple_choice).toBe(10);
+    expect(state.counts.identification).toBe(10);
+  });
+
+  it('ignores a type the notes cannot fill', async () => {
+    const state = await openWith(BIG);
+    expect(state.available.matching).toBeGreaterThan(0);
+    const thin = await openWith([definition(1), definition(2)]);
+    expect(thin.available.matching).toBe(0);
+
+    useExamStore.getState().toggleFormat('matching');
+    expect(useExamStore.getState().picks).not.toContain('matching');
+  });
+
+  it('hands the whole paper to one format for a drill', async () => {
+    await openWith(BIG);
+    useExamStore.getState().setOnly('true_false', 12);
+
+    const state = useExamStore.getState();
+    expect(state.picks).toEqual(['true_false']);
+    expect(state.counts.true_false).toBe(12);
+    expect(state.total()).toBe(12);
+  });
+
+  it('lets exact amounts override the even split', async () => {
+    await openWith(BIG);
+    useExamStore.getState().setCount('true_false', 3);
+    useExamStore.getState().setCount('multiple_choice', 7);
+
+    const state = useExamStore.getState();
+    expect(state.custom).toBe(true);
+    expect(state.picks).toEqual(['multiple_choice', 'true_false']);
+    expect(state.total()).toBe(10);
+  });
+
+  it('keeps a hand-set paper the length it is when another type is ticked', async () => {
+    await openWith(BIG);
+    useExamStore.getState().setCount('multiple_choice', 9);
+    useExamStore.getState().toggleFormat('identification');
+
+    const state = useExamStore.getState();
+    expect(state.custom).toBe(false);
+    expect(state.total()).toBe(9);
+  });
+});
+
+describe('remembering the paper', () => {
+  const BIG = Array.from({ length: 30 }, (_, i) => definition(i + 1));
+
+  async function openWith(questions: Question[]) {
+    mocked.getDeckById.mockResolvedValue(DECK);
+    mocked.listQuestions.mockResolvedValue(questions);
+    mocked.listAnswersForDeck.mockResolvedValue([]);
+    await useExamStore.getState().load(DECK.id);
+    return useExamStore.getState();
+  }
+
+  it('opens the next sitting on what was sat last time', async () => {
+    await openWith(BIG);
+    useExamStore.getState().setMode('rapid');
+    useExamStore.getState().toggleFormat('multiple_choice');
+    useExamStore.getState().toggleFormat('true_false');
+    useExamStore.getState().setTarget(20);
+    useExamStore.getState().start();
+
+    const again = await openWith(BIG);
+    expect(again.picks).toEqual(['true_false']);
+    expect(again.total()).toBe(20);
+    expect(again.lastMode).toBe('rapid');
+  });
+
+  it('trims a remembered paper to what the notes can still produce', async () => {
+    await openWith(BIG);
+    useExamStore.getState().setTarget(25);
+    useExamStore.getState().start();
+
+    const thin = await openWith([1, 2, 3, 4].map(definition));
+    expect(thin.picks).toEqual(['multiple_choice']);
+    expect(thin.total()).toBe(thin.available.multiple_choice);
+  });
+
+  it('remembers each subject separately', async () => {
+    await openWith(BIG);
+    useExamStore.getState().toggleFormat('multiple_choice');
+    useExamStore.getState().toggleFormat('identification');
+    useExamStore.getState().start();
+
+    mocked.getDeckById.mockResolvedValue({ ...DECK, id: 'note:2' });
+    mocked.listQuestions.mockResolvedValue(BIG);
+    mocked.listAnswersForDeck.mockResolvedValue([]);
+    await useExamStore.getState().load('note:2');
+    expect(useExamStore.getState().picks).toEqual(['multiple_choice']);
   });
 });

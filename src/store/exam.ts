@@ -13,6 +13,11 @@ import { gradeDraft, hasAnswer, type DraftValue } from '@/lib/draft';
 import {
   availability,
   buildExam,
+  capacityFor,
+  emptyCounts,
+  FORMAT_ORDER,
+  spreadCounts,
+  totalOf,
   type ExamFormat,
   type ExamItem,
   type ExamRequest,
@@ -30,6 +35,13 @@ import {
   type QueueEntry,
 } from '@/lib/mode';
 import { clearSnapshot, readSnapshot, saveSnapshot } from '@/lib/resume';
+import {
+  firstSetup,
+  FIRST_TARGET,
+  readSavedSetup,
+  saveSetup,
+  trimSetup,
+} from '@/lib/setup';
 import type { Deck, Question } from '@/lib/types';
 
 export type ExamStatus = 'idle' | 'loading' | 'setup' | 'active' | 'finished' | 'error';
@@ -55,9 +67,17 @@ interface ExamState {
   /** This deck's answer history, for the modes that pick their own questions. */
   deckAnswers: AnswerRecord[];
   available: Record<ExamFormat, number>;
-  /** How many of each format the student asked for. */
+  /** How many of each format the paper will hold. */
   counts: Record<ExamFormat, number>;
+  /** The formats the student ticked. */
+  picks: ExamFormat[];
+  /** How many questions they asked for altogether, before the notes get a say. */
+  target: number;
+  /** True once the per-format amounts were typed by hand; `counts` then rules. */
+  custom: boolean;
   mode: ExamMode;
+  /** The mode this subject was last sat in, so the picker can point at it. */
+  lastMode: ExamMode | null;
 
   items: ExamItem[];
   /** Pointer for the modes that walk the paper in order. */
@@ -92,6 +112,15 @@ interface ExamState {
 
   load: (deckId: string) => Promise<void>;
   setMode: (mode: ExamMode) => void;
+  /** Ticks or unticks a format, re-spreading the same total over what's left. */
+  toggleFormat: (format: ExamFormat) => void;
+  /** Asks for this many questions, spread across the ticked formats. */
+  setTarget: (total: number) => void;
+  /** Throws the whole paper at one format — how a results drill arrives. */
+  setOnly: (format: ExamFormat, count: number) => void;
+  /** The most questions the ticked formats can produce between them. */
+  capacity: () => number;
+  /** Sets one format's amount exactly, which is what `custom` means. */
   setCount: (format: ExamFormat, count: number) => void;
   total: () => number;
   start: () => void;
@@ -109,16 +138,6 @@ interface ExamState {
   reset: () => void;
 }
 
-const ZERO: Record<ExamFormat, number> = {
-  multiple_choice: 0,
-  true_false: 0,
-  modified_true_false: 0,
-  identification: 0,
-  fill_blank: 0,
-  matching: 0,
-  enumeration: 0,
-};
-
 /**
  * One survival round. Rounds after the first carry a suffix so a repeated
  * item is still its own question as far as results and drafts are concerned.
@@ -134,9 +153,10 @@ function survivalRound(
 }
 
 function requestsFrom(counts: Record<ExamFormat, number>): ExamRequest[] {
-  return (Object.keys(counts) as ExamFormat[])
-    .filter((format) => counts[format] > 0)
-    .map((format) => ({ format, count: counts[format] }));
+  return FORMAT_ORDER.filter((format) => counts[format] > 0).map((format) => ({
+    format,
+    count: counts[format],
+  }));
 }
 
 const FRESH = {
@@ -212,9 +232,13 @@ export const useExamStore = create<ExamState>((set, get) => {
     deck: null,
     questions: [],
     deckAnswers: [],
-    available: { ...ZERO },
-    counts: { ...ZERO },
+    available: emptyCounts(),
+    counts: emptyCounts(),
+    picks: [],
+    target: FIRST_TARGET,
+    custom: false,
     mode: DEFAULT_MODE,
+    lastMode: null,
     ...FRESH,
     startedAt: 0,
     durationMs: 0,
@@ -223,26 +247,32 @@ export const useExamStore = create<ExamState>((set, get) => {
     load: async (deckId) => {
       set({ status: 'loading', error: null, ...FRESH });
       try {
-        const [deck, questions, deckAnswers] = await Promise.all([
+        const [deck, questions, deckAnswers, saved] = await Promise.all([
           getDeckById(deckId),
           listQuestions(deckId),
           listAnswersForDeck(deckId),
+          readSavedSetup(deckId),
         ]);
         if (!deck || questions.length === 0) {
           set({ status: 'error', error: 'This subject has no questions yet.' });
           return;
         }
         const available = availability(questions);
-        // Open on a sensible default: everything as multiple choice.
-        const counts = { ...ZERO, multiple_choice: Math.min(10, available.multiple_choice) };
+        // Open on the paper they sat last time, as far as the notes still allow.
+        const remembered = trimSetup(saved, available);
+        const setup = remembered ?? firstSetup(available);
         set({
           status: 'setup',
           deck,
           questions,
           deckAnswers,
           available,
-          counts,
-          mode: DEFAULT_MODE,
+          counts: setup.counts,
+          picks: setup.picks,
+          target: setup.target,
+          custom: setup.custom,
+          mode: setup.mode,
+          lastMode: remembered?.mode ?? null,
         });
       } catch (e) {
         set({
@@ -254,16 +284,60 @@ export const useExamStore = create<ExamState>((set, get) => {
 
     setMode: (mode) => set({ mode }),
 
-    setCount: (format, count) => {
-      const { available } = get();
-      const clamped = Math.max(0, Math.min(count, available[format]));
-      set((s) => ({ counts: { ...s.counts, [format]: clamped } }));
+    toggleFormat: (format) => {
+      const { available, picks, target, custom, counts } = get();
+      if (available[format] === 0) return;
+      const next = picks.includes(format)
+        ? picks.filter((pick) => pick !== format)
+        : FORMAT_ORDER.filter((pick) => pick === format || picks.includes(pick));
+      // The number on screen carries over, hand-set or not: ticking a type
+      // changes what you're asked, not how long you're sat there. The floor
+      // keeps every ticked type worth at least one question.
+      const wanted = Math.max(next.length, custom ? totalOf(counts) : target);
+      set({
+        picks: next,
+        target: wanted,
+        custom: false,
+        counts: spreadCounts(next, wanted, available),
+      });
     },
 
-    total: () => Object.values(get().counts).reduce((sum, n) => sum + n, 0),
+    setTarget: (wanted) => {
+      const { available, picks } = get();
+      const target = Math.max(picks.length, Math.trunc(wanted) || 0);
+      set({ target, custom: false, counts: spreadCounts(picks, target, available) });
+    },
+
+    setOnly: (format, count) => {
+      const { available } = get();
+      const counts = emptyCounts();
+      counts[format] = Math.max(0, Math.min(count, available[format]));
+      set({
+        counts,
+        picks: counts[format] > 0 ? [format] : [],
+        target: counts[format],
+        custom: false,
+      });
+    },
+
+    capacity: () => capacityFor(get().picks, get().available),
+
+    setCount: (format, count) => {
+      const { available, counts } = get();
+      const clamped = Math.max(0, Math.min(count, available[format]));
+      const next = { ...counts, [format]: clamped };
+      set({
+        counts: next,
+        custom: true,
+        picks: FORMAT_ORDER.filter((pick) => next[pick] > 0),
+        target: totalOf(next),
+      });
+    },
+
+    total: () => totalOf(get().counts),
 
     start: () => {
-      const { questions, counts, deck, mode, deckAnswers } = get();
+      const { questions, counts, deck, mode, deckAnswers, picks, target, custom } = get();
       const spec = MODES[mode];
       const seedText = `${deck?.id ?? 'exam'}:${mode}:${Date.now()}`;
 
@@ -280,6 +354,9 @@ export const useExamStore = create<ExamState>((set, get) => {
         set({ status: 'error', error: 'Could not build an exam from those choices.' });
         return;
       }
+
+      // Remembered so the next sitting on this subject opens on this paper.
+      if (deck) void saveSetup(deck.id, { mode, picks, target, custom, counts });
 
       const startedAt = Date.now();
       set({
@@ -445,7 +522,13 @@ export const useExamStore = create<ExamState>((set, get) => {
         deck: null,
         questions: [],
         deckAnswers: [],
+        available: emptyCounts(),
+        counts: emptyCounts(),
+        picks: [],
+        target: FIRST_TARGET,
+        custom: false,
         mode: DEFAULT_MODE,
+        lastMode: null,
         error: null,
         ...FRESH,
       });
