@@ -245,7 +245,8 @@ function TrueFalse({ item, draft, setDraft, reveal, onDone }: Field<TrueFalseIte
           return (
             <Animated.View
               key={String(value)}
-              entering={FadeInDown.springify().damping(15).delay(value ? 100 : 200)}>
+              entering={FadeInDown.springify().damping(15).delay(value ? 100 : 200)}
+              style={styles.tfSlot}>
             <Pressable
               disabled={revealed}
               onPress={() => {
@@ -896,9 +897,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 6,
   },
-  tfCard: {
+  tfSlot: {
     flex: 1,
     maxWidth: 150,
+  },
+  tfCard: {
+    width: '100%',
     minHeight: 110,
     alignItems: 'center',
     justifyContent: 'center',
