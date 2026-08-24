@@ -1,7 +1,8 @@
 import { capacityFor, emptyCounts, spreadCounts, totalOf, type ExamFormat } from '../exam';
 import {
-  FIRST_TARGET,
+  DEFAULT_PER_TYPE,
   firstSetup,
+  picksIn,
   readSavedSetup,
   saveSetup,
   trimSetup,
@@ -80,31 +81,33 @@ describe('spreading a total across the ticked types', () => {
 describe('a first sitting', () => {
   it('opens on a short multiple-choice paper', () => {
     const setup = firstSetup(WIDE);
-    expect(setup.picks).toEqual(['multiple_choice']);
-    expect(totalOf(setup.counts)).toBe(FIRST_TARGET);
+    expect(picksIn(setup.counts)).toEqual(['multiple_choice']);
+    expect(totalOf(setup.counts)).toBe(DEFAULT_PER_TYPE);
   });
 
   it('falls to whatever the notes can do when multiple choice is impossible', () => {
     const setup = firstSetup(room({ enumeration: 6 }));
-    expect(setup.picks).toEqual(['enumeration']);
+    expect(picksIn(setup.counts)).toEqual(['enumeration']);
     expect(totalOf(setup.counts)).toBe(6);
+  });
+
+  it('has nothing to offer a subject with no questions at all', () => {
+    expect(totalOf(firstSetup(emptyCounts()).counts)).toBe(0);
   });
 });
 
 describe('the remembered paper', () => {
   const SAVED: ExamSetup = {
     mode: 'rapid',
-    picks: ['true_false', 'identification'],
-    target: 24,
-    custom: false,
-    counts: spreadCounts(['true_false', 'identification'], 24, WIDE),
+    counts: { ...emptyCounts(), true_false: 14, identification: 3 },
   };
 
-  it('comes back as it was left', () => {
+  it('comes back with every amount exactly as it was left', () => {
     const setup = trimSetup(SAVED, WIDE);
     expect(setup?.mode).toBe('rapid');
-    expect(setup?.picks).toEqual(['true_false', 'identification']);
-    expect(totalOf(setup!.counts)).toBe(24);
+    expect(setup?.counts.true_false).toBe(14);
+    expect(setup?.counts.identification).toBe(3);
+    expect(totalOf(setup!.counts)).toBe(17);
   });
 
   it('survives a round trip through the settings table', async () => {
@@ -113,50 +116,33 @@ describe('the remembered paper', () => {
     expect(await readSavedSetup('note:2')).toBeNull();
   });
 
-  it('drops a type the notes no longer support and re-spreads the total', () => {
+  it('drops a type the notes no longer support, and keeps the rest', () => {
     const setup = trimSetup(SAVED, room({ true_false: 40 }));
-    expect(setup?.picks).toEqual(['true_false']);
-    // The paper stays the length it was; only what fills it changed.
-    expect(totalOf(setup!.counts)).toBe(24);
+    expect(picksIn(setup!.counts)).toEqual(['true_false']);
+    expect(setup?.counts.true_false).toBe(14);
+  });
+
+  it('clamps an amount the notes can no longer reach', () => {
+    const setup = trimSetup(SAVED, room({ true_false: 5, identification: 30 }));
+    expect(setup?.counts.true_false).toBe(5);
+    expect(setup?.counts.identification).toBe(3);
   });
 
   it('gives up when nothing it remembers can be built any more', () => {
     expect(trimSetup(SAVED, room({ multiple_choice: 40 }))).toBeNull();
   });
 
-  it('keeps hand-set amounts exactly, clamped to what is there', () => {
-    const byHand: ExamSetup = {
-      mode: 'relaxed',
-      picks: ['multiple_choice', 'matching'],
-      target: 22,
-      custom: true,
-      counts: { ...emptyCounts(), multiple_choice: 20, matching: 2 },
-    };
-    const setup = trimSetup(byHand, room({ multiple_choice: 8, matching: 4 }));
-    expect(setup?.custom).toBe(true);
-    expect(setup?.counts.multiple_choice).toBe(8);
-    expect(setup?.counts.matching).toBe(2);
-    expect(setup?.target).toBe(10);
-  });
-
   it('refuses junk rather than opening on an unusable paper', () => {
     expect(trimSetup(null, WIDE)).toBeNull();
     expect(trimSetup('not an object', WIDE)).toBeNull();
-    expect(trimSetup({ picks: ['nonsense'], target: 10 }, WIDE)).toBeNull();
-    expect(trimSetup({ picks: ['matching'], custom: true, counts: {} }, WIDE)).toBeNull();
+    expect(trimSetup({ counts: { multiple_choice: 'ten' } }, WIDE)).toBeNull();
+    expect(trimSetup({ counts: { nonsense: 10 } }, WIDE)).toBeNull();
+    expect(trimSetup({ counts: { multiple_choice: -4 } }, WIDE)).toBeNull();
   });
 
-  it('falls back to a sensible mode and length when those are missing', () => {
-    const setup = trimSetup({ picks: ['true_false'] }, WIDE);
+  it('falls back to a sensible mode when the saved one is gone', () => {
+    const setup = trimSetup({ counts: { true_false: 8 } }, WIDE);
     expect(setup?.mode).toBe('relaxed');
-    expect(totalOf(setup!.counts)).toBe(FIRST_TARGET);
-  });
-
-  it('never comes back with a ticked type worth no questions', () => {
-    const setup = trimSetup(
-      { picks: ['multiple_choice', 'true_false', 'identification'], target: 1 },
-      WIDE
-    );
-    for (const format of setup!.picks) expect(setup!.counts[format]).toBeGreaterThan(0);
+    expect(setup?.counts.true_false).toBe(8);
   });
 });

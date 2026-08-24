@@ -76,9 +76,26 @@ function press(tree: ReactTestRenderer, label: string) {
   act(() => pressable!.props.onPress());
 }
 
+/** The − and + repeat once per ticked type, so reach them by what they say. */
+function pressLabelled(tree: ReactTestRenderer, accessibilityLabel: string) {
+  const node = tree.root.find(
+    (n) => typeof n.props?.onPress === 'function' && n.props.accessibilityLabel === accessibilityLabel
+  );
+  act(() => node.props.onPress());
+}
+
+/** Types straight into one type's amount field, the way a thumb would. */
+function type(tree: ReactTestRenderer, accessibilityLabel: string, value: string) {
+  const field = tree.root.find(
+    (n) => n.props?.accessibilityLabel === accessibilityLabel && 'onChangeText' in (n.props ?? {})
+  );
+  act(() => field.props.onChangeText(value));
+  act(() => field.props.onSubmitEditing());
+}
+
 beforeEach(() => {
   mockSettings.clear();
-  useExamStore.getState().reset();
+  act(() => useExamStore.getState().reset());
   db.getDeckById.mockResolvedValue(DECK);
   db.listQuestions.mockResolvedValue(QUESTIONS);
   db.listAnswersForDeck.mockResolvedValue([]);
@@ -99,16 +116,18 @@ describe('the exam setup screen', () => {
     expect(texts(tree)).toContain('Take your time');
   });
 
-  it('shows the type chips and a paper length after a mode is chosen', async () => {
+  it('shows the type chips, and an amount for what is ticked', async () => {
     const tree = await open();
     press(tree, 'Take your time');
 
     const shown = texts(tree);
     expect(shown).toContain('WHICH TYPES?');
-    expect(shown).toContain('HOW MANY?');
+    expect(shown).toContain('HOW MANY OF EACH?');
     expect(shown).toContain('Multiple choice');
     expect(shown).toContain('True or False');
     expect(shown).toContain('10 questions · about 5 min');
+    // One row, because one type is ticked.
+    expect(shown.filter((text) => text === 'Max 30')).toHaveLength(1);
   });
 
   it('swaps to a true/false paper in two taps', async () => {
@@ -123,32 +142,60 @@ describe('the exam setup screen', () => {
     expect(texts(tree)).toContain('10 questions · about 5 min');
   });
 
-  it('changes the whole paper with one number', async () => {
+  it('sets each ticked type to its own amount', async () => {
     const tree = await open();
     press(tree, 'Take your time');
-    press(tree, '20');
-    expect(useExamStore.getState().total()).toBe(20);
-    expect(texts(tree)).toContain('20 questions · about 10 min');
+    press(tree, 'True or False');
+    type(tree, 'How many Multiple choice', '10');
+    type(tree, 'How many True or False', '3');
+
+    const state = useExamStore.getState();
+    expect(state.counts.multiple_choice).toBe(10);
+    expect(state.counts.true_false).toBe(3);
+    expect(texts(tree)).toContain('13 questions · about 7 min');
   });
 
-  it('steps the length in fives and stops at what the notes hold', async () => {
+  it('does not touch one type when another is added', async () => {
     const tree = await open();
     press(tree, 'Take your time');
-    press(tree, '+');
-    expect(useExamStore.getState().total()).toBe(15);
-    press(tree, '−');
-    expect(useExamStore.getState().total()).toBe(10);
-    press(tree, 'All 30');
-    expect(useExamStore.getState().total()).toBe(30);
+    type(tree, 'How many Multiple choice', '25');
+    press(tree, 'True or False');
+    expect(useExamStore.getState().counts.multiple_choice).toBe(25);
+    expect(texts(tree)).toContain('35 questions · about 18 min');
   });
 
-  it('offers the exact amounts, and comes back', async () => {
+  it('nudges one type without disturbing the other', async () => {
     const tree = await open();
     press(tree, 'Take your time');
-    press(tree, 'Set exact amounts per type ›');
-    expect(texts(tree)).toContain('Pick the one correct answer from the four choices.');
-    press(tree, '‹ Back to quick pick');
-    expect(texts(tree)).toContain('WHICH TYPES?');
+    press(tree, 'Identification');
+    pressLabelled(tree, 'More Identification');
+    pressLabelled(tree, 'More Identification');
+    pressLabelled(tree, 'Fewer Multiple choice');
+
+    const state = useExamStore.getState();
+    expect(state.counts.identification).toBe(12);
+    expect(state.counts.multiple_choice).toBe(9);
+  });
+
+  it('fills a type to the brim from its Max', async () => {
+    const tree = await open();
+    press(tree, 'Take your time');
+    press(tree, 'Max 30');
+    expect(useExamStore.getState().counts.multiple_choice).toBe(30);
+  });
+
+  it('offers to even the types out, once there is more than one', async () => {
+    const tree = await open();
+    press(tree, 'Take your time');
+    expect(texts(tree)).not.toContain('Even them out');
+
+    press(tree, 'True or False');
+    type(tree, 'How many Multiple choice', '18');
+    press(tree, 'Even them out');
+
+    const state = useExamStore.getState();
+    expect(state.counts.multiple_choice).toBe(14);
+    expect(state.counts.true_false).toBe(14);
   });
 
   it('reopens on the paper the last sitting started', async () => {
@@ -156,7 +203,7 @@ describe('the exam setup screen', () => {
     press(first, 'Beat the clock');
     press(first, 'True or False');
     press(first, 'Multiple choice');
-    press(first, '20');
+    type(first, 'How many True or False', '20');
     press(first, 'Start exam');
 
     act(() => useExamStore.getState().reset());

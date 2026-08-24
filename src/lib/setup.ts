@@ -12,24 +12,24 @@
  */
 
 import { readSetting, writeSetting } from './db';
-import { emptyCounts, FORMAT_ORDER, spreadCounts, totalOf, type ExamFormat } from './exam';
+import { emptyCounts, FORMAT_ORDER, totalOf, type ExamFormat } from './exam';
 import { DEFAULT_MODE, MODES, type ExamMode } from './mode';
 
 export interface ExamSetup {
   mode: ExamMode;
-  /** The formats the student ticked. */
-  picks: ExamFormat[];
-  /** How many questions they asked for altogether. */
-  target: number;
-  /** True when the per-format amounts were typed by hand; `counts` then rules. */
-  custom: boolean;
+  /** How many of each format. A format at zero is one the student left off. */
   counts: Record<ExamFormat, number>;
 }
 
-/** How long a first sitting on a subject is, before anyone has an opinion. */
-export const FIRST_TARGET = 10;
+/** What a format is worth when it's first ticked, or on a first sitting. */
+export const DEFAULT_PER_TYPE = 10;
 
 const key = (deckId: string) => `exam_setup:${deckId}`;
+
+/** The formats with questions in them, in the order they're shown. */
+export function picksIn(counts: Record<ExamFormat, number>): ExamFormat[] {
+  return FORMAT_ORDER.filter((format) => counts[format] > 0);
+}
 
 /** A subject nobody has sat yet: a short multiple-choice paper. */
 export function firstSetup(available: Record<ExamFormat, number>): ExamSetup {
@@ -37,14 +37,9 @@ export function firstSetup(available: Record<ExamFormat, number>): ExamSetup {
     available.multiple_choice > 0
       ? 'multiple_choice'
       : FORMAT_ORDER.find((format) => available[format] > 0);
-  const picks = opener ? [opener] : [];
-  return {
-    mode: DEFAULT_MODE,
-    picks,
-    target: FIRST_TARGET,
-    custom: false,
-    counts: spreadCounts(picks, FIRST_TARGET, available),
-  };
+  const counts = emptyCounts();
+  if (opener) counts[opener] = Math.min(DEFAULT_PER_TYPE, available[opener]);
+  return { mode: DEFAULT_MODE, counts };
 }
 
 function whole(value: unknown): number {
@@ -65,32 +60,13 @@ export function trimSetup(
   if (!saved || typeof saved !== 'object') return null;
   const raw = saved as Partial<ExamSetup>;
 
-  const mode: ExamMode = raw.mode && MODES[raw.mode] ? raw.mode : DEFAULT_MODE;
-  const picks = FORMAT_ORDER.filter(
-    (format) => raw.picks?.includes(format) && available[format] > 0
-  );
-  if (picks.length === 0) return null;
-
-  if (raw.custom) {
-    const counts = emptyCounts();
-    for (const format of picks) {
-      counts[format] = Math.min(whole(raw.counts?.[format]), available[format]);
-    }
-    const target = totalOf(counts);
-    if (target === 0) return null;
-    return {
-      mode,
-      picks: FORMAT_ORDER.filter((format) => counts[format] > 0),
-      target,
-      custom: true,
-      counts,
-    };
+  const counts = emptyCounts();
+  for (const format of FORMAT_ORDER) {
+    counts[format] = Math.min(whole(raw.counts?.[format]), available[format]);
   }
+  if (totalOf(counts) === 0) return null;
 
-  // Never fewer than one question per ticked format, however small the
-  // remembered total was against however many types it was spread over.
-  const target = Math.max(picks.length, whole(raw.target) || FIRST_TARGET);
-  return { mode, picks, target, custom: false, counts: spreadCounts(picks, target, available) };
+  return { mode: raw.mode && MODES[raw.mode] ? raw.mode : DEFAULT_MODE, counts };
 }
 
 /** The raw remembered setup, or null. Trimming is the caller's job. */

@@ -21,11 +21,8 @@ import { colors, derpRadius, font, outline, radius, shadow } from '@/theme/token
 /** A drill sent here by the results note asks for this many of one format. */
 const DRILL_COUNT = 12;
 
-/** Paper lengths offered outright, so the common ones are a single tap. */
-const QUICK_TOTALS = [10, 20, 30];
-
-/** The − and + move in fives; anything finer is what the number field is for. */
-const STEP = 5;
+/** The − and + nudge by one; the field itself is there for a real jump. */
+const STEP = 1;
 
 /** One question type, as a sticker you tick. */
 function FormatChip({
@@ -67,94 +64,8 @@ function FormatChip({
   );
 }
 
-/** How long the paper is: one number for the whole thing. */
-function AmountCard({
-  picked,
-  room,
-  floor,
-  onSet,
-}: {
-  picked: number;
-  room: number;
-  /** Never below one question per ticked type. */
-  floor: number;
-  onSet: (total: number) => void;
-}) {
-  // Stepping snaps to the fives, so a paper nudged off them tidies itself up
-  // rather than carrying the odd number around forever.
-  const step = (up: boolean) =>
-    onSet(
-      up
-        ? Math.floor(picked / STEP) * STEP + STEP
-        : Math.max(floor, Math.ceil(picked / STEP) * STEP - STEP)
-    );
-
-  return (
-    <View style={styles.amount}>
-      <View style={styles.amountRow}>
-        <Pressable
-          onPress={() => step(false)}
-          disabled={picked <= floor}
-          hitSlop={8}
-          accessibilityLabel="Fewer questions"
-          style={({ pressed }) => [
-            styles.stepBtn,
-            picked <= floor && styles.stepBtnOff,
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[styles.stepGlyph, picked <= floor && styles.stepGlyphOff]}>−</Text>
-        </Pressable>
-
-        <View style={styles.amountMiddle}>
-          <Text style={styles.amountNumber}>{picked}</Text>
-          <Text style={styles.amountUnit}>question{picked === 1 ? '' : 's'}</Text>
-        </View>
-
-        <Pressable
-          onPress={() => step(true)}
-          disabled={picked >= room}
-          hitSlop={8}
-          accessibilityLabel="More questions"
-          style={({ pressed }) => [
-            styles.stepBtn,
-            picked >= room && styles.stepBtnOff,
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[styles.stepGlyph, picked >= room && styles.stepGlyphOff]}>+</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.quickRow}>
-        {QUICK_TOTALS.filter((n) => n > floor && n < room).map((n) => (
-          <Pressable
-            key={n}
-            onPress={() => onSet(n)}
-            style={({ pressed }) => [
-              styles.quick,
-              picked === n && styles.quickOn,
-              pressed && styles.pressed,
-            ]}>
-            <Text style={[styles.quickText, picked === n && styles.quickTextOn]}>{n}</Text>
-          </Pressable>
-        ))}
-        <Pressable
-          onPress={() => onSet(room)}
-          style={({ pressed }) => [
-            styles.quick,
-            picked === room && styles.quickOn,
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[styles.quickText, picked === room && styles.quickTextOn]}>
-            All {room}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-/** One format's exact amount — the way in for anyone who wants the say. */
-function FormatRow({
+/** How many of one ticked format, set exactly. */
+function AmountRow({
   format,
   count,
   max,
@@ -165,10 +76,9 @@ function FormatRow({
   max: number;
   onChange: (next: number) => void;
 }) {
-  const disabled = max === 0;
   const [draft, setDraft] = useState(String(count));
 
-  // Keep the field in step when Max or another control changes the number.
+  // Keep the field in step when − + or Max changes the number underneath it.
   useEffect(() => {
     setDraft(String(count));
   }, [count]);
@@ -179,39 +89,58 @@ function FormatRow({
   };
 
   return (
-    <View style={[styles.row, disabled && styles.rowOff]}>
+    <View style={styles.amountRow}>
       <View style={styles.rowText}>
-        <Text style={[styles.rowTitle, disabled && styles.rowTitleOff]}>
-          {FORMAT_LABEL[format]}
+        <Text style={styles.rowTitle}>{FORMAT_LABEL[format]}</Text>
+        <Text style={styles.rowHow} numberOfLines={2}>
+          {FORMAT_HOWTO[format]}
         </Text>
-        <Text style={styles.rowHow}>
-          {disabled ? 'Not possible with these notes' : FORMAT_HOWTO[format]}
-        </Text>
+        <Pressable
+          onPress={() => onChange(max)}
+          hitSlop={6}
+          style={({ pressed }) => [styles.maxBtn, pressed && styles.pressed]}>
+          <Text style={styles.maxText}>Max {max}</Text>
+        </Pressable>
       </View>
 
-      {disabled ? (
-        <Text style={styles.none}>—</Text>
-      ) : (
-        <View style={styles.control}>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            onBlur={commit}
-            onSubmitEditing={commit}
-            keyboardType="number-pad"
-            returnKeyType="done"
-            selectTextOnFocus
-            maxLength={3}
-            style={[styles.countInput, count > 0 && styles.countInputOn]}
-          />
-          <Pressable
-            onPress={() => onChange(max)}
-            hitSlop={6}
-            style={({ pressed }) => [styles.maxBtn, pressed && styles.pressed]}>
-            <Text style={styles.maxText}>Max {max}</Text>
-          </Pressable>
-        </View>
-      )}
+      <Pressable
+        onPress={() => onChange(count - STEP)}
+        disabled={count <= 1}
+        hitSlop={6}
+        accessibilityLabel={`Fewer ${FORMAT_LABEL[format]}`}
+        style={({ pressed }) => [
+          styles.stepBtn,
+          count <= 1 && styles.stepBtnOff,
+          pressed && styles.pressed,
+        ]}>
+        <Text style={[styles.stepGlyph, count <= 1 && styles.stepGlyphOff]}>−</Text>
+      </Pressable>
+
+      <TextInput
+        value={draft}
+        onChangeText={setDraft}
+        onBlur={commit}
+        onSubmitEditing={commit}
+        keyboardType="number-pad"
+        returnKeyType="done"
+        selectTextOnFocus
+        maxLength={3}
+        accessibilityLabel={`How many ${FORMAT_LABEL[format]}`}
+        style={styles.countInput}
+      />
+
+      <Pressable
+        onPress={() => onChange(count + STEP)}
+        disabled={count >= max}
+        hitSlop={6}
+        accessibilityLabel={`More ${FORMAT_LABEL[format]}`}
+        style={({ pressed }) => [
+          styles.stepBtn,
+          count >= max && styles.stepBtnOff,
+          pressed && styles.pressed,
+        ]}>
+        <Text style={[styles.stepGlyph, count >= max && styles.stepGlyphOff]}>+</Text>
+      </Pressable>
     </View>
   );
 }
@@ -274,18 +203,15 @@ export default function ExamSetupScreen() {
     load,
     setMode,
     toggleFormat,
-    setTarget,
-    setOnly,
     setCount,
-    capacity,
+    evenSplit,
+    setOnly,
     total,
     start,
   } = useExamStore();
 
   /** Mode first, then the paper itself. */
   const [step, setStep] = useState<'mode' | 'counts'>('mode');
-  /** Per-format amounts, for when the even split isn't what's wanted. */
-  const [exact, setExact] = useState(false);
 
   useEffect(() => {
     if (deckId) {
@@ -297,12 +223,6 @@ export default function ExamSetupScreen() {
   const begin = () => {
     start();
     if (useExamStore.getState().status === 'active') router.push('/exam/run');
-  };
-
-  /** Opens the build step showing however the remembered paper was set. */
-  const openCounts = () => {
-    setExact(useExamStore.getState().custom);
-    setStep('counts');
   };
 
   // Apply an incoming request once the subject is loaded, and only once —
@@ -322,7 +242,6 @@ export default function ExamSetupScreen() {
 
     // A mode that picks its own questions has nothing left to ask.
     if (!MODES[wanted].autoBuild) {
-      setExact(false);
       setStep('counts');
       return;
     }
@@ -333,7 +252,7 @@ export default function ExamSetupScreen() {
   const chooseMode = (id: ExamMode) => {
     setMode(id);
     if (MODES[id].autoBuild) begin();
-    else openCounts();
+    else setStep('counts');
   };
 
   if (status === 'loading' || status === 'idle') {
@@ -405,7 +324,6 @@ export default function ExamSetupScreen() {
   }
 
   const picked = total();
-  const room = capacity();
   // Roughly half a minute per question — enough to set expectations.
   const minutes = Math.round(picked * 0.5);
   const longExam = picked > 40;
@@ -431,53 +349,41 @@ export default function ExamSetupScreen() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        {exact ? (
-          FORMAT_ORDER.map((format) => (
-            <FormatRow
+        <Text style={styles.kicker}>WHICH TYPES?</Text>
+        <View style={styles.grid}>
+          {FORMAT_ORDER.map((format) => (
+            <FormatChip
               key={format}
               format={format}
-              count={counts[format]}
               max={available[format]}
-              onChange={(next) => setCount(format, next)}
+              on={picks.includes(format)}
+              onPress={() => toggleFormat(format)}
             />
-          ))
-        ) : (
-          <>
-            <Text style={styles.kicker}>WHICH TYPES?</Text>
-            <View style={styles.grid}>
-              {FORMAT_ORDER.map((format) => (
-                <FormatChip
-                  key={format}
-                  format={format}
-                  max={available[format]}
-                  on={picks.includes(format)}
-                  onPress={() => toggleFormat(format)}
-                />
-              ))}
-            </View>
+          ))}
+        </View>
 
-            {room > 0 ? (
-              <>
-                <Text style={styles.kicker}>HOW MANY?</Text>
-                <AmountCard
-                  picked={picked}
-                  room={room}
-                  floor={Math.max(1, picks.length)}
-                  onSet={setTarget}
-                />
-              </>
+        {picks.length > 0 ? (
+          <>
+            <Text style={styles.kicker}>HOW MANY OF EACH?</Text>
+            {picks.map((format) => (
+              <AmountRow
+                key={format}
+                format={format}
+                count={counts[format]}
+                max={available[format]}
+                onChange={(next) => setCount(format, next)}
+              />
+            ))}
+            {picks.length > 1 ? (
+              <Pressable
+                onPress={evenSplit}
+                hitSlop={8}
+                style={({ pressed }) => [styles.switcher, pressed && styles.pressed]}>
+                <Text style={styles.switcherText}>Even them out</Text>
+              </Pressable>
             ) : null}
           </>
-        )}
-
-        <Pressable
-          onPress={() => setExact(!exact)}
-          hitSlop={8}
-          style={({ pressed }) => [styles.switcher, pressed && styles.pressed]}>
-          <Text style={styles.switcherText}>
-            {exact ? '‹ Back to quick pick' : 'Set exact amounts per type ›'}
-          </Text>
-        </Pressable>
+        ) : null}
 
         <View style={styles.note}>
           <Icon name="bulb" size={16} color={colors.gold} strokeWidth={2.2} />
@@ -630,41 +536,22 @@ const styles = StyleSheet.create({
     color: colors.disabledText,
   },
 
-  // --- how many ---------------------------------------------------------
-  amount: {
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.card,
-    padding: 12,
-    gap: 10,
-    ...shadow.card,
-  },
+  // --- how many of each -------------------------------------------------
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  amountMiddle: {
-    alignItems: 'center',
-  },
-  amountNumber: {
-    fontFamily: font.hero,
-    fontSize: 42,
-    lineHeight: 48,
-    color: colors.text,
-    fontVariant: ['tabular-nums'],
-  },
-  amountUnit: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 11,
-    letterSpacing: 1.3,
-    color: colors.textFaint,
-    marginTop: -4,
+    gap: 8,
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: radius.card,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    ...shadow.card,
   },
   stepBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     backgroundColor: colors.accentWash,
     borderWidth: 1.5,
     borderColor: colors.accentEdge,
@@ -677,43 +564,17 @@ const styles = StyleSheet.create({
   },
   stepGlyph: {
     fontFamily: font.heading,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 23,
+    lineHeight: 28,
     color: colors.accentDeep,
   },
   stepGlyphOff: {
     color: colors.disabledText,
   },
-  quickRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  quick: {
-    flex: 1,
-    backgroundColor: colors.surface2,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
-    borderRadius: radius.pill,
-    paddingVertical: 7,
-    alignItems: 'center',
-  },
-  quickOn: {
-    backgroundColor: colors.accentWash,
-    borderColor: colors.accentEdge,
-  },
-  quickText: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 12.5,
-    color: colors.textDim,
-    fontVariant: ['tabular-nums'],
-  },
-  quickTextOn: {
-    color: colors.accentDeep,
-  },
   switcher: {
     alignSelf: 'center',
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   switcherText: {
     fontFamily: font.bodyHeavy,
@@ -721,21 +582,7 @@ const styles = StyleSheet.create({
     color: colors.textDim,
   },
 
-  // --- exact amounts ----------------------------------------------------
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.card,
-    padding: 13,
-    ...shadow.card,
-  },
-  rowOff: {
-    backgroundColor: colors.surface2,
-    opacity: 0.75,
-  },
+  // --- the amount itself ------------------------------------------------
   rowText: {
     flex: 1,
   },
@@ -744,9 +591,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
-  rowTitleOff: {
-    color: colors.textFaint,
-  },
   rowHow: {
     fontFamily: font.body,
     fontSize: 11.5,
@@ -754,45 +598,32 @@ const styles = StyleSheet.create({
     color: colors.textDim,
     marginTop: 1,
   },
-  control: {
-    alignItems: 'center',
-    gap: 5,
-  },
   countInput: {
-    width: 56,
+    width: 54,
     borderWidth: 1.5,
-    borderColor: colors.edge,
-    borderRadius: 12,
+    borderColor: colors.ink,
+    borderRadius: 13,
     backgroundColor: colors.surface2,
-    paddingVertical: 8,
+    paddingVertical: 7,
     textAlign: 'center',
     fontFamily: font.hero,
-    fontSize: 19,
-    color: colors.textFaint,
+    fontSize: 22,
+    color: colors.text,
     fontVariant: ['tabular-nums'],
   },
-  countInputOn: {
-    backgroundColor: colors.accentWash,
-    borderColor: colors.ink,
-    color: colors.text,
-  },
   maxBtn: {
+    alignSelf: 'flex-start',
     backgroundColor: colors.accentWash,
     borderRadius: radius.pill,
     paddingHorizontal: 10,
     paddingVertical: 3,
+    marginTop: 3,
   },
   maxText: {
     fontFamily: font.bodyHeavy,
     fontSize: 10.5,
     color: colors.accentDeep,
     fontVariant: ['tabular-nums'],
-  },
-  none: {
-    fontFamily: font.heading,
-    fontSize: 18,
-    color: colors.textFaint,
-    paddingHorizontal: 12,
   },
 
   // --- modes ------------------------------------------------------------
