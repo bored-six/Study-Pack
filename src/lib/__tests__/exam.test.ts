@@ -306,3 +306,81 @@ describe('buildExam question choice', () => {
     expect(items).toHaveLength(4);
   });
 });
+
+describe('buildExam reuse decay', () => {
+  const NOW = Date.now();
+  const DAY = 86_400_000;
+  const RUNS = 40;
+
+  /** Definition questions support choice, true/false and identification. */
+  function deckOf(size: number): Question[] {
+    return Array.from({ length: size }, () => DEFINITION());
+  }
+
+  const REQUESTS = [
+    { format: 'multiple_choice' as const, count: 6 },
+    { format: 'true_false' as const, count: 6 },
+    { format: 'identification' as const, count: 6 },
+  ];
+  const SLOTS = 18;
+
+  /** Three questions missed last time; everything else known cold. */
+  function historyFor(deck: Question[]) {
+    return [
+      ...deck.slice(3).flatMap((q) =>
+        [3, 2, 1].map((daysAgo) => ({
+          questionId: q.id,
+          correct: true,
+          answeredAt: NOW - daysAgo * DAY,
+        }))
+      ),
+      ...deck.slice(0, 3).map((q) => ({
+        questionId: q.id,
+        correct: false,
+        answeredAt: NOW - DAY,
+      })),
+    ];
+  }
+
+  function survey(deck: Question[]) {
+    const history = historyFor(deck);
+    const weak = new Set(deck.slice(0, 3).map((q) => q.id));
+    let distinct = 0;
+    let weakSlots = 0;
+    let overWorked = 0;
+
+    for (let i = 0; i < RUNS; i++) {
+      const items = buildExam(deck, REQUESTS, `run${i}`, history);
+      expect(items).toHaveLength(SLOTS);
+      const uses = new Map<string, number>();
+      items.forEach((item) => {
+        uses.set(item.questionId, (uses.get(item.questionId) ?? 0) + 1);
+        if (weak.has(item.questionId)) weakSlots++;
+      });
+      distinct += uses.size;
+      overWorked += [...uses.values()].filter((n) => n >= 3).length;
+    }
+
+    return {
+      distinct: distinct / RUNS,
+      weakShare: weakSlots / (RUNS * SLOTS),
+      overWorked: overWorked / RUNS,
+    };
+  }
+
+  it('spreads an exam across most of the deck instead of looping a few', () => {
+    // Without the decay this sits near 12 of 18; the weakest questions head
+    // every format bucket and come back three and four times each.
+    expect(survey(deckOf(20)).distinct).toBeGreaterThan(13);
+  });
+
+  it('still spends the paper on what needs work', () => {
+    // Three weak questions are 15% of the deck; they should take well more
+    // than 15% of the slots, or the decay has thrown away the whole point.
+    expect(survey(deckOf(20)).weakShare).toBeGreaterThan(0.2);
+  });
+
+  it('rarely asks one question a third time in a single exam', () => {
+    expect(survey(deckOf(20)).overWorked).toBeLessThan(1);
+  });
+});

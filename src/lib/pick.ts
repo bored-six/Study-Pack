@@ -61,6 +61,12 @@ export interface PickOptions {
   now?: number;
   /** Injectable so a seeded exam rebuilds identically. */
   random?: () => number;
+  /**
+   * Multiplier applied to a question's weight, by id. Lets a caller that
+   * fills several buckets from one deck damp down what it has already used —
+   * see the reuse decay in exam.ts. Return 1 to leave a weight alone.
+   */
+  weightScale?: (questionId: string) => number;
 }
 
 /**
@@ -80,12 +86,18 @@ export function rankByNeed<T extends Pickable>(
   answers: readonly AnswerRecord[],
   options: PickOptions = {}
 ): T[] {
-  const { now = Date.now(), random = Math.random } = options;
+  const { now = Date.now(), random = Math.random, weightScale } = options;
   const grouped = byQuestion(answers);
 
   return questions
     .map((question) => {
-      const weight = weightFor(grouped.get(question.id) ?? [], now);
+      const scale = weightScale ? weightScale(question.id) : 1;
+      // A scale of 0 would make the key 0 for every such question, sorting
+      // them arbitrarily against each other. Keep weights strictly positive.
+      const weight = Math.max(
+        weightFor(grouped.get(question.id) ?? [], now) * scale,
+        Number.MIN_VALUE
+      );
       // random() can return exactly 0, and 0^(1/w) is 0 for every weight —
       // which would sort those items arbitrarily. Nudging keeps keys distinct.
       const roll = Math.max(random(), Number.MIN_VALUE);

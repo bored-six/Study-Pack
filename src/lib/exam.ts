@@ -379,6 +379,13 @@ export function availability(questions: Question[]): Record<ExamFormat, number> 
  * ten-question request gets: the shaky and the unseen, not the first ten
  * parsed. Pass an empty log and it degrades to the plain seeded shuffle.
  */
+/**
+ * What a question's weight is multiplied by for each slot it has already
+ * taken in this exam. Low enough that a third outing is rare, high enough
+ * that a genuinely weak fact can still be asked a second way.
+ */
+const REUSE_DECAY = 0.35;
+
 export function buildExam(
   questions: Question[],
   requests: ExamRequest[],
@@ -386,21 +393,39 @@ export function buildExam(
   history: readonly AnswerRecord[] = []
 ): ExamItem[] {
   const rand = seed(seedText + questions.length);
-  // Seeded rand, so the same exam rebuilds identically for its seed.
-  const pool = rankByNeed(shuffleWith(questions, rand), history, { random: rand });
+  const base = shuffleWith(questions, rand);
   const items: ExamItem[] = [];
+
+  // How many slots each question has already taken in this exam. Weighting by
+  // need alone would put the same worst fact at the head of *every* format
+  // bucket, so your weakest question came back as multiple choice, then
+  // true/false, then identification in one sitting. Decaying its weight per
+  // use keeps deliberate reinforcement — a fact can still come round twice —
+  // while spending the rest of the paper on the other things you are weak on.
+  //
+  // It also protects the mastery signal in instant-feedback mode: once a
+  // format has shown you the answer, re-asking the same fact records recall
+  // you did not actually perform.
+  const used = new Map<string, number>();
+  const weightScale = (id: string) => Math.pow(REUSE_DECAY, used.get(id) ?? 0);
+  const spend = (id: string) => used.set(id, (used.get(id) ?? 0) + 1);
+  // Seeded rand throughout, so the same exam rebuilds identically for its seed.
+  const rank = () => rankByNeed(base, history, { random: rand, weightScale });
 
   // Matching first: one exercise consumes several questions at once, and no
   // question should appear in two different matching grids.
   const usedInMatching = new Set<string>();
   for (const request of requests.filter((r) => r.format === 'matching')) {
     for (let n = 0; n < request.count; n++) {
-      const available = pool.filter((q) => !usedInMatching.has(q.id));
+      const available = rank().filter((q) => !usedInMatching.has(q.id));
       const item = buildMatching(available, rand);
       if (!item) break;
       item.terms.forEach((term) => {
         const match = available.find((q) => q.correctAnswer === term);
-        if (match) usedInMatching.add(match.id);
+        if (match) {
+          usedInMatching.add(match.id);
+          spend(match.id);
+        }
       });
       items.push(item);
     }
@@ -411,7 +436,8 @@ export function buildExam(
     const usedInFormat = new Set<string>();
     let made = 0;
 
-    for (const question of pool) {
+    // Re-ranked per format, so questions already spent sink down the order.
+    for (const question of rank()) {
       if (made >= request.count) break;
       if (usedInFormat.has(question.id)) continue;
       if (!supportedFormats(question).includes(request.format)) continue;
@@ -438,6 +464,7 @@ export function buildExam(
 
       if (!item) continue;
       usedInFormat.add(question.id);
+      spend(question.id);
       items.push(item);
       made++;
     }
