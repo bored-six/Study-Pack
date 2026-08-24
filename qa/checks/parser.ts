@@ -134,7 +134,7 @@ export function checkParser(): Report {
       // items, so it is checked piece by piece rather than as one string.
       const sourceParts =
         question.kind === 'enumeration'
-          ? question.sourceLine.split(/:\s*|,\s*/).filter((part) => part.trim().length > 0)
+          ? (question.sourceLine ?? '').split(/:\s*|,\s*/).filter((part) => part.trim().length > 0)
           : [question.sourceLine];
       const unsourced = sourceParts.filter((part) => part && !contains(corpus.text, part));
       if (question.sourceLine && unsourced.length > 0) {

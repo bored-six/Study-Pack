@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 
-import { addQuestionsToDeck, createSubject, deleteDeck, listDecks } from '@/lib/db';
+import {
+  addQuestionsToDeck,
+  createSubject,
+  deleteDeck,
+  listAnswerPool,
+  listDecks,
+} from '@/lib/db';
 import { parseNotes, type ParseResult, type ParsedQuestion } from '@/lib/noteParser';
 import type { Deck } from '@/lib/types';
 
@@ -21,6 +27,14 @@ interface NotesState {
   addSubject: (name: string) => Promise<string>;
   /** Runs the offline parser and stages the result for review. */
   parse: (raw: string) => ParseResult;
+  /** Options already saved in a subject, to borrow wrong answers from. */
+  poolFor: (deckId: string) => Promise<string[]>;
+  /**
+   * Stages one hand-written question for the same review screen the parser
+   * uses, so a question you wrote is read over before saving just like one
+   * we built for you.
+   */
+  stageCustom: (question: ParsedQuestion, deckId: string | null) => void;
   reviseDraftQuestion: (index: number, patch: Partial<ParsedQuestion>) => void;
   removeDraftQuestion: (index: number) => void;
   clearDraft: () => void;
@@ -58,6 +72,24 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     // made about *these* questions, not one inherited from last time.
     set({ draft: result.questions, stats: result.stats, targetId: null });
     return result;
+  },
+
+  poolFor: async (deckId) => listAnswerPool(deckId),
+
+  stageCustom: (question, deckId) => {
+    // The review screen only renders once a scan has happened, and one
+    // written question is a scan of one line that produced one question.
+    set({
+      draft: [question],
+      stats: {
+        linesRead: 1,
+        linesUsed: 1,
+        skipped: [],
+        truncatedInput: false,
+        cappedQuestions: false,
+      },
+      targetId: deckId,
+    });
   },
 
   reviseDraftQuestion: (index, patch) => {

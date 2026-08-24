@@ -203,7 +203,7 @@ export function supportedFormats(question: Question): ExamFormat[] {
     formats.push('true_false');
   }
 
-  if (question.kind === 'definition') formats.push('matching');
+  if (question.kind === 'definition' && question.sourceLine) formats.push('matching');
 
   return formats;
 }

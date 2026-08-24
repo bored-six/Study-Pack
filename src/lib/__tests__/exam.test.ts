@@ -42,6 +42,36 @@ const DEFINITION = () =>
     sourceLine: 'Chlorophyll: the green pigment that absorbs light',
   });
 
+/** A question the student wrote by hand: no line was read to make it. */
+const OWN = () =>
+  question({
+    kind: 'definition',
+    prompt: 'Which organelle releases energy from glucose?',
+    correctAnswer: 'Mitochondria',
+    answers: ['Mitochondria', 'Ribosome', 'Nucleus', 'Chloroplast'],
+    sourceLine: null,
+  });
+
+describe('a hand-written question', () => {
+  it('can be asked as multiple choice or typed out', () => {
+    expect(supportedFormats(OWN()).sort()).toEqual(['identification', 'multiple_choice']);
+  });
+
+  it('is never turned into true/false or matching', () => {
+    // Both rebuild a sentence out of the source line, and there isn't one —
+    // inventing it would put words in the student's mouth.
+    const formats = supportedFormats(OWN());
+    expect(formats).not.toContain('true_false');
+    expect(formats).not.toContain('matching');
+  });
+
+  it('is not counted towards matching grids that cannot be built', () => {
+    const deck = [OWN(), OWN(), OWN(), OWN(), OWN()];
+    expect(availability(deck).matching).toBe(0);
+    expect(buildExam(deck, [{ format: 'matching', count: 1 }], 'own-seed')).toHaveLength(0);
+  });
+});
+
 describe('supportedFormats', () => {
   it('offers typing and matching for a definition', () => {
     const formats = supportedFormats(DEFINITION());

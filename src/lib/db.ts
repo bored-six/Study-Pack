@@ -1,4 +1,4 @@
-import { openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
+import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { inferRepair } from './repair';
 
@@ -20,14 +20,21 @@ let instance: SQLiteDatabase | null = null;
 
 export function getDb(): SQLiteDatabase {
   if (!instance) {
-    instance = openDatabaseSync(DB_NAME);
+    throw new Error('Database not open. initDb() must resolve before any query.');
   }
   return instance;
 }
 
 /** Runs versioned migrations. Must complete before any screen renders. */
 export async function initDb(): Promise<void> {
-  const db = getDb();
+  // Opened async, never with openDatabaseSync. On web the sync variant blocks the
+  // main thread in a spin-loop capped at 1M iterations, and the worker cannot
+  // fetch + compile the 617KB SQLite wasm inside that budget, so it always threw
+  // "Sync operation timeout" on a cold load.
+  if (!instance) {
+    instance = await openDatabaseAsync(DB_NAME);
+  }
+  const db = instance;
   await db.execAsync('PRAGMA journal_mode = WAL');
   await db.execAsync('PRAGMA foreign_keys = ON');
 
@@ -346,6 +353,31 @@ export async function addQuestionsToDeck(
       deckId
     );
   });
+}
+
+/**
+ * Every option already saved in a subject — the material a hand-written
+ * question borrows its wrong answers from. Options are included alongside
+ * correct answers because a decoy the parser once chose is, by construction,
+ * a sibling term from the same notes.
+ */
+export async function listAnswerPool(deckId: string): Promise<string[]> {
+  const rows = await getDb().getAllAsync<{ correct_answer: string; answers_json: string }>(
+    'SELECT correct_answer, answers_json FROM questions WHERE deck_id = ?',
+    deckId
+  );
+  const pool = new Set<string>();
+  for (const row of rows) {
+    pool.add(row.correct_answer);
+    try {
+      for (const option of JSON.parse(row.answers_json) as string[]) {
+        if (typeof option === 'string' && option.trim()) pool.add(option);
+      }
+    } catch {
+      // One unreadable row shouldn't cost the whole pool.
+    }
+  }
+  return [...pool];
 }
 
 /** Removes a notes deck and its questions outright. */

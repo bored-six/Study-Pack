@@ -160,6 +160,17 @@ export default function NewNotesScreen() {
             onPress={runParse}
             style={styles.cta}
           />
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>or</Text>
+            <View style={styles.orLine} />
+          </View>
+          <ChunkyButton
+            label="Write my own question"
+            icon="pencil"
+            variant="soft"
+            onPress={() => router.push('/notes/custom')}
+          />
           <Text style={styles.footnote}>
             Runs entirely on your phone — no internet, no AI, nothing uploaded.
           </Text>
@@ -357,6 +368,23 @@ const styles = StyleSheet.create({
   },
   cta: {
     marginTop: 16,
+  },
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginVertical: 12,
+  },
+  orLine: {
+    flex: 1,
+    height: 1.5,
+    backgroundColor: colors.lineSoft,
+  },
+  orText: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 11,
+    letterSpacing: 0.8,
+    color: colors.textFaint,
   },
   footnote: {
     fontFamily: font.body,

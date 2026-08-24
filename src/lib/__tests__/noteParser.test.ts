@@ -266,3 +266,40 @@ describe('determinism', () => {
     expect(JSON.stringify(parseNotes(notes))).toBe(JSON.stringify(parseNotes(notes)));
   });
 });
+
+describe('option order', () => {
+  const NOTES = `Chlorophyll: the green pigment that absorbs light
+    Osmosis: movement of water across a semipermeable membrane
+    Glycolysis: breakdown of glucose into pyruvate
+    Diffusion: spreading of particles down a concentration gradient
+    Mitosis: division of a cell into two identical daughter cells
+    Meiosis: division that halves the chromosome number
+    Respiration: release of energy from glucose inside the cell
+    Transcription: copying of DNA into messenger RNA
+    Translation: building of a protein from messenger RNA
+    Cytoplasm: the jelly that fills the inside of a cell
+    Ribosome: the structure that assembles amino acids
+    Chloroplast: the organelle where photosynthesis happens`;
+
+  it('does not park the right answer in the same slot every time', () => {
+    // The bug this guards: seededShuffle multiplied past 2^53, the rounding
+    // wiped the low bits the index was read from, and the correct answer
+    // came out last in 999 questions out of 1000. A student could pass by
+    // always picking D.
+    const slots = parseNotes(NOTES).questions.map((q) => q.answers.indexOf(q.correctAnswer));
+    expect(slots.length).toBeGreaterThan(6);
+    expect(new Set(slots).size).toBeGreaterThan(2);
+  });
+
+  it('always puts the right answer somewhere in the options', () => {
+    for (const question of parseNotes(NOTES).questions) {
+      expect(question.answers).toContain(question.correctAnswer);
+    }
+  });
+
+  it('freezes the order, so the same notes always quiz the same way', () => {
+    const first = parseNotes(NOTES).questions.map((q) => q.answers.join('|'));
+    const second = parseNotes(NOTES).questions.map((q) => q.answers.join('|'));
+    expect(first).toEqual(second);
+  });
+});

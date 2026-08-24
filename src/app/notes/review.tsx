@@ -39,6 +39,8 @@ function QuestionCard({
   };
 
   const definition = question.kind === 'definition';
+  // Only a hand-written question is a definition with no line behind it.
+  const own = definition && question.sourceLine == null;
 
   return (
     <View
@@ -49,7 +51,7 @@ function QuestionCard({
       <View style={styles.cardTop}>
         <View style={[styles.kindPill, definition ? styles.kindDef : styles.kindBlank]}>
           <Text style={[styles.kindText, definition ? styles.kindTextDef : styles.kindTextBlank]}>
-            {definition ? 'DEFINITION' : 'FILL THE BLANK'}
+            {own ? 'YOUR QUESTION' : definition ? 'DEFINITION' : 'FILL THE BLANK'}
           </Text>
         </View>
         <View style={styles.cardActions}>

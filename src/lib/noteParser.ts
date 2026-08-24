@@ -31,7 +31,8 @@ export interface ParsedQuestion {
   /** Exactly 4 options, shuffled — or every list item, for enumeration. */
   answers: string[];
   kind: QuestionKind;
-  sourceLine: string;
+  /** The line this came from; null when the student wrote the question. */
+  sourceLine: string | null;
   /** Enumeration only: items were numbered, so order is part of the answer. */
   ordered?: boolean;
 }
@@ -270,17 +271,28 @@ function titleish(word: string): boolean {
   return (/^[A-Z]/.test(w) && /[a-z]/.test(w)) || /^[A-Z]{2,}\d*$/.test(w);
 }
 
-/** Deterministic shuffle seeded by the question text — stable across renders. */
-function seededShuffle<T>(items: T[], seed: string): T[] {
+/**
+ * Deterministic shuffle seeded by the question text — stable across renders.
+ *
+ * Two things this has to get right, both about the low bits of the state:
+ *
+ *   - Math.imul, not `*`. Both multipliers overflow 2^53 as doubles and the
+ *     rounding wipes the low bits out entirely. Written with plain `*` this
+ *     returned one fixed permutation whatever the seed, which put the
+ *     correct answer last in almost every multiple-choice question.
+ *   - The index comes off the top of the state, not `% (i + 1)`. An LCG's
+ *     low bits cycle far too short to pick from, and taking them left the
+ *     first option a third more likely than the rest.
+ */
+export function seededShuffle<T>(items: T[], seed: string): T[] {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {
-    h = (h ^ seed.charCodeAt(i)) * 16777619;
-    h >>>= 0;
+    h = Math.imul(h ^ seed.charCodeAt(i), 16777619) >>> 0;
   }
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
-    h = (h * 1103515245 + 12345) >>> 0;
-    const j = h % (i + 1);
+    h = (Math.imul(h, 1103515245) + 12345) >>> 0;
+    const j = Math.floor((h / 0x1_0000_0000) * (i + 1));
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
@@ -524,6 +536,29 @@ function termDistractors(answer: string, pool: string[], seed: string): string[]
     if (chosen.length === 3) break;
   }
   return chosen;
+}
+
+/**
+ * Three wrong answers for one right one.
+ *
+ * Numbers get near-miss numbers, which need nothing but the answer itself;
+ * everything else borrows sibling terms from `pool`, so a subject with
+ * little in it yet will honestly return fewer than three rather than pad
+ * the question out with filler.
+ *
+ * Exported because a question the student wrote by hand needs decoys too,
+ * and it must get them from the same code the parser's questions use.
+ */
+export function suggestDistractors(
+  answer: string,
+  pool: readonly string[],
+  seed: string
+): string[] {
+  const clean = answer.trim();
+  if (!clean) return [];
+  return isNumeric(clean)
+    ? numericDistractors(clean, seed)
+    : termDistractors(clean, [...pool], seed);
 }
 
 // --- enumeration --------------------------------------------------------
