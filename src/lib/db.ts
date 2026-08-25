@@ -14,7 +14,7 @@ import type {
 } from './types';
 
 const DB_NAME = 'studypack.db';
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 let instance: SQLiteDatabase | null = null;
 
@@ -135,6 +135,17 @@ export async function initDb(): Promise<void> {
     await db.execAsync(`
       ALTER TABLE decks ADD COLUMN color TEXT;
       ALTER TABLE decks ADD COLUMN icon TEXT;
+    `);
+  }
+
+  if (version < 8) {
+    // Migrate legacy derp icons saved in the database to their standard names
+    await db.execAsync(`
+      UPDATE decks SET icon = 'cat' WHERE icon = 'derpCat';
+      UPDATE decks SET icon = 'ghost' WHERE icon = 'derpGhost';
+      UPDATE decks SET icon = 'plus' WHERE icon = 'derpPlus';
+      UPDATE decks SET icon = 'bulb' WHERE icon = 'derpBulb';
+      UPDATE decks SET icon = 'dice' WHERE icon = 'derpDice';
     `);
   }
 
