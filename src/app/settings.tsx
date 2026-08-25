@@ -39,7 +39,7 @@ import { useDecksStore } from '@/store/decks';
 import { useNotesStore } from '@/store/notes';
 import { usePlannerStore } from '@/store/planner';
 import { useProgressStore } from '@/store/progress';
-import { colors, derpRadius, font, outline, radius, shadow } from '@/theme/tokens';
+import { derpRadius, font, outline, radius, shadow, useThemeStore, getColors } from '@/theme/tokens';
 
 /** Which destructive action is waiting on a yes. */
 type Pending = 'trivia' | 'history' | 'erase' | 'eraseReally';
@@ -63,9 +63,13 @@ function Row({
   hint?: string;
   right?: React.ReactNode;
   onPress?: () => void;
-  tone?: 'danger';
+  tone?: 'danger' | 'info';
   style?: StyleProp<ViewStyle>;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const ink = tone === 'danger' ? colors.coral : colors.ink;
   const body = (
     <>
@@ -95,6 +99,9 @@ function Row({
 }
 
 function Toggle({ value, onChange, label }: { value: boolean; onChange: (on: boolean) => void; label: string }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+
   return (
     <Switch
       value={value}
@@ -107,6 +114,10 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: (on: boo
 }
 
 export default function SettingsScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
   const insets = useSafeAreaInsets();
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [storage, setStorage] = useState<StorageSummary | null>(null);
@@ -225,6 +236,13 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Row
+            icon="bulb"
+            title="Dark mode"
+            hint="Switch to dark paper"
+            right={<Toggle label="Dark mode" value={isDark} onChange={toggleTheme} />}
+            style={styles.divided}
+          />
+          <Row
             icon="sound"
             title="Sound effects"
             right={<Toggle label="Sound effects" value={prefs.sound} onChange={change('sound', setSound)} />}
@@ -286,6 +304,13 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.card}>
+          <Row
+            icon="bulb"
+            title="Dark mode"
+            hint="Switch to dark paper"
+            right={<Toggle label="Dark mode" value={isDark} onChange={toggleTheme} />}
+            style={styles.divided}
+          />
           <View style={styles.storageHead}>
             <Tape rotate="-3deg" />
             <Text style={styles.storageTitle}>Everything is stored here</Text>
@@ -387,7 +412,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
