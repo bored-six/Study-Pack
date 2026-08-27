@@ -77,7 +77,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'first-quiz',
     title: 'The first one',
-    icon: 'sproutClassic',
+    icon: 'sprout',
     family: 'tally',
     earned: (c) => c.totalAttempts >= 1,
     notes: [
@@ -88,7 +88,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'ten-quizzes',
     title: 'Ten deep',
-    icon: 'cardsClassic',
+    icon: 'cards',
     family: 'tally',
     earned: (c) => c.totalAttempts >= 10,
     notes: [
@@ -99,7 +99,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'fifty-quizzes',
     title: 'Fifty strong',
-    icon: 'cardsClassic',
+    icon: 'flag',
     family: 'tally',
     earned: (c) => c.totalAttempts >= 50,
     notes: [
@@ -110,7 +110,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'hundred-quizzes',
     title: 'A hundred',
-    icon: 'trophyClassic',
+    icon: 'trophy',
     family: 'tally',
     earned: (c) => c.totalAttempts >= 100,
     notes: [
@@ -120,7 +120,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'two-fifty-quizzes',
     title: 'Two hundred and fifty',
-    icon: 'trophyClassic',
+    icon: 'museum',
     family: 'tally',
     earned: (c) => c.totalAttempts >= 250,
     notes: [
@@ -130,7 +130,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'first-subject',
     title: 'A shelf of your own',
-    icon: 'bookClassic',
+    icon: 'book',
     family: 'knowledge',
     earned: (c) => c.subjectCount >= 1,
     notes: [
@@ -140,7 +140,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'three-subjects',
     title: 'The full shelf',
-    icon: 'bookClassic',
+    icon: 'globe',
     family: 'knowledge',
     earned: (c) => c.subjectCount >= 3,
     notes: [
@@ -150,7 +150,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'getting-there',
     title: 'Getting there',
-    icon: 'chartClassic',
+    icon: 'chart',
     family: 'knowledge',
     earned: (c) => c.subjectPercents.some((p) => p >= 60),
     notes: [
@@ -161,7 +161,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'solid',
     title: 'Solid ground',
-    icon: 'trophyClassic',
+    icon: 'atom',
     family: 'knowledge',
     earned: (c) => c.subjectPercents.some((p) => p >= 85),
     notes: [
@@ -171,7 +171,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'all-steady',
     title: 'All of it, steady',
-    icon: 'starClassic',
+    icon: 'star',
     family: 'knowledge',
     earned: (c) => c.subjectCount >= 2 && c.subjectPercents.every((p) => p >= 60),
     notes: [
@@ -181,7 +181,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'perfect',
     title: 'Every single one',
-    icon: 'starClassic',
+    icon: 'burst',
     family: 'promises',
     earned: (c) => c.score === c.total && c.total >= 5,
     notes: [
@@ -192,7 +192,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'five-perfects',
     title: 'Five flawless',
-    icon: 'starClassic',
+    icon: 'flower',
     family: 'promises',
     earned: (c) => c.perfectRounds >= 5,
     notes: [
@@ -202,7 +202,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'comeback',
     title: 'The return',
-    icon: 'heartClassic',
+    icon: 'heart',
     family: 'character',
     earned: (c) => c.daysSinceLastStudy != null && c.daysSinceLastStudy >= 3,
     notes: [
@@ -213,7 +213,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'night-owl',
     title: 'While the house sleeps',
-    icon: 'heartClassic',
+    icon: 'ghost',
     family: 'character',
     earned: (c) => c.hourOfDay >= 23 || c.hourOfDay < 5,
     notes: [
@@ -223,7 +223,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'early-bird',
     title: 'Before the day starts',
-    icon: 'clockClassic',
+    icon: 'apple',
     family: 'character',
     earned: (c) => c.hourOfDay >= 5 && c.hourOfDay < 7,
     notes: [
@@ -233,7 +233,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'week-fire',
     title: 'Seven days burning',
-    icon: 'flameClassic',
+    icon: 'flameSmall',
     family: 'fire',
     earned: (c) => c.streak >= 7,
     notes: [
@@ -243,7 +243,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'month-fire',
     title: 'A month of fire',
-    icon: 'flameBigClassic',
+    icon: 'flame',
     family: 'fire',
     earned: (c) => c.streak >= 30,
     notes: [
@@ -253,7 +253,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'hundred-fire',
     title: 'The everlasting',
-    icon: 'flameCrownClassic',
+    icon: 'flameCrown',
     family: 'fire',
     earned: (c) => c.streak >= 100,
     notes: [
@@ -263,7 +263,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'year-fire',
     title: 'The eternal year',
-    icon: 'flameYearClassic',
+    icon: 'flameYear',
     family: 'fire',
     earned: (c) => c.streak >= 365,
     notes: [
@@ -273,7 +273,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'all-solid',
     title: 'All of it, solid',
-    icon: 'trophyClassic',
+    icon: 'planet',
     family: 'knowledge',
     earned: (c) => c.subjectCount >= 2 && c.subjectPercents.every((p) => p >= 85),
     notes: [
@@ -283,7 +283,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'long-return',
     title: 'The long way back',
-    icon: 'heartClassic',
+    icon: 'plane',
     family: 'character',
     earned: (c) => c.daysSinceLastStudy != null && c.daysSinceLastStudy >= 30,
     notes: [
@@ -293,7 +293,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'kept-plan',
     title: 'Word kept',
-    icon: 'calendarClassic',
+    icon: 'clock',
     family: 'promises',
     earned: (c) => c.keptPlan,
     notes: [
@@ -303,7 +303,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'ten-plans',
     title: 'Ten promises',
-    icon: 'calendarClassic',
+    icon: 'bell',
     family: 'promises',
     earned: (c) => c.plansKeptTotal >= 10,
     notes: [
@@ -313,7 +313,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'hundred-answers',
     title: 'A hundred answers',
-    icon: 'checkClassic',
+    icon: 'check',
     family: 'tally',
     earned: (c) => c.totalAnswers >= 100,
     notes: [
@@ -323,7 +323,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'five-hundred-answers',
     title: 'Five hundred answers',
-    icon: 'checkClassic',
+    icon: 'pencil',
     family: 'promises',
     earned: (c) => c.totalAnswers >= 500,
     notes: [
@@ -333,7 +333,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'weak-cleared',
     title: 'The stubborn ones',
-    icon: 'boltClassic',
+    icon: 'question',
     family: 'promises',
     earned: (c) => c.clearedWeakSubject,
     notes: [
@@ -343,7 +343,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'marathon',
     title: 'The long sitting',
-    icon: 'flameClassic',
+    icon: 'bolt',
     family: 'fire',
     earned: (c) => c.attemptsToday >= 5,
     notes: [
@@ -353,7 +353,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'dedicated',
     title: 'A week of days',
-    icon: 'calendarClassic',
+    icon: 'calendar',
     family: 'fire',
     earned: (c) => c.distinctStudyDays >= 7,
     notes: [
@@ -363,7 +363,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'weekender',
     title: 'The whole weekend',
-    icon: 'heartClassic',
+    icon: 'gamepad',
     family: 'character',
     earned: (c) => c.weekendPair,
     notes: [
@@ -373,7 +373,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'rough-day',
     title: 'Stayed anyway',
-    icon: 'heartClassic',
+    icon: 'cross',
     family: 'character',
     earned: (c) => c.total >= 5 && c.score / c.total < 0.4,
     notes: [

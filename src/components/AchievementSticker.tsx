@@ -10,8 +10,9 @@ import { font, getColors } from '@/theme/tokens';
  *
  * Each family wears its own shape — a wax seal for the tally, a rosette
  * ribbon for the fire, a shield for what you know, a luggage tag for
- * promises, a heart for the character ones. Shape carries the family so
- * a filled album can be read across the room.
+ * promises, a heart for the character ones. Every sticker then carries
+ * its achievement's duotone glyph on a white medallion, the same icon
+ * language as the rest of the app — never the flat line icons.
  *
  * Locked stickers are the pressed outline of that shape and nothing
  * else: no title, no requirement, no progress. They give away which
@@ -44,13 +45,13 @@ const WASH: Record<AchievementFamily, { fill: string; edge: string }> = {
   character: { fill: '#EAE2FA', edge: '#6C51A8' },
 };
 
-/** Where the icon sits inside each shape, so it looks centred by eye. */
-const ICON_OFFSET: Record<AchievementFamily, number> = {
-  tally: 0,
-  fire: -8,
-  knowledge: -2,
-  promises: 0,
-  character: -3,
+/** The white medallion each glyph sits on, tuned per shape by eye. */
+const MEDALLION: Record<AchievementFamily, { cx: number; cy: number; r: number; icon: number }> = {
+  tally: { cx: 32, cy: 31.7, r: 13.5, icon: 0.32 },
+  fire: { cx: 32, cy: 20, r: 10, icon: 0.24 },
+  knowledge: { cx: 32, cy: 28.5, r: 11.5, icon: 0.28 },
+  promises: { cx: 33, cy: 32, r: 11, icon: 0.27 },
+  character: { cx: 32, cy: 27.5, r: 10.5, icon: 0.25 },
 };
 
 interface Props {
@@ -64,30 +65,22 @@ interface Props {
 export function AchievementSticker({ family, icon, size = 64, isDark = false }: Props) {
   const colors = getColors(isDark);
   const wash = WASH[family];
+  const spot = MEDALLION[family];
   const locked = icon == null;
   const scale = size / 64;
 
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size} viewBox="0 0 64 64">
-        {family === 'fire' && !locked ? (
+        {family === 'fire' ? (
           <Path
             d={FIRE_TAILS}
-            fill="#F7CFD3"
-            stroke={colors.ink}
-            strokeWidth={2.4}
+            fill={locked ? 'none' : '#F7CFD3'}
+            stroke={locked ? colors.textFaint : colors.ink}
+            strokeWidth={locked ? 2 : 2.4}
             strokeLinejoin="round"
-          />
-        ) : null}
-        {family === 'fire' && locked ? (
-          <Path
-            d={FIRE_TAILS}
-            fill="none"
-            stroke={colors.textFaint}
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeDasharray="4 3.5"
-            opacity={0.75}
+            strokeDasharray={locked ? '4 3.5' : undefined}
+            opacity={locked ? 0.75 : 1}
           />
         ) : null}
 
@@ -101,6 +94,19 @@ export function AchievementSticker({ family, icon, size = 64, isDark = false }: 
           opacity={locked ? 0.75 : 1}
         />
 
+        {family === 'promises' && !locked ? (
+          <>
+            <Path
+              d="M9 22c3-3 6-3 9 0"
+              stroke={colors.ink}
+              strokeWidth={2}
+              fill="none"
+              strokeLinecap="round"
+            />
+            <Circle cx={21} cy={22} r={3.2} fill="#FAF3E1" stroke={colors.ink} strokeWidth={2} />
+          </>
+        ) : null}
+
         {locked ? (
           <SvgText
             x={32}
@@ -112,11 +118,16 @@ export function AchievementSticker({ family, icon, size = 64, isDark = false }: 
             opacity={0.9}>
             ?
           </SvgText>
-        ) : family === 'tally' ? (
-          <Circle cx={32} cy={31.7} r={13.5} fill="#FFF6DC" stroke={wash.edge} strokeWidth={1.8} />
-        ) : family === 'fire' ? (
-          <Circle cx={32} cy={20} r={9} fill="#FFF6DC" stroke={wash.edge} strokeWidth={1.8} />
-        ) : null}
+        ) : (
+          <Circle
+            cx={spot.cx}
+            cy={spot.cy}
+            r={spot.r}
+            fill="#FFF6DC"
+            stroke={wash.edge}
+            strokeWidth={1.8}
+          />
+        )}
       </Svg>
 
       {!locked ? (
@@ -125,9 +136,20 @@ export function AchievementSticker({ family, icon, size = 64, isDark = false }: 
           style={[
             StyleSheet.absoluteFill,
             styles.iconLayer,
-            { transform: [{ translateY: ICON_OFFSET[family] * scale }] },
+            {
+              transform: [
+                { translateX: (spot.cx - 32) * scale },
+                { translateY: (spot.cy - 32) * scale },
+              ],
+            },
           ]}>
-          <Icon name={icon} size={Math.round(size * 0.4)} color={wash.edge} strokeWidth={2} />
+          <Icon
+            name={icon}
+            size={Math.round(size * spot.icon * 2)}
+            color="#1A211C"
+            fill="#FFFFFF"
+            strokeWidth={1.9}
+          />
         </View>
       ) : null}
     </View>

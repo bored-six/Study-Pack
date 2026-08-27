@@ -1,9 +1,12 @@
+import { useEffect } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AchievementSticker } from '@/components/AchievementSticker';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon } from '@/components/Icon';
 import { Tape } from '@/components/notebook';
 import { achievementById, LOCKED_NOTE, type Unlock } from '@/lib/achievements';
+import { playSfx } from '@/lib/sfx';
 import { colors, font, outline, radius, shadow } from '@/theme/tokens';
 
 interface Props {
@@ -34,6 +37,12 @@ export function AchievementModal({
   const def = unlock ? achievementById(unlock.id) : undefined;
   const hasMore = index < unlocks.length - 1;
 
+  useEffect(() => {
+    if (visible && !locked) {
+      playSfx('victory_derp');
+    }
+  }, [visible, index, locked]);
+
   return (
     <Modal
       visible={visible}
@@ -45,14 +54,18 @@ export function AchievementModal({
         <View style={styles.centering}>
           <Pressable style={styles.card} onPress={() => {}}>
             <Tape />
-            <View style={[styles.badge, locked && styles.badgeLocked]}>
-              <Icon
-                name={locked ? 'question' : (def?.icon ?? 'star')}
-                size={34}
-                color={colors.ink}
-                fill={locked ? colors.surface2 : colors.goldWash}
-              />
-            </View>
+            {locked || !def ? (
+              <View style={[styles.badge, styles.badgeLocked]}>
+                <Icon name="question" size={34} color={colors.ink} fill={colors.surface2} />
+              </View>
+            ) : (
+              // The exact sticker that lands in the album — reveal and
+              // keepsake must be the same object, or the album feels
+              // like it swapped something on you.
+              <View style={styles.stickerWrap}>
+                <AchievementSticker family={def.family} icon={def.icon} size={96} />
+              </View>
+            )}
 
             {locked ? (
               <>
@@ -116,6 +129,10 @@ const styles = StyleSheet.create({
   },
   badgeLocked: {
     backgroundColor: colors.surface2,
+  },
+  stickerWrap: {
+    marginBottom: 10,
+    transform: [{ rotate: '-3deg' }],
   },
   kicker: {
     fontFamily: font.bodyHeavy,

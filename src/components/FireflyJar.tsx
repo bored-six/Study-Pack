@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
@@ -12,12 +12,11 @@ import Svg, {
 } from 'react-native-svg';
 import Animated, {
   Easing,
-  useAnimatedProps,
+  useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withDelay,
   withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -28,17 +27,17 @@ import type { FireTier } from '@/lib/fire';
  *
  * A streak is light you have collected, not heat you have to feed — so
  * each tier adds fireflies rather than making one flame bigger. Every
- * firefly carries its own soft halo and drifts on its own loop, so the
- * jar never looks like a static diagram: at a glance it reads as
- * something alive that you are keeping.
+ * firefly is its own small Animated.View floating over the glass: plain
+ * view transforms, because animating SVG element props through
+ * Reanimated is unreliable in Expo Go and on web — that was the bug the
+ * first version shipped with.
  *
  * At a full year the lid comes off and a few of them climb out.
  */
 
-/** How many fireflies each tier is worth. Index matches FIRE_TIERS order. */
+/** How many fireflies each tier is worth. */
 function fliesFor(tier: FireTier): number {
   if (tier.from >= 365) return 9;
-  if (tier.from >= 300) return 8;
   if (tier.from >= 200) return 8;
   if (tier.from >= 100) return 7;
   if (tier.from >= 50) return 6;
@@ -80,122 +79,147 @@ const SEATS: { x: number; y: number }[] = [
   { x: 41, y: 50 },
 ];
 
-const AnimatedG = Animated.createAnimatedComponent(G);
+/** The fly's own canvas, in viewBox units — halo included. */
+const FLY_BOX = 18;
 
-/** One firefly: a soft halo, a bright core, and a pair of little wings. */
+/** One firefly: a soft halo, a bright core, wings — on its own View. */
 function Firefly({
-  x,
-  y,
+  seat,
+  scale,
   glow,
   core,
   index,
   still,
 }: {
-  x: number;
-  y: number;
+  seat: { x: number; y: number };
+  scale: number;
   glow: string;
   core: string;
   index: number;
   still: boolean;
 }) {
   const drift = useSharedValue(0);
+  const sway = useSharedValue(0);
   const pulse = useSharedValue(1);
 
   useEffect(() => {
     if (still) return;
-    const delay = index * 380;
+    const delay = index * 340;
     drift.value = withDelay(
       delay,
       withRepeat(
-        withSequence(
-          withTiming(1, { duration: 2100 + index * 170, easing: Easing.inOut(Easing.sin) }),
-          withTiming(0, { duration: 2100 + index * 170, easing: Easing.inOut(Easing.sin) })
-        ),
+        withTiming(1, { duration: 2000 + index * 180, easing: Easing.inOut(Easing.sin) }),
         -1,
-        false
+        true
+      )
+    );
+    sway.value = withDelay(
+      delay + 400,
+      withRepeat(
+        withTiming(1, { duration: 1500 + index * 140, easing: Easing.inOut(Easing.sin) }),
+        -1,
+        true
       )
     );
     pulse.value = withDelay(
       delay,
       withRepeat(
-        withSequence(
-          withTiming(0.35, { duration: 900 + index * 120, easing: Easing.inOut(Easing.quad) }),
-          withTiming(1, { duration: 900 + index * 120, easing: Easing.inOut(Easing.quad) })
-        ),
+        withTiming(0.35, { duration: 850 + index * 110, easing: Easing.inOut(Easing.quad) }),
         -1,
-        false
+        true
       )
     );
-  }, [drift, pulse, index, still]);
+  }, [drift, sway, pulse, index, still]);
 
-  const animatedProps = useAnimatedProps(() => {
-    const dx = drift.value * (index % 2 === 0 ? 2.6 : -2.6);
-    const dy = drift.value * -3.2;
-    return {
-      transform: `translate(${dx}, ${dy})`,
-      opacity: 0.55 + pulse.value * 0.45,
-    };
-  });
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: sway.value * (index % 2 === 0 ? 3 : -3) * scale },
+      { translateY: drift.value * -4 * scale },
+    ],
+    opacity: 0.55 + pulse.value * 0.45,
+  }));
+
+  const box = FLY_BOX * scale;
+  const half = FLY_BOX / 2;
 
   return (
-    <AnimatedG animatedProps={animatedProps}>
-      {/* halo, biggest and faintest first */}
-      <Circle cx={x} cy={y} r={6.4} fill={glow} opacity={0.16} />
-      <Circle cx={x} cy={y} r={4.2} fill={glow} opacity={0.3} />
-      {/* wings */}
-      <Path
-        d={`M${x - 1.8} ${y - 1.4}c-2-1.6-3.6-1.2-4.2.4 1.2 1.2 2.8 1.3 4.2.2z`}
-        fill={core}
-        opacity={0.55}
-      />
-      <Path
-        d={`M${x + 1.8} ${y - 1.4}c2-1.6 3.6-1.2 4.2.4-1.2 1.2-2.8 1.3-4.2.2z`}
-        fill={core}
-        opacity={0.55}
-      />
-      {/* body */}
-      <Circle cx={x} cy={y} r={2.3} fill={core} stroke={glow} strokeWidth={1.3} />
-      <Circle cx={x - 0.6} cy={y - 0.7} r={0.7} fill="#FFFFFF" opacity={0.9} />
-    </AnimatedG>
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        {
+          position: 'absolute',
+          left: seat.x * scale - box / 2,
+          top: seat.y * scale - box / 2,
+          width: box,
+          height: box,
+        },
+        style,
+      ]}>
+      <Svg width={box} height={box} viewBox={`0 0 ${FLY_BOX} ${FLY_BOX}`}>
+        <Circle cx={half} cy={half} r={7.6} fill={glow} opacity={0.16} />
+        <Circle cx={half} cy={half} r={4.6} fill={glow} opacity={0.3} />
+        <Path
+          d={`M${half - 1.8} ${half - 1.4}c-2-1.6-3.6-1.2-4.2.4 1.2 1.2 2.8 1.3 4.2.2z`}
+          fill={core}
+          opacity={0.6}
+        />
+        <Path
+          d={`M${half + 1.8} ${half - 1.4}c2-1.6 3.6-1.2 4.2.4-1.2 1.2-2.8 1.3-4.2.2z`}
+          fill={core}
+          opacity={0.6}
+        />
+        <Circle cx={half} cy={half} r={2.3} fill={core} stroke={glow} strokeWidth={1.3} />
+        <Circle cx={half - 0.6} cy={half - 0.7} r={0.7} fill="#FFFFFF" opacity={0.9} />
+      </Svg>
+    </Animated.View>
   );
 }
 
 /** One firefly that has escaped the jar and is climbing away. */
 function Escapee({
   x,
+  scale,
   glow,
   core,
   delay,
-  still,
 }: {
   x: number;
+  scale: number;
   glow: string;
   core: string;
   delay: number;
-  still: boolean;
 }) {
   const rise = useSharedValue(0);
 
   useEffect(() => {
-    if (still) return;
     rise.value = withDelay(
       delay,
-      withRepeat(withTiming(1, { duration: 3400, easing: Easing.out(Easing.quad) }), -1, false)
+      withRepeat(withTiming(1, { duration: 3200, easing: Easing.out(Easing.quad) }), -1, false)
     );
-  }, [rise, delay, still]);
+  }, [rise, delay]);
 
-  const animatedProps = useAnimatedProps(() => ({
-    transform: `translate(${rise.value * 2.4}, ${-rise.value * 13})`,
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: -rise.value * 15 * scale },
+      { translateX: rise.value * 3 * scale },
+    ],
     opacity: rise.value < 0.15 ? rise.value / 0.15 : 1 - (rise.value - 0.15) / 0.85,
   }));
 
-  if (still) return null;
+  const box = 12 * scale;
 
   return (
-    <AnimatedG animatedProps={animatedProps}>
-      <Circle cx={x} cy={17} r={4.4} fill={glow} opacity={0.22} />
-      <Circle cx={x} cy={17} r={2.1} fill={core} stroke={glow} strokeWidth={1.2} />
-    </AnimatedG>
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        { position: 'absolute', left: x * scale - box / 2, top: 14 * scale, width: box, height: box },
+        style,
+      ]}>
+      <Svg width={box} height={box} viewBox="0 0 12 12">
+        <Circle cx={6} cy={6} r={5} fill={glow} opacity={0.22} />
+        <Circle cx={6} cy={6} r={2.2} fill={core} stroke={glow} strokeWidth={1.2} />
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -214,14 +238,16 @@ export function FireflyJar({ tier, size = 72, lit = true }: Props) {
   const count = lit ? fliesFor(tier) : 0;
   const tint = jarTint(tier);
   const isYear = tier.from >= 365;
+  const scale = size / 64;
 
-  const seats = useMemo(() => SEATS.slice(0, count), [count]);
+  const seats = SEATS.slice(0, count);
 
   // Brightness of the whole jar scales with how full it is.
   const fill = count / SEATS.length;
 
   return (
     <View style={[styles.wrap, { width: size, height: size }]}>
+      {/* the jar itself — everything the flies float in front of */}
       <Svg width={size} height={size} viewBox="0 0 64 64">
         <Defs>
           <RadialGradient id="jarGlow" cx="50%" cy="58%" r="50%">
@@ -234,26 +260,8 @@ export function FireflyJar({ tier, size = 72, lit = true }: Props) {
           </RadialGradient>
         </Defs>
 
-        {/* the light the jar throws into the room */}
         <Circle cx={32} cy={38} r={30} fill="url(#jarGlow)" />
 
-        {/* lid — tipped off once they start getting out */}
-        <G
-          transform={isYear ? 'rotate(-24 26 13)' : undefined}
-          opacity={1}>
-          <Rect
-            x={24}
-            y={isYear ? 7 : 10}
-            width={16}
-            height={5}
-            rx={2}
-            fill="#EFE5CB"
-            stroke="#27362B"
-            strokeWidth={2.2}
-          />
-        </G>
-
-        {/* glass */}
         <Path
           d="M22 15h20c2 4 4 7 4 14v18c0 5-3 8-8 8H26c-5 0-8-3-8-8V29c0-7 2-10 4-14z"
           fill="url(#glassFill)"
@@ -262,50 +270,64 @@ export function FireflyJar({ tier, size = 72, lit = true }: Props) {
           strokeLinejoin="round"
         />
 
-        {/* fireflies live between the glass and its highlight */}
-        {seats.map((seat, i) => (
-          <Firefly
-            key={i}
-            x={seat.x}
-            y={seat.y}
-            glow={tint.glow}
-            core={tint.core}
-            index={i}
-            still={still}
-          />
-        ))}
-
-        {/* a pool of settled light at the bottom once the jar is full */}
         {fill > 0.5 ? (
           <Ellipse cx={32} cy={52} rx={12} ry={3.2} fill={tint.glow} opacity={0.22} />
         ) : null}
-
-        {/* glass highlight, over everything so it reads as a surface */}
-        <Path
-          d="M24 24c-1 3-1.6 5-1.6 9v14"
-          stroke="#FFFFFF"
-          strokeWidth={2.4}
-          strokeLinecap="round"
-          fill="none"
-          opacity={0.85}
-        />
-        <Path
-          d="M41.5 26c.8 2.4 1.2 4 1.2 7"
-          stroke="#FFFFFF"
-          strokeWidth={1.6}
-          strokeLinecap="round"
-          fill="none"
-          opacity={0.5}
-        />
-
-        {isYear ? (
-          <>
-            <Escapee x={30} glow={tint.glow} core={tint.core} delay={0} still={still} />
-            <Escapee x={40} glow={tint.glow} core={tint.core} delay={1100} still={still} />
-            <Escapee x={22} glow={tint.glow} core={tint.core} delay={2200} still={still} />
-          </>
-        ) : null}
       </Svg>
+
+      {seats.map((seat, i) => (
+        <Firefly
+          key={i}
+          seat={seat}
+          scale={scale}
+          glow={tint.glow}
+          core={tint.core}
+          index={i}
+          still={still}
+        />
+      ))}
+
+      {/* glass highlight and lid, over the flies so the glass reads as a surface */}
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Svg width={size} height={size} viewBox="0 0 64 64">
+          <Path
+            d="M24 24c-1 3-1.6 5-1.6 9v14"
+            stroke="#FFFFFF"
+            strokeWidth={2.4}
+            strokeLinecap="round"
+            fill="none"
+            opacity={0.85}
+          />
+          <Path
+            d="M41.5 26c.8 2.4 1.2 4 1.2 7"
+            stroke="#FFFFFF"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            fill="none"
+            opacity={0.5}
+          />
+          <G transform={isYear ? 'rotate(-24 26 13)' : undefined}>
+            <Rect
+              x={24}
+              y={isYear ? 7 : 10}
+              width={16}
+              height={5}
+              rx={2}
+              fill="#EFE5CB"
+              stroke="#27362B"
+              strokeWidth={2.2}
+            />
+          </G>
+        </Svg>
+      </View>
+
+      {isYear && !still ? (
+        <>
+          <Escapee x={30} scale={scale} glow={tint.glow} core={tint.core} delay={0} />
+          <Escapee x={40} scale={scale} glow={tint.glow} core={tint.core} delay={1100} />
+          <Escapee x={22} scale={scale} glow={tint.glow} core={tint.core} delay={2200} />
+        </>
+      ) : null}
     </View>
   );
 }

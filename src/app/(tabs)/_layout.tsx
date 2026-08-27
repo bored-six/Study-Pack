@@ -20,9 +20,21 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   };
 
   const bottomPad = Math.max(insets.bottom, 10);
+  // The opaque paper shelf the tabs stand on. Sized to the resting tab
+  // (paddingTop 9 + icon 26 + bottomPad) minus a hair, so the tab
+  // borders stay visible — without it, screen content shows through the
+  // gaps between tabs and the bar looks like it overlaps every screen.
+  const shelfHeight = 33 + bottomPad;
 
   return (
-    <View style={styles.tabBar}>
+    <View style={styles.tabBar} pointerEvents="box-none">
+      <View
+        pointerEvents="none"
+        style={[
+          styles.shelf,
+          { height: shelfHeight, backgroundColor: colors.bg, borderTopColor: colors.edge },
+        ]}
+      />
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
@@ -104,6 +116,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-end',
     gap: 10,
+  },
+  shelf: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopWidth: 1.5,
   },
   tab: {
     width: 92,
