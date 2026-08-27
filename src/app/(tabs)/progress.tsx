@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AchievementModal } from '@/components/AchievementModal';
 import { AchievementSticker } from '@/components/AchievementSticker';
-import { FireflyJar } from '@/components/FireflyJar';
+import { DoodleFlame } from '@/components/DoodleFlame';
 import { Icon } from '@/components/Icon';
 import { RuledPaper } from '@/components/notebook';
 import { ACHIEVEMENTS, achievementById, type Unlock } from '@/lib/achievements';
@@ -178,8 +178,8 @@ export default function ProgressScreen() {
           <>
             {/* ---- the streak ---- */}
             <View style={styles.streakCard}>
-              <View style={styles.jarWrap}>
-                <FireflyJar tier={fire} size={72} lit={currentStreak > 0} />
+              <View style={styles.flameWrap}>
+                <DoodleFlame tier={fire} size={72} lit={currentStreak > 0} />
               </View>
               <View style={styles.streakText}>
                 <Text style={styles.streakDays}>
@@ -194,7 +194,7 @@ export default function ProgressScreen() {
                 <Text style={styles.tierLabel}>
                   {toNext != null && nextTier
                     ? `${toNext} ${toNext === 1 ? 'day' : 'days'} to ${nextTier.name}`
-                    : 'The jar is full.'}
+                    : 'Nothing left to reach. Keep it lit.'}
                 </Text>
               </View>
             </View>
@@ -467,7 +467,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     transform: [{ rotate: '-0.4deg' }],
     ...shadow.card,
   },
-  jarWrap: {
+  flameWrap: {
     width: 76,
     height: 76,
     backgroundColor: colors.surface,

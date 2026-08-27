@@ -13,7 +13,7 @@ jest.mock('@/lib/sfx', () => ({
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { AchievementSticker } from '@/components/AchievementSticker';
-import { FireflyJar } from '@/components/FireflyJar';
+import { DoodleFlame } from '@/components/DoodleFlame';
 import {
   ACHIEVEMENTS,
   FAMILY_ORDER,
@@ -78,27 +78,42 @@ describe('the album', () => {
   });
 });
 
-describe('the firefly jar', () => {
+describe('the doodle flame', () => {
   it('mounts at every tier, lit', () => {
     for (const tier of FIRE_TIERS) {
-      const tree = mount(<FireflyJar tier={tier} lit />);
+      const tree = mount(<DoodleFlame tier={tier} lit />);
       expect(tree.toJSON()).toBeTruthy();
       unmount(tree);
     }
   });
 
-  it('mounts unlit — a streak of nothing should still draw a jar', () => {
-    const tree = mount(<FireflyJar tier={FIRE_TIERS[0]} lit={false} />);
+  it('mounts unlit — a streak of nothing still draws the pencil ghost', () => {
+    const tree = mount(<DoodleFlame tier={FIRE_TIERS[0]} lit={false} />);
     expect(tree.toJSON()).toBeTruthy();
     unmount(tree);
   });
 
   it('keeps running once the animations have ticked', () => {
-    const tree = mount(<FireflyJar tier={FIRE_TIERS[FIRE_TIERS.length - 1]} lit />);
+    const tree = mount(<DoodleFlame tier={FIRE_TIERS[FIRE_TIERS.length - 1]} lit />);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
     expect(tree.toJSON()).toBeTruthy();
+    unmount(tree);
+  });
+
+  /**
+   * The firefly jar this replaced sat frozen because its motion was
+   * driven through react-native-svg element props, which Reanimated does
+   * not repaint in Expo Go or on web. The flame must animate Views
+   * instead, and each layer must grow from its base rather than its
+   * middle or it reads as a pulsing icon, not fire.
+   */
+  it('animates views from the base, never svg props', () => {
+    const tree = mount(<DoodleFlame tier={FIRE_TIERS[5]} lit />);
+    const json = JSON.stringify(tree.toJSON());
+    expect(json).toContain('transformOrigin');
+    expect(json).not.toContain('animatedProps');
     unmount(tree);
   });
 });
