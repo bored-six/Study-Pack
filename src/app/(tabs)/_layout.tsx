@@ -1,80 +1,130 @@
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet } from 'react-native';
 
 import { Icon } from '@/components/Icon';
-import { colors, font, outline, shadow } from '@/theme/tokens';
+import { font, getColors, useThemeStore, outline, shadow } from '@/theme/tokens';
+import { BouncyPressable } from '@/components/BouncyPressable';
 
-/**
- * Floating pill tab bar — an ink-outlined sticker hovering over the paper
- * ground. Screens pad their bottom content by tokens.tabClearance.
- */
-export default function TabsLayout() {
+/** Binder-divider tabs growing from the bottom edge; the active one rises and names itself. */
+function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+
+  const getIconName = (routeName: string) => {
+    if (routeName === 'index') return 'decksTab';
+    if (routeName === 'planner') return 'plannerTab';
+    if (routeName === 'progress') return 'progressTab';
+    return 'decksTab';
+  };
+
+  const bottomPad = Math.max(insets.bottom, 10);
+
+  return (
+    <View style={styles.tabBar}>
+      {state.routes.map((route: any, index: number) => {
+        const { options } = descriptors[route.key];
+        const isFocused = state.index === index;
+        const label = (options.title ?? route.name).toUpperCase();
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name, route.params);
+          }
+        };
+
+        const onLongPress = () => {
+          navigation.emit({
+            type: 'tabLongPress',
+            target: route.key,
+          });
+        };
+
+        return (
+          <BouncyPressable
+            key={route.key}
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={options.tabBarAccessibilityLabel ?? options.title}
+            testID={options.tabBarTestID}
+            onPress={onPress}
+            onLongPress={onLongPress}
+            style={[
+              styles.tab,
+              { backgroundColor: colors.surface, paddingBottom: bottomPad },
+              isFocused && [styles.tabActive, { backgroundColor: colors.accentWash }],
+            ]}
+          >
+            <Icon
+              name={getIconName(route.name)}
+              size={26}
+              color={isFocused ? (isDark ? colors.accentDeep : colors.ink) : colors.textFaint}
+            />
+            {isFocused ? (
+              <Text style={[styles.tabLabel, { color: colors.accentDeep }]}>{label}</Text>
+            ) : null}
+          </BouncyPressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export default function TabsLayout() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
 
   return (
     <Tabs
+      tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.bg },
-        tabBarActiveTintColor: colors.accentDeep,
-        tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: {
-          position: 'absolute',
-          left: 16,
-          right: 16,
-          bottom: Math.max(insets.bottom, 12),
-          height: 64,
-          borderRadius: 22,
-          backgroundColor: colors.surface,
-          ...outline,
-          ...shadow.card,
-          paddingTop: 6,
-        },
-        tabBarItemStyle: { paddingVertical: 4 },
-        tabBarLabelStyle: { fontFamily: font.bodyHeavy, fontSize: 11 },
       }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Decks',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Icon
-              name={focused ? 'cardsFilled' : 'cards'}
-              color={color}
-              fill={focused ? undefined : colors.surface2}
-              size={size}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="planner"
-        options={{
-          title: 'Planner',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Icon
-              name="calendar"
-              color={color}
-              fill={focused ? colors.accentWash : colors.surface2}
-              size={size}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="progress"
-        options={{
-          title: 'Progress',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Icon
-              name={focused ? 'chartFilled' : 'chart'}
-              color={color}
-              fill={focused ? undefined : colors.surface2}
-              size={size}
-            />
-          ),
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: 'Decks' }} />
+      <Tabs.Screen name="planner" options={{ title: 'Planner' }} />
+      <Tabs.Screen name="progress" options={{ title: 'Progress' }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    gap: 10,
+  },
+  tab: {
+    width: 92,
+    paddingTop: 9,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 2,
+    ...outline,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 13,
+    borderTopRightRadius: 16,
+    ...shadow.card,
+  },
+  tabActive: {
+    paddingTop: 15,
+    transform: [{ rotate: '-1deg' }],
+    ...shadow.pop,
+  },
+  tabLabel: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 9.5,
+    letterSpacing: 1,
+  },
+});

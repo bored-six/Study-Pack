@@ -1,36 +1,24 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  Dimensions,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { PlanQuizSheet, type PlanDraft } from '@/components/PlanQuizSheet';
 import { RuledPaper } from '@/components/notebook';
-import { listDecks } from '@/lib/db';
+import { listDecks, readSetting } from '@/lib/db';
 import {
   AVAILABLE_LEADS,
   formatClock,
   isSpent,
-  joinDeckNames,
   LEAD_LABEL,
   SESSION_WINDOW_MIN,
   type Session,
 } from '@/lib/schedule';
-import { REPEAT_LABEL, type Deck } from '@/lib/types';
+import { REPEAT_LABEL, type Deck, type Schedule } from '@/lib/types';
 import { usePlannerStore } from '@/store/planner';
-import { font, radius, tabClearance, getColors, useThemeStore } from '@/theme/tokens';
-
-const { width } = Dimensions.get('window');
+import { derpRadius, font, outline, shadow, tabClearance, getColors, useThemeStore } from '@/theme/tokens';
 
 function clockFor(timeOfDay: number): string {
   return formatClock(new Date().setHours(Math.floor(timeOfDay / 60), timeOfDay % 60, 0, 0));
@@ -52,7 +40,7 @@ function DerpToggle({ value, onChange, label }: { value: boolean; onChange: (on:
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
   const styles = getStyles(colors);
-  
+
   return (
     <Pressable
       accessibilityLabel={label}
@@ -63,8 +51,8 @@ function DerpToggle({ value, onChange, label }: { value: boolean; onChange: (on:
       ]}>
       <View style={[
         styles.derpToggleThumb,
-        { 
-          left: value ? 22 : 2, 
+        {
+          left: value ? 22 : 2,
           backgroundColor: value ? colors.surface : (isDark ? '#1A211C' : colors.ink),
           borderColor: value ? (isDark ? '#1A211C' : colors.ink) : 'transparent',
           borderWidth: value ? 2 : 0,
@@ -79,7 +67,7 @@ export default function PlannerScreen() {
   const colors = getColors(isDark);
   const styles = getStyles(colors);
   const insets = useSafeAreaInsets();
-  
+
   const {
     schedules,
     leads,
@@ -98,7 +86,7 @@ export default function PlannerScreen() {
   const [clashDraft, setClashDraft] = useState<{ draft: PlanDraft; withName: string } | null>(null);
   const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
   const [deleting, setDeleting] = useState<{ id: number; name: string } | null>(null);
-  const [tuning, setTuning] = useState(false);
+  const [kept, setKept] = useState(0);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -112,10 +100,16 @@ export default function PlannerScreen() {
       void listDecks('notes').then((decks) =>
         setSubjects(decks.filter((deck) => deck.questionCount > 0))
       );
+      void readSetting('plans_kept_total').then((value) =>
+        setKept(Number(value ?? 0) || 0)
+      );
     }, [refresh])
   );
 
   const next: Session | undefined = useMemo(() => upcoming(now)[0], [upcoming, now, schedules]);
+
+  const active = useMemo(() => schedules.filter((s) => s.enabled), [schedules]);
+  const paused = useMemo(() => schedules.filter((s) => !s.enabled), [schedules]);
 
   const saveDraft = useCallback(async (draft: PlanDraft) => {
     await add(draft);
@@ -137,158 +131,148 @@ export default function PlannerScreen() {
     await saveDraft(draft);
   }, [saveDraft, schedules]);
 
-  const handleDelete = useCallback((id: number, name: string) => setDeleting({ id, name }), []);
-
   const toggleLead = useCallback((lead: number) => {
     const nextLeads = leads.includes(lead) ? leads.filter((l) => l !== lead) : [...leads, lead];
     if (nextLeads.length === 0) return;
     void setLeads(nextLeads);
   }, [leads, setLeads]);
 
-  return (
-    <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
-      <RuledPaper />
-      
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View style={styles.magnetTitle}>
-          <Text style={styles.magnetText}>My Planner</Text>
-        </View>
-      </View>
+  const renderRow = (schedule: Schedule, index: number) => {
+    const isNext = next?.occurrences.some((o) => o.scheduleId === schedule.id) ?? false;
+    const isDone = isSpent(schedule, now);
 
+    let statusText = REPEAT_LABEL[schedule.repeat];
+    if (!schedule.enabled) statusText = 'Paused';
+    else if (isNext) statusText = `Upcoming (${countdown(next!.at, now)})`;
+    else if (isDone) statusText = 'Done for today';
+
+    const tileWash = !schedule.enabled
+      ? colors.surface2
+      : isNext
+        ? '#FBD5CC'
+        : isDone
+          ? '#E2E5E0'
+          : '#DDF3DC';
+
+    const timeStr = clockFor(schedule.timeOfDay);
+    const split = timeStr.split(' ');
+
+    return (
+      <Pressable
+        key={schedule.id}
+        onLongPress={() => setDeleting({ id: schedule.id, name: schedule.deckName })}
+        accessibilityLabel={`${schedule.deckName} plan`}
+        style={[
+          styles.row,
+          index % 2 === 0 ? styles.rowTiltLeft : styles.rowTiltRight,
+          !schedule.enabled && styles.rowOff,
+        ]}>
+        <View style={[styles.timeTile, { backgroundColor: tileWash }]}>
+          <Text style={styles.timeNum}>{split[0]}</Text>
+          {split.length > 1 ? <Text style={styles.timeAmPm}>{split[1]}</Text> : null}
+        </View>
+        <View style={styles.rowMid}>
+          <Text
+            style={[styles.rowName, schedule.enabled && isDone && { textDecorationLine: 'line-through' }]}
+            numberOfLines={1}>
+            {schedule.deckName}
+          </Text>
+          <Text style={styles.rowStatus} numberOfLines={1}>{statusText}</Text>
+        </View>
+        <DerpToggle label={`Toggle ${schedule.deckName}`} value={schedule.enabled} onChange={(val) => void toggle(schedule.id, val)} />
+      </Pressable>
+    );
+  };
+
+  return (
+    <View style={styles.screen}>
+      <RuledPaper />
+      <View pointerEvents="none" style={styles.holes}>
+        {Array.from({ length: 8 }, (_, i) => (
+          <View key={i} style={styles.hole} />
+        ))}
+      </View>
       <ScrollView
         style={styles.fill}
-        contentContainerStyle={[styles.content, { paddingBottom: tabClearance + 40 }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: tabClearance + 20 }]}
         showsVerticalScrollIndicator={false}>
-        
-        {/* SCHEDULE POLAROIDS (HORIZONTAL SWIPE) */}
-        {schedules.length > 0 ? (
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.carouselContainer}
-            snapToInterval={width * 0.75 + 16}
-            decelerationRate="fast"
-          >
-            {schedules.map((schedule, i) => {
-              const isNext = next?.occurrences.some(o => o.scheduleId === schedule.id);
-              const isDone = isSpent(schedule, now);
-              
-              let statusText = REPEAT_LABEL[schedule.repeat];
-              if (!schedule.enabled) statusText = 'Paused';
-              else if (isNext) statusText = `Upcoming (${countdown(next!.at, now)})`;
-              else if (isDone) statusText = 'Done for today';
 
-              const timeStr = clockFor(schedule.timeOfDay);
-              const splitTime = timeStr.split(' ');
-              const num = splitTime[0];
-              const ampm = splitTime.length > 1 ? splitTime[1] : '';
-
-              return (
-                <View
-                  key={schedule.id}
-                  style={[
-                    styles.polaroid,
-                    { transform: [{ rotate: i % 2 === 0 ? '2deg' : '-2deg' }] },
-                    !schedule.enabled && { opacity: 0.6 }
-                  ]}>
-                  <View style={styles.pin} />
-                  
-                  {/* Delete Button */}
-                  <Pressable 
-                    onPress={() => handleDelete(schedule.id, schedule.deckName)}
-                    style={styles.deleteBtn}>
-                    <Icon name="trash" size={16} color="#FFFFFF" fill="#E57373" strokeWidth={2.5} />
-                  </Pressable>
-                  
-                  <View style={[styles.photoArea, isNext ? { backgroundColor: '#FBD5CC' } : (isDone ? { backgroundColor: '#E2E5E0' } : { backgroundColor: '#DDF3DC' })]}>
-                    <View style={styles.photoTimeRow}>
-                      <Text style={styles.photoTimeNum}>{num}</Text>
-                      {ampm ? <Text style={styles.photoTimeAmPm}>{ampm}</Text> : null}
-                    </View>
-                    {isNext ? (
-                       <ChunkyButton 
-                         label="Start Quiz" 
-                         size="sm" 
-                         variant="primary" 
-                         style={{ position: 'absolute', bottom: 10, alignSelf: 'center' }}
-                         onPress={() => router.push({ pathname: '/quiz/[deckId]', params: { deckId: next!.occurrences[0].deckId } })} 
-                       />
-                    ) : null}
-                  </View>
-                  
-                  <View style={styles.photoBot}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.photoDeck, isDone && { textDecorationLine: 'line-through' }]} numberOfLines={1}>{schedule.deckName}</Text>
-                      <Text style={styles.photoStatus}>{statusText}</Text>
-                    </View>
-                    <DerpToggle label="Toggle plan" value={schedule.enabled} onChange={(val) => void toggle(schedule.id, val)} />
-                  </View>
-                </View>
-              );
-            })}
-          </ScrollView>
-        ) : null}
-
-        {/* EMPTY STATE */}
-        {schedules.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconWrap}>
-              <Icon name="dice" size={48} color={colors.ink} fill={colors.bg} />
+        <View style={styles.headRow}>
+          <Text style={styles.kicker}>FLIPP</Text>
+          {kept > 0 ? (
+            <View style={styles.keptChip}>
+              <Text style={styles.keptText}>{kept} {kept === 1 ? 'plan' : 'plans'} kept</Text>
             </View>
-            <Text style={styles.emptyTitle}>Nothing planned yet!</Text>
-            <Text style={styles.emptySub}>A blank canvas. Schedule a quiz to build a habit.</Text>
-          </View>
-        ) : !schedules.some(s => s.enabled) ? (
-
-          <View style={styles.endHint}>
-            <View style={styles.endIconWrap}>
-              <Icon name="check" size={20} color={colors.ink} />
-            </View>
-            <Text style={styles.endText}>Nothing else planned today!</Text>
-          </View>
-        ) : null}
-
-        {/* ACTION BUTTONS (NO LONGER ABSOLUTE - NO OVERLAP) */}
-        <View style={styles.bottomBar}>
-          <Pressable onPress={() => setTuning(true)} style={({ pressed }) => [styles.remindersBtn, pressed && { opacity: 0.8 }]}>
-            <Icon name="bell" size={24} color="#1A211C" />
-          </Pressable>
-          
-          <Pressable onPress={() => setPlanning(true)} style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.9 }]}>
-            <Text style={styles.addBtnText}>+ Add a Plan</Text>
-          </Pressable>
+          ) : null}
         </View>
+        <Text style={styles.title}>My planner</Text>
+
+        {schedules.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Icon name="calendar" size={40} color={colors.ink} fill={colors.bg} />
+            <Text style={styles.emptyTitle}>Nothing planned yet!</Text>
+            <Text style={styles.emptySub}>Schedule a quiz to build a habit.</Text>
+          </View>
+        ) : (
+          <>
+            {active.length > 0 ? (
+              <>
+                <View style={styles.dividerTab}>
+                  <Text style={styles.dividerText}>PLANS · {active.length}</Text>
+                </View>
+                {active.map(renderRow)}
+              </>
+            ) : null}
+
+            {paused.length > 0 ? (
+              <>
+                <View style={[styles.dividerTab, styles.dividerTabPaused]}>
+                  <Text style={[styles.dividerText, { color: colors.textFaint }]}>PAUSED · {paused.length}</Text>
+                </View>
+                {paused.map(renderRow)}
+              </>
+            ) : null}
+
+            <View style={styles.remCard}>
+              <Icon name="bell" size={20} color="#1A211C" fill={colors.goldWash} />
+              <Text style={styles.remLabel}>REMIND ME</Text>
+              <View style={styles.leadChips}>
+                {AVAILABLE_LEADS.map((lead) => {
+                  const activeLead = leads.includes(lead);
+                  return (
+                    <Pressable
+                      key={lead}
+                      onPress={() => toggleLead(lead)}
+                      style={[styles.leadChip, activeLead && styles.leadChipActive]}>
+                      <Text style={[styles.leadText, activeLead && styles.leadTextActive]}>{LEAD_LABEL[lead]}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+            {capability === 'denied' ? (
+              <Pressable onPress={() => void askPermission()} hitSlop={6}>
+                <Text style={styles.permText}>Notifications are off — tap to turn on</Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+
+        <Pressable
+          onPress={() => setPlanning(true)}
+          style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.9 }]}>
+          <Text style={styles.addBtnText}>+ Add a plan</Text>
+        </Pressable>
+        {schedules.length > 0 ? (
+          <Text style={styles.holdHint}>Hold a plan to delete it</Text>
+        ) : null}
 
       </ScrollView>
 
-      {/* MODALS */}
       <ConfirmModal visible={clashDraft != null} title="Same time slot" message={clashDraft ? `You already have ${clashDraft.withName} around ${clockFor(clashDraft.draft.timeOfDay)}. They'll run together as one session, with a single reminder.` : undefined} confirmLabel="Add it" onCancel={() => setClashDraft(null)} onConfirm={() => { const draft = clashDraft?.draft; setClashDraft(null); if (draft) void saveDraft(draft); }} />
       <ConfirmModal visible={notice != null} title={notice?.title ?? ''} message={notice?.message} confirmLabel="Got it" onCancel={() => setNotice(null)} />
       <ConfirmModal visible={deleting != null} title="Delete this plan?" message={deleting ? `${deleting.name} will stop reminding you.` : undefined} confirmLabel="Delete" cancelLabel="Keep" destructive onCancel={() => setDeleting(null)} onConfirm={() => { const id = deleting?.id; setDeleting(null); if (id != null) void remove(id); }} />
       <PlanQuizSheet visible={planning} subjects={subjects} onCancel={() => setPlanning(false)} onSave={(draft) => void handleSave(draft)} />
-
-      <Modal visible={tuning} animationType="slide" transparent onRequestClose={() => setTuning(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setTuning(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.grabber} />
-            <Text style={styles.sheetTitle}>Remind me</Text>
-            {capability === 'denied' ? <ChunkyButton label="Turn on notifications" size="lg" onPress={() => void askPermission()} style={styles.permBtn} /> : null}
-            <View style={styles.leadChips}>
-              {AVAILABLE_LEADS.map((lead) => {
-                const active = leads.includes(lead);
-                return (
-                  <Pressable key={lead} onPress={() => toggleLead(lead)} style={[styles.leadChip, active && styles.leadChipActive]}>
-                    <Text style={[styles.leadText, active && styles.leadTextActive]}>{LEAD_LABEL[lead]}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.sheetNote}>Quizzes planned for the same time share one reminder. Short lead times are approximate.</Text>
-            <ChunkyButton label="Done" size="lg" onPress={() => setTuning(false)} style={styles.doneBtn} />
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -296,195 +280,238 @@ export default function PlannerScreen() {
 const getStyles = (colors: any) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   fill: { flex: 1 },
-  content: { paddingTop: 10 },
-  
-  header: {
-    alignItems: 'center',
-    marginBottom: 24,
+  content: {
+    paddingLeft: 32,
+    paddingRight: 16,
+    maxWidth: 640,
+    alignSelf: 'center',
+    width: '100%',
   },
-  magnetTitle: {
-    backgroundColor: '#DBEEFB',
-    borderWidth: 2,
-    borderColor: '#1A211C',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 20,
-    transform: [{ rotate: '-1deg' }],
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 0, elevation: 4,
-  },
-  magnetText: {
-    fontFamily: font.hero,
-    fontSize: 32,
-    color: '#1A211C',
-  },
-
-  carouselContainer: {
-    paddingHorizontal: 24,
-    gap: 16,
-    paddingTop: 16,
-    paddingBottom: 30,
-  },
-  polaroid: {
-    width: width * 0.75,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    padding: 12,
-    paddingBottom: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 0, elevation: 8,
-  },
-  pin: {
+  holes: {
     position: 'absolute',
-    top: -8,
-    left: '50%',
-    marginLeft: -10,
-    width: 20,
-    height: 20,
-    backgroundColor: '#E57373',
-    borderWidth: 2,
-    borderColor: '#1A211C',
-    borderRadius: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 0, elevation: 4,
-    zIndex: 10,
+    left: 11,
+    top: 96,
+    bottom: tabClearance,
+    width: 13,
+    justifyContent: 'space-evenly',
   },
-  deleteBtn: {
-    position: 'absolute',
-    top: -12,
-    right: -12,
-    width: 32,
-    height: 32,
-    backgroundColor: '#E57373',
-    borderWidth: 2,
-    borderColor: '#1A211C',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 0, elevation: 4,
-    zIndex: 12,
+  hole: {
+    width: 13,
+    height: 13,
+    borderRadius: 999,
+    backgroundColor: colors.track,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
   },
-  photoArea: {
-    height: 120,
-    borderWidth: 2,
-    borderColor: '#1A211C',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoTimeRow: {
+  headRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  photoTimeNum: {
-    fontFamily: font.hero,
-    fontSize: 52,
-    color: '#1A211C',
-  },
-  photoTimeAmPm: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 18,
-    color: '#1A211C',
-    marginBottom: 8,
-  },
-  photoBot: {
-    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
-    paddingHorizontal: 4,
+    paddingTop: 6,
+    minHeight: 30,
   },
-  photoDeck: {
+  kicker: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 12,
+    letterSpacing: 2,
+    color: colors.accentDeep,
+  },
+  keptChip: {
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    ...shadow.card,
+    transform: [{ rotate: '2deg' }],
+  },
+  keptText: {
+    fontFamily: font.heading,
+    fontSize: 12.5,
+    color: colors.text,
+  },
+  title: {
+    fontFamily: font.hero,
+    fontSize: 34,
+    lineHeight: 42,
+    color: colors.text,
+  },
+  dividerTab: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.accentWash,
+    ...outline,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 2,
+    borderBottomLeftRadius: 2,
+    paddingHorizontal: 14,
+    paddingTop: 5,
+    paddingBottom: 4,
+    marginTop: 16,
+    marginBottom: 10,
+    transform: [{ rotate: '-1deg' }],
+  },
+  dividerTabPaused: {
+    backgroundColor: colors.surface2,
+  },
+  dividerText: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    color: colors.accentDeep,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    backgroundColor: colors.surface,
+    ...outline,
+    ...derpRadius,
+    paddingVertical: 10,
+    paddingLeft: 10,
+    paddingRight: 12,
+    marginBottom: 10,
+    ...shadow.card,
+  },
+  rowTiltLeft: { transform: [{ rotate: '-0.3deg' }] },
+  rowTiltRight: { transform: [{ rotate: '0.3deg' }] },
+  rowOff: { opacity: 0.55 },
+  timeTile: {
+    width: 58,
+    height: 52,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    borderTopLeftRadius: 13,
+    borderTopRightRadius: 15,
+    borderBottomRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-2deg' }],
+  },
+  timeNum: {
+    fontFamily: font.hero,
+    fontSize: 19,
+    lineHeight: 21,
+    color: '#1A211C',
+  },
+  timeAmPm: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 9,
+    letterSpacing: 0.8,
+    color: '#1A211C',
+  },
+  rowMid: {
+    flex: 1,
+    minWidth: 0,
+  },
+  rowName: {
+    fontFamily: font.heading,
+    fontSize: 15.5,
+    lineHeight: 19,
+    color: colors.text,
+  },
+  rowStatus: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
+    color: colors.textFaint,
+    marginTop: 1,
+  },
+  remCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: colors.goldWash,
+    ...outline,
+    ...derpRadius,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    transform: [{ rotate: '-0.4deg' }],
+    ...shadow.card,
+  },
+  remLabel: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    color: colors.gold,
+  },
+  leadChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  leadChip: {
+    backgroundColor: colors.surface,
+    ...outline,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 4,
+  },
+  leadChipActive: {
+    backgroundColor: '#FCEBC0',
+    transform: [{ rotate: '2deg' }],
+  },
+  leadText: {
+    fontFamily: font.heading,
+    fontSize: 12,
+    color: colors.textDim,
+  },
+  leadTextActive: {
+    color: '#1A211C',
+  },
+  permText: {
+    fontFamily: font.bodyBold,
+    fontSize: 12.5,
+    color: colors.coral,
+    marginTop: 8,
+    marginLeft: 4,
+  },
+  emptyCard: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: colors.edge,
+    ...derpRadius,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 30,
+    marginTop: 18,
+  },
+  emptyTitle: {
     fontFamily: font.hero,
     fontSize: 24,
     color: colors.text,
   },
-  photoStatus: {
-    fontFamily: font.bodyBold,
-    fontSize: 14,
-    color: colors.textFaint,
-  },
-
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: 40,
-    opacity: 0.8,
-  },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontFamily: font.hero,
-    fontSize: 28,
-    color: colors.text,
-    marginBottom: 8,
-  },
   emptySub: {
-    fontFamily: font.bodyBold,
-    fontSize: 14,
+    fontFamily: font.bodySemibold,
+    fontSize: 13,
     color: colors.textFaint,
     textAlign: 'center',
   },
-  endHint: {
-    alignItems: 'center',
-    marginTop: 10,
-    opacity: 0.6,
-  },
-  endIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  endText: {
-    fontFamily: font.bodyBold,
-    fontSize: 14,
-    color: colors.text,
-  },
-
-  bottomBar: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 40,
-    paddingHorizontal: 24,
-  },
-  remindersBtn: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#FCEBC0',
-    borderWidth: 2,
-    borderColor: '#1A211C',
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 0, elevation: 6,
-  },
   addBtn: {
-    flex: 1,
-    height: 60,
-    backgroundColor: '#5FD184',
-    borderWidth: 2,
-    borderColor: '#1A211C',
-    borderRadius: 16,
+    height: 58,
+    backgroundColor: colors.accent,
+    borderWidth: 1.5,
+    borderColor: colors.accentEdge,
+    ...derpRadius,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 0, elevation: 6,
+    marginTop: 16,
+    transform: [{ rotate: '0.4deg' }],
+    ...shadow.pop,
   },
   addBtnText: {
     fontFamily: font.hero,
-    fontSize: 26,
-    color: '#1A211C',
+    fontSize: 24,
+    color: colors.onAccent,
+  },
+  holdHint: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
+    color: colors.textFaint,
+    textAlign: 'center',
+    marginTop: 10,
   },
   derpToggle: {
     width: 48,
@@ -499,17 +526,4 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 20,
     borderRadius: 10,
   },
-  
-  backdrop: { flex: 1, backgroundColor: 'rgba(39, 54, 43, 0.3)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 28, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32 },
-  grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line, marginBottom: 18 },
-  sheetTitle: { fontFamily: font.hero, fontSize: 26, lineHeight: 34, color: colors.text, marginBottom: 18 },
-  permBtn: { marginBottom: 18 },
-  leadChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  leadChip: { backgroundColor: colors.surface2, borderRadius: radius.pill, paddingHorizontal: 15, paddingVertical: 9 },
-  leadChipActive: { backgroundColor: colors.accent },
-  leadText: { fontFamily: font.bodyBold, fontSize: 13, color: colors.textDim },
-  leadTextActive: { color: colors.ink },
-  sheetNote: { fontFamily: font.body, fontSize: 12.5, lineHeight: 18, color: colors.textFaint, marginTop: 18 },
-  doneBtn: { marginTop: 26 },
 });
