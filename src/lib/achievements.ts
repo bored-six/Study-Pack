@@ -34,10 +34,34 @@ export interface AchievementContext {
   total: number;
 }
 
+/**
+ * Which shelf of the album a sticker sits on. Six per family, five
+ * families, thirty in all — so every row of the album is a complete set
+ * and the page looks finished even when it is empty.
+ */
+export type AchievementFamily = 'tally' | 'fire' | 'knowledge' | 'promises' | 'character';
+
+export const FAMILY_ORDER: AchievementFamily[] = [
+  'tally',
+  'fire',
+  'knowledge',
+  'promises',
+  'character',
+];
+
+export const FAMILY_LABEL: Record<AchievementFamily, string> = {
+  tally: 'THE TALLY',
+  fire: 'THE FIRE',
+  knowledge: 'WHAT YOU KNOW',
+  promises: 'PROMISES KEPT',
+  character: 'WHO YOU ARE',
+};
+
 export interface AchievementDef {
   id: string;
   title: string;
   icon: IconName;
+  family: AchievementFamily;
   earned: (ctx: AchievementContext) => boolean;
   /** One is chosen at random when unlocked, then kept forever. */
   notes: string[];
@@ -53,7 +77,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'first-quiz',
     title: 'The first one',
-    icon: 'sprout',
+    icon: 'sproutClassic',
+    family: 'tally',
     earned: (c) => c.totalAttempts >= 1,
     notes: [
       'Every streak, every mastered subject, every good grade that ever came from this app will trace back to today. You started.',
@@ -63,7 +88,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'ten-quizzes',
     title: 'Ten deep',
-    icon: 'cards',
+    icon: 'cardsClassic',
+    family: 'tally',
     earned: (c) => c.totalAttempts >= 10,
     notes: [
       "Ten quizzes. This stopped being an experiment a while ago — it's just what you do now.",
@@ -73,7 +99,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'fifty-quizzes',
     title: 'Fifty strong',
-    icon: 'cards',
+    icon: 'cardsClassic',
+    family: 'tally',
     earned: (c) => c.totalAttempts >= 50,
     notes: [
       'Fifty. Nobody watched you do most of these. That is exactly what makes them count.',
@@ -83,7 +110,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'hundred-quizzes',
     title: 'A hundred',
-    icon: 'trophy',
+    icon: 'trophyClassic',
+    family: 'tally',
     earned: (c) => c.totalAttempts >= 100,
     notes: [
       'One hundred quizzes. Think of who you were at number one — you know things now that person was still afraid of.',
@@ -92,7 +120,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'two-fifty-quizzes',
     title: 'Two hundred and fifty',
-    icon: 'trophy',
+    icon: 'trophyClassic',
+    family: 'tally',
     earned: (c) => c.totalAttempts >= 250,
     notes: [
       "Two hundred and fifty. At this point it isn't an app helping you study — it's a record of who you are.",
@@ -101,7 +130,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'first-subject',
     title: 'A shelf of your own',
-    icon: 'book',
+    icon: 'bookClassic',
+    family: 'knowledge',
     earned: (c) => c.subjectCount >= 1,
     notes: [
       'Your own notes, your own subject, your own pace. This one is nobody else’s syllabus.',
@@ -110,7 +140,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'three-subjects',
     title: 'The full shelf',
-    icon: 'book',
+    icon: 'bookClassic',
+    family: 'knowledge',
     earned: (c) => c.subjectCount >= 3,
     notes: [
       'Three subjects, side by side. You are not cramming a topic — you are running your whole life from here.',
@@ -119,7 +150,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'getting-there',
     title: 'Getting there',
-    icon: 'chart',
+    icon: 'chartClassic',
+    family: 'knowledge',
     earned: (c) => c.subjectPercents.some((p) => p >= 60),
     notes: [
       'A subject crossed sixty. That number never lies and never rounds up — you genuinely know most of this now.',
@@ -129,7 +161,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'solid',
     title: 'Solid ground',
-    icon: 'trophy',
+    icon: 'trophyClassic',
+    family: 'knowledge',
     earned: (c) => c.subjectPercents.some((p) => p >= 85),
     notes: [
       "Eighty-five percent mastery. You could be asked almost anything from these notes and you'd be fine. Sit with that for a second.",
@@ -138,7 +171,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'all-steady',
     title: 'All of it, steady',
-    icon: 'star',
+    icon: 'starClassic',
+    family: 'knowledge',
     earned: (c) => c.subjectCount >= 2 && c.subjectPercents.every((p) => p >= 60),
     notes: [
       'Every subject above sixty. No weak flank, nothing you’re quietly avoiding. This is what prepared feels like.',
@@ -147,7 +181,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'perfect',
     title: 'Every single one',
-    icon: 'star',
+    icon: 'starClassic',
+    family: 'promises',
     earned: (c) => c.score === c.total && c.total >= 5,
     notes: [
       'A perfect round. Not luck — you watched yourself know every answer, one after another.',
@@ -157,7 +192,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'five-perfects',
     title: 'Five flawless',
-    icon: 'star',
+    icon: 'starClassic',
+    family: 'promises',
     earned: (c) => c.perfectRounds >= 5,
     notes: [
       'Five perfect rounds. Once is a good day. Five is who you are becoming.',
@@ -166,7 +202,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'comeback',
     title: 'The return',
-    icon: 'heart',
+    icon: 'heartClassic',
+    family: 'character',
     earned: (c) => c.daysSinceLastStudy != null && c.daysSinceLastStudy >= 3,
     notes: [
       'You were gone a while, and you came back anyway. Coming back is the whole game — everything else is detail.',
@@ -176,7 +213,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'night-owl',
     title: 'While the house sleeps',
-    icon: 'heart',
+    icon: 'heartClassic',
+    family: 'character',
     earned: (c) => c.hourOfDay >= 23 || c.hourOfDay < 5,
     notes: [
       "Studying while everyone else is asleep. Nobody sees these hours — but they're the ones that show up in the result.",
@@ -185,7 +223,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'early-bird',
     title: 'Before the day starts',
-    icon: 'clock',
+    icon: 'clockClassic',
+    family: 'character',
     earned: (c) => c.hourOfDay >= 5 && c.hourOfDay < 7,
     notes: [
       'A quiz before seven in the morning. You gave the best part of the day to yourself before anyone could ask for it.',
@@ -194,7 +233,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'week-fire',
     title: 'Seven days burning',
-    icon: 'flame',
+    icon: 'flameClassic',
+    family: 'fire',
     earned: (c) => c.streak >= 7,
     notes: [
       "Seven days in a row. This is the week the habit stopped needing you to push it.",
@@ -203,7 +243,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'month-fire',
     title: 'A month of fire',
-    icon: 'flameBig',
+    icon: 'flameBigClassic',
+    family: 'fire',
     earned: (c) => c.streak >= 30,
     notes: [
       'Thirty days without missing one. Most resolutions die in a fortnight. Yours is just getting warm.',
@@ -212,16 +253,48 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'hundred-fire',
     title: 'The everlasting',
-    icon: 'flameCrown',
+    icon: 'flameCrownClassic',
+    family: 'fire',
     earned: (c) => c.streak >= 100,
     notes: [
       'One hundred consecutive days. There is no message equal to this. You already know what you did.',
     ],
   },
   {
+    id: 'year-fire',
+    title: 'The eternal year',
+    icon: 'flameYearClassic',
+    family: 'fire',
+    earned: (c) => c.streak >= 365,
+    notes: [
+      'Three hundred and sixty-five days. Not one missed. There is nothing left to say about consistency that you have not already said yourself.',
+    ],
+  },
+  {
+    id: 'all-solid',
+    title: 'All of it, solid',
+    icon: 'trophyClassic',
+    family: 'knowledge',
+    earned: (c) => c.subjectCount >= 2 && c.subjectPercents.every((p) => p >= 85),
+    notes: [
+      'Every subject above eighty-five. There is no weak one to worry about on the way in. Whatever they ask, you have already answered it.',
+    ],
+  },
+  {
+    id: 'long-return',
+    title: 'The long way back',
+    icon: 'heartClassic',
+    family: 'character',
+    earned: (c) => c.daysSinceLastStudy != null && c.daysSinceLastStudy >= 30,
+    notes: [
+      'A month away, and you still came back. Most people who stop, stop for good. You just proved you are not most people.',
+    ],
+  },
+  {
     id: 'kept-plan',
     title: 'Word kept',
-    icon: 'calendar',
+    icon: 'calendarClassic',
+    family: 'promises',
     earned: (c) => c.keptPlan,
     notes: [
       'You set a time, and when it came, you were there. Keeping promises to yourself is the hardest kind of keeping.',
@@ -230,7 +303,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'ten-plans',
     title: 'Ten promises',
-    icon: 'calendar',
+    icon: 'calendarClassic',
+    family: 'promises',
     earned: (c) => c.plansKeptTotal >= 10,
     notes: [
       "Ten planned sessions, ten showed up for. People trust others who do that. You get to trust yourself.",
@@ -239,7 +313,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'hundred-answers',
     title: 'A hundred answers',
-    icon: 'check',
+    icon: 'checkClassic',
+    family: 'tally',
     earned: (c) => c.totalAnswers >= 100,
     notes: [
       'One hundred questions faced. Right or wrong, each one taught the next one something.',
@@ -248,7 +323,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'five-hundred-answers',
     title: 'Five hundred answers',
-    icon: 'check',
+    icon: 'checkClassic',
+    family: 'promises',
     earned: (c) => c.totalAnswers >= 500,
     notes: [
       'Five hundred answers. Grain by grain, this is how the mountain got moved.',
@@ -257,7 +333,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'weak-cleared',
     title: 'The stubborn ones',
-    icon: 'bolt',
+    icon: 'boltClassic',
+    family: 'promises',
     earned: (c) => c.clearedWeakSubject,
     notes: [
       "The questions that kept beating you — you went back for them, and now there are none left. That's not studying, that's character.",
@@ -266,7 +343,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'marathon',
     title: 'The long sitting',
-    icon: 'flame',
+    icon: 'flameClassic',
+    family: 'fire',
     earned: (c) => c.attemptsToday >= 5,
     notes: [
       'Five quizzes in one day. Some days you find a rhythm and ride it. Today was one of those.',
@@ -275,7 +353,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'dedicated',
     title: 'A week of days',
-    icon: 'calendar',
+    icon: 'calendarClassic',
+    family: 'fire',
     earned: (c) => c.distinctStudyDays >= 7,
     notes: [
       "Seven different days you chose this. Not in a row — that's not the point. The point is you keep choosing it.",
@@ -284,7 +363,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'weekender',
     title: 'The whole weekend',
-    icon: 'heart',
+    icon: 'heartClassic',
+    family: 'character',
     earned: (c) => c.weekendPair,
     notes: [
       'Saturday and Sunday, both. Weekends are the honest test — nobody makes you, and you did anyway.',
@@ -293,7 +373,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'rough-day',
     title: 'Stayed anyway',
-    icon: 'heart',
+    icon: 'heartClassic',
+    family: 'character',
     earned: (c) => c.total >= 5 && c.score / c.total < 0.4,
     notes: [
       "A hard round, finished anyway. Anyone can study on the good days. You just proved you're not only a good-day student.",

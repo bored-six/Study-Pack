@@ -20,8 +20,20 @@ interface ProgressState {
   weakCount: number;
   currentStreak: number;
   longestStreak: number;
+  /** Rounds taken per local calendar day, keyed 'YYYY-MM-DD'. */
+  dayCounts: Record<string, number>;
+  /** Every answer recorded, for the running total. */
+  totalAnswers: number;
   status: 'idle' | 'loading' | 'ready';
   refresh: () => Promise<void>;
+}
+
+/** Local calendar day key — the grid must match the user's own midnight. */
+export function dayKey(timestamp: number): string {
+  const date = new Date(timestamp);
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 export const useProgressStore = create<ProgressState>((set, get) => ({
@@ -31,6 +43,8 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
   weakCount: 0,
   currentStreak: 0,
   longestStreak: 0,
+  dayCounts: {},
+  totalAnswers: 0,
   status: 'idle',
 
   refresh: async () => {
@@ -61,6 +75,12 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
 
       const { current, longest } = computeStreaks(timestamps);
 
+      const dayCounts: Record<string, number> = {};
+      for (const timestamp of timestamps) {
+        const key = dayKey(timestamp);
+        dayCounts[key] = (dayCounts[key] ?? 0) + 1;
+      }
+
       set({
         attempts,
         totalAttempts: timestamps.length,
@@ -68,6 +88,8 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
         weakCount: weakSpots(answers, now).length,
         currentStreak: current,
         longestStreak: longest,
+        dayCounts,
+        totalAnswers: answers.length,
         status: 'ready',
       });
     } catch (e) {
