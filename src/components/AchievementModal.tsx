@@ -7,7 +7,7 @@ import { Icon } from '@/components/Icon';
 import { Tape } from '@/components/notebook';
 import { achievementById, LOCKED_NOTE, type Unlock } from '@/lib/achievements';
 import { playSfx } from '@/lib/sfx';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -117,7 +117,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 24,
     paddingTop: 28,

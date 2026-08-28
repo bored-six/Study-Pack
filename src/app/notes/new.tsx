@@ -31,7 +31,7 @@ import { LIMITS } from '@/lib/noteParser';
 import { readShape, shapeAdvice } from '@/lib/noteShape';
 import { playSfx } from '@/lib/sfx';
 import { useNotesStore } from '@/store/notes';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 const PLACEHOLDER = `Chlorophyll: the green pigment that absorbs light
 ATP stands for adenosine triphosphate
@@ -417,7 +417,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 76,
     borderRadius: 26,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
@@ -458,7 +458,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 38,
     borderRadius: 13,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.card,
@@ -482,7 +482,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   titleSticker: {
     backgroundColor: colors.accentWash,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: 11,
     paddingHorizontal: 9,
     paddingVertical: 1,
@@ -517,7 +517,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   recipe: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -582,7 +582,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   page: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     overflow: 'hidden',
     minHeight: PAGE_PAD * 2 + LINE_H * 8,
@@ -669,7 +669,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.pill,
     paddingHorizontal: 9,
     paddingVertical: 4,

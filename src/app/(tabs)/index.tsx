@@ -10,7 +10,7 @@ import { RuledPaper } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import type { Deck } from '@/lib/types';
 import { updateSubject } from '@/lib/db';
-import { derpRadius, font, outline, shadow, subjectInkFor, tabClearance, getColors, useThemeStore } from '@/theme/tokens';
+import { derpRadius, font, getColors, outlineOn, shadow, subjectInkFor, tabClearance, useThemeStore } from '@/theme/tokens';
 import { formatClock, joinDeckNames } from '@/lib/schedule';
 import { usePlannerStore } from '@/store/planner';
 import { useDecksStore } from '@/store/decks';
@@ -365,7 +365,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: colors.goldWash,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: 999,
     paddingVertical: 9,
     paddingHorizontal: 15,
@@ -388,7 +388,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: 14,
     paddingHorizontal: 13,
     paddingVertical: 9,
@@ -407,7 +407,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   dividerTab: {
     alignSelf: 'flex-start',
     backgroundColor: colors.accentWash,
-    ...outline,
+    ...outlineOn(colors),
     borderTopLeftRadius: 8,
     borderTopRightRadius: 10,
     borderBottomRightRadius: 2,
@@ -430,7 +430,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     paddingVertical: 11,
     paddingLeft: 11,
@@ -541,7 +541,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   actionBtn: {
     flex: 1,
     flexDirection: 'row',
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     paddingVertical: 14,
     paddingHorizontal: 8,
@@ -563,7 +563,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     backgroundColor: '#FFE5D2', // peach
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     paddingVertical: 12,
     paddingHorizontal: 14,

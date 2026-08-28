@@ -4,7 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 
 import { Icon } from '@/components/Icon';
 import { playSfx } from '@/lib/sfx';
-import { font, getColors, useThemeStore, outline, shadow } from '@/theme/tokens';
+import { font, getColors, outlineOn, shadow, useThemeStore } from '@/theme/tokens';
 import { BouncyPressable } from '@/components/BouncyPressable';
 
 /** Binder-divider tabs growing from the bottom edge; the active one rises and names itself. */
@@ -12,6 +12,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
+  const styles = getStyles(colors);
 
   const getIconName = (routeName: string) => {
     if (routeName === 'index') return 'decksTab';
@@ -93,6 +94,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 export default function TabsLayout() {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
+  const styles = getStyles(colors);
 
   return (
     <Tabs
@@ -108,7 +110,7 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   tabBar: {
     position: 'absolute',
     left: 0,
@@ -132,7 +134,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 2,
-    ...outline,
+    ...outlineOn(colors),
     borderBottomWidth: 0,
     borderTopLeftRadius: 13,
     borderTopRightRadius: 16,

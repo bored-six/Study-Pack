@@ -15,7 +15,7 @@ import { useAchievementsStore } from '@/store/achievements';
 import { dayKey, useProgressStore } from '@/store/progress';
 import { playSfx } from '@/lib/sfx';
 import { readSetting, writeSetting } from '@/lib/db';
-import { subjectInkFor } from '@/theme/tokens';
+import { outlineOn, subjectInkFor } from '@/theme/tokens';
 import { derpRadius, font, outline, shadow, tabClearance, useThemeStore, getColors } from '@/theme/tokens';
 import { useNotesStore } from '@/store/notes';
 
@@ -517,7 +517,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 11,
     backgroundColor: colors.goldWash,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     padding: 11,
     marginTop: 12,
@@ -577,7 +577,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   dividerTab: {
     alignSelf: 'flex-start',
     backgroundColor: colors.accentWash,
-    ...outline,
+    ...outlineOn(colors),
     borderTopLeftRadius: 8,
     borderTopRightRadius: 10,
     borderBottomRightRadius: 2,
@@ -600,7 +600,7 @@ const getStyles = (colors: any) => StyleSheet.create({
 
   chartCard: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     padding: 11,
     ...shadow.card,
@@ -757,7 +757,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   numCard: {
     flex: 1,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderTopLeftRadius: 13,
     borderTopRightRadius: 15,
     borderBottomRightRadius: 12,
@@ -787,7 +787,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     paddingVertical: 9,
     paddingHorizontal: 11,
@@ -814,7 +814,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 11,
     backgroundColor: colors.coralWash,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     padding: 12,
     marginTop: 12,
@@ -839,7 +839,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     paddingVertical: 10,
     paddingLeft: 10,

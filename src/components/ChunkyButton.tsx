@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import { Icon, type IconName } from '@/components/Icon';
-import { buttonEdge, font, getColors, outline, radius, useThemeStore } from '@/theme/tokens';
+import { buttonEdge, font, getColors, outlineOn, radius, useThemeStore } from '@/theme/tokens';
 
 type Variant = 'primary' | 'soft' | 'paper';
 type Size = 'sm' | 'md' | 'lg';
@@ -139,9 +139,9 @@ const shellStylesFor = (colors: any): Record<Variant, ViewStyle> => ({
 });
 
 const faceStylesFor = (colors: any): Record<Variant, ViewStyle> => ({
-  primary: { backgroundColor: colors.accent, ...outline },
-  soft: { backgroundColor: colors.accentWash, ...outline },
-  paper: { backgroundColor: colors.surface, ...outline },
+  primary: { backgroundColor: colors.accent, ...outlineOn(colors) },
+  soft: { backgroundColor: colors.accentWash, ...outlineOn(colors) },
+  paper: { backgroundColor: colors.surface, ...outlineOn(colors) },
 });
 
 const labelStylesFor = (colors: any) => ({

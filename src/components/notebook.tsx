@@ -1,7 +1,7 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { colors, getColors, useThemeStore } from '@/theme/tokens';
+import { getColors, useThemeStore } from '@/theme/tokens';
 
 /**
  * Notebook furniture: faint ruled paper, washi tape strips, and squiggly
@@ -51,12 +51,14 @@ interface SquiggleProps {
 }
 
 /** A hand-drawn wavy underline, like a pen stroke under a heading. */
-export function Squiggle({ width = 108, color = colors.accent, style }: SquiggleProps) {
+export function Squiggle({ width = 108, color, style }: SquiggleProps) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const ink = color ?? getColors(isDark).accent;
   return (
     <Svg width={width} height={10} viewBox="0 0 108 10" style={style}>
       <Path
         d="M3 6 Q 11 1 19 6 T 35 6 T 51 6 T 67 6 T 83 6 T 99 6 L 105 5"
-        stroke={color}
+        stroke={ink}
         strokeWidth={2.5}
         strokeLinecap="round"
         fill="none"

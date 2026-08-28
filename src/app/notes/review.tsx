@@ -16,7 +16,7 @@ import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { SKIP_LABEL, type ParsedQuestion, type SkippedLine } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
-import { candy, font, getColors, outline, radius, shadow, subjectInkFor, useThemeStore } from '@/theme/tokens';
+import { candy, font, getColors, outlineOn, radius, shadow, subjectInkFor, useThemeStore } from '@/theme/tokens';
 
 function QuestionCard({
   question,
@@ -393,7 +393,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 38,
     borderRadius: 13,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.card,
@@ -427,7 +427,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   saveTo: {
     gap: 8,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 14,
     marginTop: 8,
@@ -447,7 +447,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   nameInput: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingHorizontal: 13,
     paddingVertical: 11,
@@ -494,7 +494,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 14,
     gap: 10,
@@ -704,7 +704,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   empty: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 22,
     alignItems: 'center',

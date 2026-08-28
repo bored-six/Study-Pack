@@ -23,7 +23,7 @@ import {
 } from '@/lib/customQuestion';
 import { suggestDistractors } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
-import { font, getColors, outline, radius, shadow, subjectInkFor, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, subjectInkFor, useThemeStore } from '@/theme/tokens';
 
 const BLANK_DECOYS = ['', '', ''];
 
@@ -328,7 +328,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 38,
     borderRadius: 13,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.card,
@@ -352,7 +352,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   titleSticker: {
     backgroundColor: colors.accentWash,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: 11,
     paddingHorizontal: 9,
     paddingVertical: 1,
@@ -377,7 +377,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     gap: 10,
     alignItems: 'flex-start',
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     padding: 13,
     marginTop: 4,
@@ -395,7 +395,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 14,
     paddingTop: 18,
@@ -419,7 +419,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: colors.surface2,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.pill,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -440,7 +440,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingHorizontal: 13,
     ...shadow.card,
@@ -467,7 +467,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 22,
     borderRadius: 11,
     backgroundColor: colors.leafWash,
-    ...outline,
+    ...outlineOn(colors),
     borderColor: colors.leaf,
     alignItems: 'center',
     justifyContent: 'center',
@@ -482,7 +482,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.pill,
     paddingHorizontal: 11,
     paddingVertical: 6,
@@ -533,7 +533,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     gap: 8,
     alignItems: 'flex-start',
     backgroundColor: colors.goldWash,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     padding: 11,
     marginTop: 8,

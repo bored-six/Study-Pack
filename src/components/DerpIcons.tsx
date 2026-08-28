@@ -1,8 +1,10 @@
 import React from 'react';
 import Svg, { Path, SvgProps } from 'react-native-svg';
-import { colors } from '@/theme/tokens';
+import { getColors, useThemeStore } from '@/theme/tokens';
 
 export function DerpCheck({ checked, ...props }: SvgProps & { checked?: boolean }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
   return (
     <Svg viewBox="0 0 40 40" {...props}>
       {/* Wobbly hand-drawn box */}
@@ -31,6 +33,8 @@ export function DerpCheck({ checked, ...props }: SvgProps & { checked?: boolean 
 }
 
 export function DerpPlus(props: SvgProps) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
   return (
     <Svg viewBox="0 0 48 48" {...props}>
       {/* Wobbly blob background */}
@@ -54,6 +58,8 @@ export function DerpPlus(props: SvgProps) {
 }
 
 export function DerpMinus(props: SvgProps) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
   return (
     <Svg viewBox="0 0 48 48" {...props}>
       {/* Wobbly blob background */}
@@ -77,6 +83,8 @@ export function DerpMinus(props: SvgProps) {
 }
 
 export function DerpScribbleLine(props: SvgProps) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
   return (
     <Svg viewBox="0 0 100 20" preserveAspectRatio="none" {...props}>
       <Path
@@ -91,6 +99,8 @@ export function DerpScribbleLine(props: SvgProps) {
 }
 
 export function DerpArrow(props: SvgProps) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
   return (
     <Svg viewBox="0 0 24 24" {...props}>
       {/* Hand-drawn arrow */}

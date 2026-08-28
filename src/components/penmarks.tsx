@@ -22,13 +22,16 @@ import Svg, { Ellipse, Path } from 'react-native-svg';
 
 import { markJuice } from '@/lib/juice';
 import { playSfx } from '@/lib/sfx';
-import { colors, font } from '@/theme/tokens';
+import { font, getColors, useThemeStore } from '@/theme/tokens';
 
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 /** A pen line struck through a rejected option. Grows left to right. */
-export function PenStrike({ color = colors.textFaint }: { color?: string }) {
+export function PenStrike({ color }: { color?: string }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const ink = color ?? colors.textFaint;
   const reduced = useReducedMotion();
   const grow = useSharedValue(reduced ? 1 : 0);
 
@@ -43,7 +46,7 @@ export function PenStrike({ color = colors.textFaint }: { color?: string }) {
   return (
     <Animated.View
       pointerEvents="none"
-      style={[styles.strike, { backgroundColor: color }, style]}
+      style={[styles.strike, { backgroundColor: ink }, style]}
     />
   );
 }
@@ -52,12 +55,14 @@ export function PenStrike({ color = colors.textFaint }: { color?: string }) {
 export function PenCircle({
   width,
   height,
-  color = colors.coral,
+  color,
 }: {
   width: number;
   height: number;
   color?: string;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const ink = color ?? getColors(isDark).coral;
   const reduced = useReducedMotion();
   // Perimeter approximation for the dash trick.
   const rx = width / 2 + 5;
@@ -87,7 +92,7 @@ export function PenCircle({
           cy={(height + 12) / 2}
           rx={rx}
           ry={ry}
-          stroke={color}
+          stroke={ink}
           strokeWidth={2.2}
           strokeLinecap="round"
           fill="none"
@@ -103,7 +108,7 @@ export function PenCircle({
 /** A big pen tick, drawn stroke by stroke. */
 export function PenTick({
   size = 22,
-  color = colors.leaf,
+  color,
   delay = 0,
 }: {
   size?: number;
@@ -111,6 +116,8 @@ export function PenTick({
   /** Stagger for cascades — several ticks at once is one loud click. */
   delay?: number;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const ink = color ?? getColors(isDark).leaf;
   const reduced = useReducedMotion();
   const LEN = 34;
   const progress = useSharedValue(reduced ? 0 : LEN);
@@ -134,7 +141,7 @@ export function PenTick({
     <Svg width={size} height={size} viewBox="0 0 24 24">
       <AnimatedPath
         d="m5 12.5 4.5 4.5L19 7"
-        stroke={color}
+        stroke={ink}
         strokeWidth={3}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -178,6 +185,8 @@ export function Stamp({
     transform: [{ scale: scale.value }, { rotate: tone === 'right' ? '-7deg' : '6deg' }],
   }));
 
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
   const color = tone === 'right' ? colors.leaf : colors.coral;
 
   return (

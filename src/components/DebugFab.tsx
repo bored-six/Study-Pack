@@ -19,7 +19,7 @@ import { clearPracticeHistory, eraseEverything, getDb, writeSetting } from '@/li
 import { FIRE_TIERS } from '@/lib/fire';
 import { useAchievementsStore } from '@/store/achievements';
 import { useProgressStore } from '@/store/progress';
-import { derpRadius, font, getColors, outline, shadow, useThemeStore } from '@/theme/tokens';
+import { derpRadius, font, getColors, outlineOn, shadow, useThemeStore } from '@/theme/tokens';
 
 /**
  * The bug button: a movable control panel for exercising states that are
@@ -371,7 +371,7 @@ const getStyles = (colors: any) =>
       height: 54,
       borderRadius: 27,
       backgroundColor: colors.goldWash,
-      ...outline,
+      ...outlineOn(colors),
       alignItems: 'center',
       justifyContent: 'center',
       ...shadow.pop,
@@ -454,7 +454,7 @@ const getStyles = (colors: any) =>
       paddingVertical: 6,
       paddingHorizontal: 2,
       backgroundColor: colors.bg,
-      ...outline,
+      ...outlineOn(colors),
       borderRadius: 12,
     },
     tierChipOn: {
@@ -477,7 +477,7 @@ const getStyles = (colors: any) =>
     input: {
       width: 78,
       backgroundColor: colors.bg,
-      ...outline,
+      ...outlineOn(colors),
       borderRadius: 10,
       paddingHorizontal: 10,
       paddingVertical: 9,
@@ -490,7 +490,7 @@ const getStyles = (colors: any) =>
     btnRow: { flexDirection: 'row', gap: 8 },
     btn: {
       backgroundColor: colors.bg,
-      ...outline,
+      ...outlineOn(colors),
       ...derpRadius,
       paddingVertical: 11,
       paddingHorizontal: 12,
@@ -512,7 +512,7 @@ const getStyles = (colors: any) =>
       alignItems: 'center',
       gap: 5,
       backgroundColor: colors.bg,
-      ...outline,
+      ...outlineOn(colors),
       borderRadius: 999,
       paddingVertical: 5,
       paddingHorizontal: 9,

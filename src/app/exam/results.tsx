@@ -24,7 +24,7 @@ import { correctText, draftText, itemPrompt, type DraftValue } from '@/lib/draft
 import { FORMAT_LABEL, type ExamFormat, type ExamItem } from '@/lib/exam';
 import { MODES } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const total = Math.round(ms / 1000);
@@ -513,7 +513,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 26,
     alignItems: 'center',
@@ -568,7 +568,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   paper: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 14,
     gap: 14,
@@ -623,7 +623,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   breakdown: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 14,
     gap: 12,

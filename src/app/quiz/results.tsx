@@ -11,7 +11,7 @@ import { AchievementModal } from '@/components/AchievementModal';
 import { useAchievementsStore } from '@/store/achievements';
 import { useMomentsStore } from '@/store/moments';
 import { useQuizStore } from '@/store/quiz';
-import { font, getColors, outline, radius, shadow, textPop, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, textPop, useThemeStore } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -141,7 +141,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 28,
     alignItems: 'center',
@@ -246,7 +246,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     backgroundColor: colors.goldWash,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingVertical: 13,
     paddingHorizontal: 15,

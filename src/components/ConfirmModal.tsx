@@ -1,7 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -92,7 +92,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 20,
     gap: 10,

@@ -16,7 +16,7 @@ import {
 } from '@/lib/achievements';
 import { playSfx } from '@/lib/sfx';
 import { useAchievementsStore } from '@/store/achievements';
-import { derpRadius, font, outline, shadow, useThemeStore, getColors } from '@/theme/tokens';
+import { derpRadius, font, getColors, outlineOn, shadow, useThemeStore } from '@/theme/tokens';
 
 const FAMILY_INK: Record<string, string> = {
   tally: '#AC761C',
@@ -175,7 +175,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 34,
     borderRadius: 12,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '180deg' }],
@@ -214,7 +214,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   shelf: {
     marginTop: 16,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     paddingVertical: 12,
     paddingHorizontal: 10,

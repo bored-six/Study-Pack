@@ -18,7 +18,7 @@ import {
 } from '@/lib/schedule';
 import { REPEAT_LABEL, type Deck, type Schedule } from '@/lib/types';
 import { usePlannerStore } from '@/store/planner';
-import { derpRadius, font, outline, shadow, tabClearance, getColors, useThemeStore } from '@/theme/tokens';
+import { derpRadius, font, getColors, outlineOn, shadow, tabClearance, useThemeStore } from '@/theme/tokens';
 
 function clockFor(timeOfDay: number): string {
   const d = new Date();
@@ -372,7 +372,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   keptChip: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -393,7 +393,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   dividerTab: {
     alignSelf: 'flex-start',
     backgroundColor: colors.accentWash,
-    ...outline,
+    ...outlineOn(colors),
     borderTopLeftRadius: 8,
     borderTopRightRadius: 10,
     borderBottomRightRadius: 2,
@@ -419,7 +419,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 11,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     paddingVertical: 10,
     paddingLeft: 10,
@@ -480,7 +480,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     backgroundColor: colors.goldWash,
-    ...outline,
+    ...outlineOn(colors),
     ...derpRadius,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -501,7 +501,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   leadChip: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: 999,
     paddingHorizontal: 11,
     paddingVertical: 4,

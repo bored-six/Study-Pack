@@ -71,7 +71,9 @@ export function CartridgeLoad({ spec, onCovered, onDone }: Props) {
       return;
     }
 
+    // The clunk is the slot; the note a beat later is which cartridge it was.
     playSfx('cartridge_click');
+    const note = setTimeout(() => playSfx(spec.loadSfx), DROP_MS);
 
     // The animation is the picture; these timers are the contract. Driving
     // the handover off an animation callback meant a dropped frame or a
@@ -102,6 +104,7 @@ export function CartridgeLoad({ spec, onCovered, onDone }: Props) {
 
     const done = setTimeout(onDone, LOAD_MS);
     return () => {
+      clearTimeout(note);
       clearTimeout(covered);
       clearTimeout(done);
     };

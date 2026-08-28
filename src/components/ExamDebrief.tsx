@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Tape } from '@/components/notebook';
 import type { Debrief, DebriefNote, NextStep } from '@/lib/debrief';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 /**
  * The marker's note under the score.
@@ -75,7 +75,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   card: {
     marginTop: 14,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     paddingHorizontal: 14,
     paddingTop: 20,
@@ -105,7 +105,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   nextCard: {
     marginTop: 10,
     backgroundColor: colors.accentWash,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 15,
     gap: 4,

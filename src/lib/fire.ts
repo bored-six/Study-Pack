@@ -8,7 +8,6 @@
  * getting bigger.
  */
 import type { IconName } from '@/components/Icon';
-import { colors } from '@/theme/tokens';
 
 export interface FireTier {
   /** Smallest streak that reaches this tier. */
@@ -26,7 +25,7 @@ export const FIRE_TIERS: FireTier[] = [
     from: 0,
     name: 'Unlit',
     icon: 'sparkClassic',
-    color: colors.textFaint,
+    color: '#9AA396',
     greeting: 'Take a quiz to light it.',
   },
   {
@@ -40,7 +39,7 @@ export const FIRE_TIERS: FireTier[] = [
     from: 5,
     name: 'Ember',
     icon: 'flameSmallClassic',
-    color: colors.gold,
+    color: '#D4A02A',
     greeting: 'Five days in. It glows on its own now.',
   },
   {
@@ -54,7 +53,7 @@ export const FIRE_TIERS: FireTier[] = [
     from: 20,
     name: 'Steady burn',
     icon: 'flameBigClassic',
-    color: colors.coral,
+    color: '#E06A4E',
     greeting: 'Twenty days. This is a habit, not an effort.',
   },
   {

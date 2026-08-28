@@ -18,7 +18,7 @@ import { RuledPaper } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useOnline } from '@/hooks/useOnline';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 import { useDecksStore } from '@/store/decks';
 
 /** What each difficulty actually means, so the levels aren't just labels. */
@@ -225,7 +225,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 38,
     borderRadius: 13,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.card,
@@ -249,7 +249,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   titleSticker: {
     backgroundColor: colors.accent,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: 11,
     paddingHorizontal: 8,
     paddingVertical: 5,
@@ -315,7 +315,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   empty: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 22,
     alignItems: 'center',

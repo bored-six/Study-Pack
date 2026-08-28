@@ -18,10 +18,13 @@ import Animated, {
 
 import { Icon } from '@/components/Icon';
 import type { ExamFormat } from '@/lib/exam';
-import { colors, font } from '@/theme/tokens';
+import { font, getColors, useThemeStore } from '@/theme/tokens';
 
 /** Progress as a graphite stroke: longer as you go, bolder as combos grow. */
 export function PencilProgress({ progress, combo }: { progress: number; combo: number }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
   const heat = Math.min(combo, 20) / 20;
   return (
     <View style={styles.penTrack}>
@@ -44,6 +47,9 @@ export function PencilProgress({ progress, combo }: { progress: number; combo: n
 
 /** Handwritten "3 of 12" — always legible, unlike a lone tally stroke. */
 export function PageCount({ count, total }: { count: number; total: number }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
   return (
     <Text style={styles.pageCount}>
       {count} <Text style={styles.pageCountOf}>of</Text> {total}
@@ -73,6 +79,9 @@ export function DeskProp({
   idle: boolean;
   mood?: DeskMood;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
   const reduced = useReducedMotion();
   const tap = useSharedValue(0);
   const blink = useSharedValue(1);
@@ -218,6 +227,9 @@ export function DeskProp({
 
 /** Evening warms the whole stage; late night dims it like a desk lamp. */
 export function DayTint() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
   const hour = new Date().getHours();
   const wash =
     hour >= 18 && hour < 22
@@ -236,6 +248,9 @@ export function DayTint() {
 
 /** One ember sails across the screen when a best combo falls. */
 export function EmberDrift({ nonce }: { nonce: number }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
   const reduced = useReducedMotion();
   const { width } = useWindowDimensions();
   const p = useSharedValue(0);
@@ -262,7 +277,7 @@ export function EmberDrift({ nonce }: { nonce: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   penTrack: {
     flex: 1,
     height: 14,

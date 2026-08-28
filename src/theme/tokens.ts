@@ -176,8 +176,8 @@ export const subjectPalette = [
 ] as const;
 
 /** The deep ink paired with a wash; falls back to plain ink. */
-export function subjectInkFor(wash: string | null): string {
-  return subjectPalette.find((p) => p.wash === wash)?.ink ?? colors.ink;
+export function subjectInkFor(wash: string | null, fallback: string = colors.ink): string {
+  return subjectPalette.find((p) => p.wash === wash)?.ink ?? fallback;
 }
 
 export const radius = {
@@ -192,11 +192,25 @@ export const shadow = {
   pop: { boxShadow: '0 3px 0 rgba(39, 54, 43, 0.11)' },
 } as const;
 
-/** The standard soft sticker outline. Spread onto any card/badge/control. */
-export const outline = {
-  borderWidth: 1.5,
-  borderColor: colors.edge,
-} as const;
+/**
+ * The standard soft sticker outline. Spread onto any card/badge/control.
+ *
+ * It takes the palette rather than closing over one: the old constant baked
+ * in the light theme's edge, and it is spread by seventy-odd styles across
+ * twenty-five files, so at night every card on every screen was drawing a
+ * dark line on a dark ground and had no visible border at all.
+ */
+export const outlineOn = (palette: { edge: string }) =>
+  ({
+    borderWidth: 1.5,
+    borderColor: palette.edge,
+  }) as const;
+
+/**
+ * The light-theme outline, for the one place that has no palette in scope.
+ * Everything inside a `getStyles(colors)` must use `outlineOn(colors)`.
+ */
+export const outline = outlineOn(lightColors);
 
 /** Hard offset text shadow for dimensional display type. */
 export const textPop = (color: string, drop = 3) =>

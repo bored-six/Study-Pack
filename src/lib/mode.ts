@@ -8,6 +8,8 @@
  */
 
 import type { IconName } from '@/components/Icon';
+// Type-only, so the pure rules here never pull the audio stack into a test.
+import type { SfxName } from './sfx';
 
 import { availability, type ExamFormat, type ExamItem, type ExamRequest } from './exam';
 import type { Question } from './types';
@@ -68,6 +70,13 @@ export interface ModeSpec {
   reportTitle: string;
   /** How the sitting closes, before the card arrives. */
   outro: OutroKind;
+  /**
+   * The note under the clunk as this cartridge seats.
+   *
+   * Every mode played the same click, which made the one animation that
+   * exists to tell five games apart sound like one game.
+   */
+  loadSfx: SfxName;
 }
 
 /**
@@ -117,6 +126,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     hud: 'pages',
     reportTitle: 'REPORT CARD',
     outro: 'tear',
+    loadSfx: 'album_open',
     autoBuild: false,
   },
   mastery: {
@@ -139,6 +149,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     hud: 'pile',
     reportTitle: 'THE PILE',
     outro: 'pile',
+    loadSfx: 'sticker_peel',
     autoBuild: false,
   },
   rapid: {
@@ -161,6 +172,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     hud: 'fuse',
     reportTitle: 'TIME SHEET',
     outro: 'burnout',
+    loadSfx: 'tick',
     autoBuild: false,
   },
   simulation: {
@@ -183,6 +195,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     hud: 'paper',
     reportTitle: 'MARKED PAPER',
     outro: 'seal',
+    loadSfx: 'stamp',
     autoBuild: false,
   },
   survival: {
@@ -205,6 +218,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     hud: 'lives',
     reportTitle: 'HOW FAR YOU GOT',
     outro: 'lastheart',
+    loadSfx: 'bell',
     autoBuild: true,
   },
 };

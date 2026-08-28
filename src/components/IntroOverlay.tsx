@@ -13,7 +13,7 @@ import Animated, {
 import { Icon } from '@/components/Icon';
 import { playSfx } from '@/lib/sfx';
 import { Squiggle, Tape } from '@/components/notebook';
-import { font, getColors, outline, shadow, textPop, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, shadow, textPop, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   onDone: () => void;
@@ -178,7 +178,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 104,
     borderRadius: 30,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.pop,

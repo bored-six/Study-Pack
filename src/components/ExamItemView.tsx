@@ -35,7 +35,7 @@ import type {
   TypedItem,
 } from '@/lib/exam';
 import { checkAnswer, checkEnumeration } from '@/lib/grade';
-import { candy, font, getColors, onWash, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { candy, font, getColors, onWash, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   item: ExamItem;
@@ -1090,7 +1090,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     gap: 10,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingHorizontal: 14,
     paddingVertical: 13,
@@ -1132,7 +1132,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   tfBtn: {
     flex: 1,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingVertical: 18,
     alignItems: 'center',
@@ -1172,7 +1172,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   input: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingHorizontal: 14,
     paddingVertical: 13,

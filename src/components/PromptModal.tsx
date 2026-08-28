@@ -12,7 +12,7 @@ import {
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Squiggle, Tape } from '@/components/notebook';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -121,7 +121,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderTopLeftRadius: radius.card,
     borderTopRightRadius: radius.card + 4,
     borderBottomRightRadius: radius.card - 3,

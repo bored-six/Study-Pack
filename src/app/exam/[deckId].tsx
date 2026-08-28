@@ -27,7 +27,7 @@ import { FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib/exam';
 import { estimateLabel, MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
 import { playSfx } from '@/lib/sfx';
 import { useExamStore } from '@/store/exam';
-import { font, getColors, onWash, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, onWash, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 /** A drill sent here by the results note asks for this many of one format. */
 const DRILL_COUNT = 12;
@@ -431,7 +431,10 @@ export default function ExamSetupScreen() {
                 wide={i === MODE_ORDER.length - 1 && MODE_ORDER.length % 2 === 1}
                 last={id === lastMode}
                 onPress={() => {
-                  playSfx('cartridge_click');
+                  // Picking one off the shelf to look at it. The heavier
+                  // cartridge_click belongs to the slot, and playing it here
+                  // too meant hearing the same clunk twice, a moment apart.
+                  playSfx('tap');
                   setPeek(id);
                 }}
               />
@@ -655,7 +658,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 38,
     borderRadius: 13,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
     ...shadow.card,
@@ -714,7 +717,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   // --- the paper: one row per type ---------------------------------------
   sheet: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -983,7 +986,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 13,
     ...shadow.card,
@@ -1077,7 +1080,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   errorCard: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 22,
     alignItems: 'center',

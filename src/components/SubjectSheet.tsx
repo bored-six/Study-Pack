@@ -16,7 +16,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { Tape } from '@/components/notebook';
 import { Icon, type IconName } from '@/components/Icon';
 import type { Deck } from '@/lib/types';
-import { font, getColors, outline, radius, subjectPalette, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, subjectPalette, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -296,7 +296,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     lineHeight: 30,
     color: colors.text,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === 'ios' ? 8 : 2,

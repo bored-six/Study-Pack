@@ -18,7 +18,7 @@ import { DeskProp, type DeskMood } from '@/components/deskdress';
 import { Squiggle } from '@/components/notebook';
 import type { ExamFormat } from '@/lib/exam';
 import type { PaperStock } from '@/lib/mode';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   format: ExamFormat;
@@ -264,7 +264,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   page: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     overflow: 'hidden',
     ...shadow.card,

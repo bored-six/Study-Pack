@@ -47,7 +47,7 @@ import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
 import { MODES, questionSeconds } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
-import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 export default function ExamRunScreen() {
   const isDark = useThemeStore((s) => s.isDark);
@@ -946,7 +946,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   briefCard: {
     alignSelf: 'stretch',
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 26,
     alignItems: 'center',
@@ -999,7 +999,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.bg,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
-    ...outline,
+    ...outlineOn(colors),
     paddingHorizontal: 18,
     paddingTop: 20,
     maxHeight: '82%',
@@ -1029,7 +1029,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 46,
     borderRadius: 15,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     alignItems: 'center',
     justifyContent: 'center',
   },

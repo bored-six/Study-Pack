@@ -9,7 +9,7 @@ import { Icon } from '@/components/Icon';
 import { RuledPaper } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useQuizStore } from '@/store/quiz';
-import { candy, font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { candy, font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 export default function QuizScreen() {
   const isDark = useThemeStore((s) => s.isDark);
@@ -256,7 +256,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     gap: 11,
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.control,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -328,7 +328,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   errorCard: {
     backgroundColor: colors.surface,
-    ...outline,
+    ...outlineOn(colors),
     borderRadius: radius.card,
     padding: 22,
     alignItems: 'center',
