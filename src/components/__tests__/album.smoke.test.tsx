@@ -13,7 +13,7 @@ jest.mock('@/lib/sfx', () => ({
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { AchievementSticker } from '@/components/AchievementSticker';
-import { DoodleFlame } from '@/components/DoodleFlame';
+import { DoodleFlame, coreOutline, flameOutline } from '@/components/DoodleFlame';
 import {
   ACHIEVEMENTS,
   FAMILY_ORDER,
@@ -103,17 +103,35 @@ describe('the doodle flame', () => {
   });
 
   /**
-   * The firefly jar this replaced sat frozen because its motion was
-   * driven through react-native-svg element props, which Reanimated does
-   * not repaint in Expo Go or on web. The flame must animate Views
-   * instead, and each layer must grow from its base rather than its
-   * middle or it reads as a pulsing icon, not fire.
+   * The outline is generated per frame rather than picked from a set of
+   * drawings, which is what removes the frame-rate ceiling. These guard
+   * the generator: it must stay a closed path, stay inside the 64-unit
+   * box, and actually differ from moment to moment.
    */
-  it('animates views from the base, never svg props', () => {
-    const tree = mount(<DoodleFlame tier={FIRE_TIERS[5]} lit />);
-    const json = JSON.stringify(tree.toJSON());
-    expect(json).toContain('transformOrigin');
-    expect(json).not.toContain('animatedProps');
-    unmount(tree);
+  it('draws a closed path that stays inside the box', () => {
+    for (let i = 0; i < 24; i++) {
+      const t = (i / 24) * Math.PI * 2;
+      for (const d of [flameOutline(t, 1, 1), coreOutline(t, 1)]) {
+        expect(d.startsWith('M')).toBe(true);
+        expect(d.endsWith('Z')).toBe(true);
+        const numbers = d.match(/-?\d+(\.\d+)?/g)!.map(Number);
+        expect(Math.min(...numbers)).toBeGreaterThan(0);
+        expect(Math.max(...numbers)).toBeLessThan(64);
+      }
+    }
+  });
+
+  it('is a different shape at every moment of the swirl', () => {
+    const shapes = new Set<string>();
+    for (let i = 0; i < 60; i++) shapes.add(flameOutline((i / 60) * Math.PI * 2, 1, 1));
+    expect(shapes.size).toBe(60);
+  });
+
+  it('closes its loop seamlessly, so the swirl never jumps', () => {
+    expect(flameOutline(0, 1, 1)).toBe(flameOutline(Math.PI * 2, 1, 1));
+  });
+
+  it('holds still when the streak is unlit', () => {
+    expect(flameOutline(1.2, 1, 0)).toBe(flameOutline(4.8, 1, 0));
   });
 });

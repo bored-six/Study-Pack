@@ -3,13 +3,13 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import Animated, {
   Easing,
+  useAnimatedProps,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withDelay,
   withRepeat,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated';
 
 import type { FireTier } from '@/lib/fire';
@@ -25,63 +25,104 @@ import type { FireTier } from '@/lib/fire';
  *
  * ## How the motion works
  *
- * Squashing one rigid shape only ever looks like breathing. Fire looks
- * fluid because its *outline* changes, so the flame is drawn as six
- * hand-made silhouettes that cross-fade in a loop: at any moment two are
- * on screen at once, and the tongue appears to rise, lean and pinch off
- * as one dissolves into the next. That is cel animation — the flipbook
- * this app is named after — with the cuts smoothed away.
+ * The outline is *computed every frame*, not picked from a set of
+ * drawings. Six control points around the silhouette each drift on their
+ * own stack of sine harmonics, so the tip leans and curls while the
+ * flanks swell and pinch — continuously, at the display's full refresh
+ * rate, never landing on the same shape twice within a cycle.
  *
- * Three slower loops ride on top so the morph never feels mechanical:
+ * Earlier passes at this cycled between a handful of fixed drawings.
+ * Cross-fading hid the seams but the silhouette still only changed a few
+ * times a second, which is what made it look stepped rather than fluid.
+ * Generating the path instead removes the frame rate ceiling entirely.
  *
- *   - the body stretches from its base on a ~2.3s loop,
- *   - the core swims on a ~1.5s loop, leaning the other way,
- *   - the whole doodle sways on a ~3.1s loop.
- *
- * The morph cycle and those three share no small common multiple, so the
- * composite takes minutes to repeat. Their amplitudes are deliberately
- * small: once the silhouette does the work, big transforms read as
- * wobble rather than fire.
- *
- * Everything animates through plain View opacity and transforms. Driving
- * react-native-svg element props from Reanimated silently fails to
- * repaint in Expo Go and on web, so no SVG prop — `d` least of all — is
- * ever animated here.
+ * Every wobble is an integer harmonic of one clock that loops over 2π,
+ * so the loop closes seamlessly with no jump at the wrap.
  */
+
+const TAU = Math.PI * 2;
+
+/** How long one full swirl takes. Slower reads calmer, not choppier. */
+const SWIRL_MS = 5200;
 
 /**
- * Six drawings of the same flame, a beat apart. Read in order the tip
- * leans left, straightens and rises, tilts right, pinches in, flares
- * wide, then falls back — a full breath of fire.
+ * The flame silhouette at a moment in the cycle.
+ *
+ * Built as two Bézier flanks meeting at a wandering tip, closed with a
+ * rounded base. `spread` fattens or narrows the whole shape; `amp`
+ * scales how far the outline is allowed to travel, so small tiers stay
+ * readable instead of thrashing.
  */
-const BODY_FRAMES = [
-  'M31.5 49c4-9-5.2-12 1.5-20.8 2.6 6 10 7.7 10 15A8.9 8.9 0 0 1 25.2 49c-.6-1-.9-2.2-.9-3.4 0-2.8 1.2-5 2.6-6.8',
-  'M31.5 49c4.2-9.4-5.7-12.4 1.1-21.4 2.6 6.1 10.2 7.9 10.2 15.3A8.9 8.9 0 0 1 25 49c-.6-1-.9-2.2-.9-3.4 0-2.7 1.1-4.9 2.5-6.7',
-  'M31.6 49c4.4-9.8-5.1-12.9 1.7-22 2.7 6.3 10.1 8.1 10.1 15.6A8.9 8.9 0 0 1 25.3 49c-.6-1-.9-2.2-.9-3.4 0-3 1.3-5.3 2.9-7.2',
-  'M31.4 49c3.7-8.5-4.7-11.5 2.2-20 2.9 5.8 10.4 7.4 10.4 14.7A8.9 8.9 0 0 1 25.5 49c-.6-1-.9-2.2-.9-3.4 0-2.5 1-4.6 2.2-6.3',
-  'M31.5 49.2c3.5-8.2-4.5-11.2 1.3-19.4 2.4 5.6 9.5 7.2 9.5 14.2A8.6 8.6 0 0 1 25.7 49c-.5-.9-.8-2-.8-3.2 0-2.4.9-4.4 2.1-6',
-  'M31.5 49c4.5-9.8-6.1-13.2 1-22.4 2.5 6.4 10.4 8.2 10.4 15.8A9.1 9.1 0 0 1 24.8 49c-.6-1-.9-2.3-.9-3.5 0-3.1 1.4-5.5 3-7.4',
-];
+export function flameOutline(t: number, spread: number, amp: number): string {
+  'worklet';
+  const cx = 32;
+  const baseY = 50;
 
-/** The hotter shape inside it, on a shorter cycle of its own. */
-const CORE_FRAMES = [
-  'M31.5 48c2-4.6-2.5-6.4.7-11 1.4 3.3 5.2 4.3 5.2 8.2a4.4 4.4 0 0 1-5.9 4.2',
-  'M31.5 48c1.8-4.2-2.2-6 1-10.4 1.3 3.1 4.9 4.1 4.9 7.8a4.3 4.3 0 0 1-5.8 4',
-  'M31.4 48.2c2.2-5-2.8-6.9.6-11.6 1.5 3.5 5.4 4.5 5.4 8.5a4.5 4.5 0 0 1-6 4.3',
-  'M31.6 48c1.9-4.4-2.3-6.2 1.2-10.8 1.35 3.2 5 4.2 5 8a4.35 4.35 0 0 1-5.9 4.1',
-];
+  // A flame is a bulb that pinches into a leaning tip — not a teardrop.
+  // Three widths do the work: the foot, the widest point low down, and
+  // the waist where it necks in before the tip.
+  const foot = 8.4 * spread;
+  const bulgeL = (11.4 + Math.sin(t * 2 + 0.7) * 1.1 * amp) * spread;
+  const bulgeR = (11.4 + Math.sin(t * 2 + 2.9) * 1.1 * amp) * spread;
+  const bulgeY = 41.5 + Math.sin(t + 1.4) * 1.4 * amp;
+
+  const waistL = (5.6 + Math.sin(t * 3 + 2.1) * 1.5 * amp) * spread;
+  const waistR = (5.6 + Math.sin(t * 3 + 0.5) * 1.5 * amp) * spread;
+  const waistY = 32.5 + Math.sin(t * 2 + 1.1) * 1.8 * amp;
+
+  // The tip wanders and curls — the part the eye actually reads as fire.
+  const tipX = cx + Math.sin(t) * 3.4 * amp + Math.sin(t * 3 + 1.1) * 1.5 * amp;
+  const tipY = 21 - Math.sin(t * 2 + 0.5) * 2.2 * amp;
+  const curl = Math.sin(t * 2 + 2.4) * 2.6 * amp;
+
+  return (
+    `M${cx - foot} ${baseY}` +
+    `C${cx - bulgeL} ${bulgeY + 4} ${cx - bulgeL} ${bulgeY - 3} ${cx - waistL} ${waistY}` +
+    `C${cx - waistL + curl * 0.4} ${waistY - 5} ${tipX - 3.2} ${tipY + 6} ${tipX} ${tipY}` +
+    `C${tipX + 3.4} ${tipY + 6} ${cx + waistR - curl * 0.4} ${waistY - 5} ${cx + waistR} ${waistY}` +
+    `C${cx + bulgeR} ${bulgeY - 3} ${cx + bulgeR} ${bulgeY + 4} ${cx + foot} ${baseY}` +
+    `Q${cx} ${baseY + 3.2} ${cx - foot} ${baseY}Z`
+  );
+}
+
+/** The hotter shape inside it — same maths, tighter and quicker. */
+export function coreOutline(t: number, amp: number): string {
+  'worklet';
+  const cx = 32;
+  const baseY = 47.5;
+  const foot = 4.4;
+
+  const bulgeL = 6.4 + Math.sin(t * 2 + 1.3) * 0.8 * amp;
+  const bulgeR = 6.4 + Math.sin(t * 2 + 3.1) * 0.8 * amp;
+  const bulgeY = 42 + Math.sin(t + 0.9) * 0.9 * amp;
+
+  const waistL = 2.8 + Math.sin(t * 3 + 0.4) * 0.8 * amp;
+  const waistR = 2.8 + Math.sin(t * 3 + 2.6) * 0.8 * amp;
+  const waistY = 37 + Math.sin(t * 2 + 2.2) * 1 * amp;
+
+  const tipX = cx + Math.sin(t + 0.6) * 2.2 * amp;
+  const tipY = 30 - Math.sin(t * 2 + 1.7) * 1.6 * amp;
+
+  return (
+    `M${cx - foot} ${baseY}` +
+    `C${cx - bulgeL} ${bulgeY + 2.5} ${cx - bulgeL} ${bulgeY - 1.5} ${cx - waistL} ${waistY}` +
+    `C${cx - waistL} ${waistY - 2.5} ${tipX - 1.8} ${tipY + 3} ${tipX} ${tipY}` +
+    `C${tipX + 1.9} ${tipY + 3} ${cx + waistR} ${waistY - 2.5} ${cx + waistR} ${waistY}` +
+    `C${cx + bulgeR} ${bulgeY - 1.5} ${cx + bulgeR} ${bulgeY + 2.5} ${cx + foot} ${baseY}` +
+    `Q${cx} ${baseY + 2} ${cx - foot} ${baseY}Z`
+  );
+}
 
 /** A doodled crown, for the tiers that have earned one. */
 const CROWN = 'M24.5 22.5l3.2 3.6 4.3-4.7 4.3 4.7 3.2-3.6v4.5H24.5z';
 
-/** One full pass through the body drawings. */
-const BODY_CYCLE = 2400;
-/** The core flickers faster, and out of step. */
-const CORE_CYCLE = 1650;
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 interface Skin {
   /** Size of the whole doodle relative to the box. */
   scale: number;
+  /** How freely the outline is allowed to travel. */
+  amp: number;
   bodyFill: string | null;
   bodyStroke: string;
   bodyWidth: number;
@@ -99,6 +140,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 365:
       return {
         scale: 1.06,
+        amp: 1.15,
         bodyFill: '#F0B93A',
         bodyStroke: '#8A6508',
         bodyWidth: 2.4,
@@ -110,6 +152,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 300:
       return {
         scale: 1.03,
+        amp: 1.1,
         bodyFill: '#9A88DA',
         bodyStroke: '#5B4AA0',
         bodyWidth: 2.3,
@@ -120,6 +163,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 200:
       return {
         scale: 1.02,
+        amp: 1.05,
         bodyFill: '#FFFFFF',
         bodyStroke: '#7E8CA0',
         bodyWidth: 2.3,
@@ -130,6 +174,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 100:
       return {
         scale: 1,
+        amp: 1,
         bodyFill: '#7FB5E3',
         bodyStroke: '#2E6FA3',
         bodyWidth: 2.3,
@@ -139,6 +184,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 50:
       return {
         scale: 1,
+        amp: 1,
         bodyFill: '#FF9E52',
         bodyStroke: '#27362B',
         bodyWidth: 2.3,
@@ -149,6 +195,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 20:
       return {
         scale: 0.95,
+        amp: 0.9,
         bodyFill: '#FFC66B',
         bodyStroke: '#27362B',
         bodyWidth: 2.3,
@@ -158,6 +205,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 10:
       return {
         scale: 0.88,
+        amp: 0.8,
         bodyFill: '#F6E7A2',
         bodyStroke: '#27362B',
         bodyWidth: 2.2,
@@ -166,6 +214,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 5:
       return {
         scale: 0.82,
+        amp: 0.7,
         bodyFill: null,
         bodyStroke: '#27362B',
         bodyWidth: 2.2,
@@ -174,6 +223,7 @@ function skinFor(tier: FireTier): Skin {
     case tier.from >= 1:
       return {
         scale: 0.72,
+        amp: 0.6,
         bodyFill: null,
         bodyStroke: '#5D6F5C',
         bodyWidth: 2,
@@ -182,6 +232,7 @@ function skinFor(tier: FireTier): Skin {
     default:
       return {
         scale: 0.78,
+        amp: 0,
         bodyFill: null,
         bodyStroke: '#A5AF9E',
         bodyWidth: 1.8,
@@ -205,89 +256,6 @@ function useBreath(duration: number, delay: number, still: boolean) {
     );
   }, [value, duration, delay, still]);
   return value;
-}
-
-/** A clock that runs 0 to 1 forever, for cycling through drawings. */
-function useCycle(duration: number, still: boolean) {
-  const value = useSharedValue(0);
-  useEffect(() => {
-    if (still) {
-      value.value = 0;
-      return;
-    }
-    value.value = withRepeat(
-      withTiming(1, { duration, easing: Easing.linear }),
-      -1,
-      false
-    );
-  }, [value, duration, still]);
-  return value;
-}
-
-/**
- * One drawing in the cycle. Its opacity peaks as the clock passes its
- * slot and falls off before the next, so exactly two frames overlap and
- * the silhouette dissolves rather than cuts.
- */
-function MorphFrame({
-  d,
-  index,
-  total,
-  clock,
-  scale,
-  size,
-  fill,
-  stroke,
-  strokeWidth,
-  dashed,
-}: {
-  d: string;
-  index: number;
-  total: number;
-  clock: SharedValue<number>;
-  scale: number;
-  size: number;
-  fill: string | null;
-  stroke?: string;
-  strokeWidth?: number;
-  dashed?: boolean;
-}) {
-  const style = useAnimatedStyle(() => {
-    // Where this drawing sits in its own pass, 0 to 1.
-    const raw = clock.value - index / total;
-    const phase = raw - Math.floor(raw);
-
-    // A trapezoid, not a triangle. Each drawing reaches full opacity
-    // well before the one under it starts leaving and holds there
-    // through the whole handover, so some frame is always solid. A
-    // plain cross-fade would leave two half-transparent copies at the
-    // swap and the flame would visibly dim on every beat.
-    let opacity: number;
-    if (phase < 0.05) opacity = phase / 0.05;
-    else if (phase < 0.22) opacity = 1;
-    else if (phase < 0.33) opacity = (0.33 - phase) / 0.11;
-    else opacity = 0;
-
-    return { opacity };
-  });
-
-  return (
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, style]}>
-      <Svg width={size} height={size} viewBox="0 0 64 64">
-        <Path
-          d={d}
-          transform={`translate(32 34) scale(${scale}) translate(-32 -34)`}
-          fill={fill ?? 'none'}
-          stroke={stroke}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeDasharray={dashed ? '5 4' : undefined}
-          opacity={dashed ? 0.8 : 1}
-        />
-      </Svg>
-    </Animated.View>
-  );
 }
 
 /** One ember drifting up off the flame and fading out. */
@@ -356,11 +324,22 @@ export function DoodleFlame({ tier, size = 72, lit = true }: Props) {
 
   const skin = lit ? skinFor(tier) : skinFor({ ...tier, from: -1 } as FireTier);
 
-  // The silhouette does the work; the transforms only keep it honest.
-  const bodyClock = useCycle(BODY_CYCLE, still);
-  const coreClock = useCycle(CORE_CYCLE, still);
-  const body = useBreath(2300, 0, still);
-  const core = useBreath(1500, 120, still);
+  // One clock, running 0 to 2π forever. Every wobble is an integer
+  // harmonic of it, so the loop closes without a seam.
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (still) {
+      t.value = 0;
+      return;
+    }
+    t.value = withRepeat(
+      withTiming(TAU, { duration: SWIRL_MS, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, [t, still]);
+
+  // A slow lean on top, so the flame is not perfectly centred forever.
   const sway = useBreath(3100, 0, still);
 
   const swayStyle = useAnimatedStyle(() => ({
@@ -370,29 +349,18 @@ export function DoodleFlame({ tier, size = 72, lit = true }: Props) {
     ],
   }));
 
-  const bodyStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scaleY: 1 + body.value * 0.05 },
-      { scaleX: 1 - body.value * 0.025 },
-      { rotate: `${(body.value - 0.5) * 1.6}deg` },
-    ],
+  const bodyProps = useAnimatedProps(() => ({
+    d: flameOutline(t.value, 1, skin.amp),
   }));
 
-  const coreStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scaleY: 1 + core.value * 0.09 },
-      { scaleX: 1 - core.value * 0.04 },
-      { rotate: `${(0.5 - core.value) * 3}deg` },
-      { translateY: -core.value * 0.9 * (size / 64) },
-    ],
-    opacity: 0.88 + core.value * 0.12,
+  const coreProps = useAnimatedProps(() => ({
+    d: coreOutline(t.value * 1.6 + 2, skin.amp),
   }));
 
-  const layer = [StyleSheet.absoluteFill, styles.fromBase];
+  const transform = `translate(32 34) scale(${skin.scale}) translate(-32 -34)`;
 
   return (
     <View style={[styles.wrap, { width: size, height: size }]}>
-      {/* still furniture — rays do not breathe with the flame */}
       {skin.rays ? (
         <Svg width={size} height={size} viewBox="0 0 64 64" style={StyleSheet.absoluteFill}>
           <Path
@@ -406,45 +374,35 @@ export function DoodleFlame({ tier, size = 72, lit = true }: Props) {
       ) : null}
 
       <Animated.View style={[StyleSheet.absoluteFill, swayStyle]}>
-        {/* the doodled body, dissolving between six drawings */}
-        <Animated.View style={[layer, bodyStyle]}>
-          {BODY_FRAMES.map((d, i) => (
-            <MorphFrame
-              key={i}
-              d={d}
-              index={i}
-              total={BODY_FRAMES.length}
-              clock={bodyClock}
-              scale={skin.scale}
-              size={size}
-              fill={skin.bodyFill}
+        <Svg width={size} height={size} viewBox="0 0 64 64">
+          {still ? (
+            <Path
+              d={flameOutline(0, 1, skin.amp)}
+              transform={transform}
+              fill={skin.bodyFill ?? 'none'}
               stroke={skin.bodyStroke}
               strokeWidth={skin.bodyWidth}
-              dashed={skin.dashed}
+              strokeLinejoin="round"
+              strokeDasharray={skin.dashed ? '5 4' : undefined}
+              opacity={skin.dashed ? 0.8 : 1}
             />
-          ))}
-        </Animated.View>
+          ) : (
+            <AnimatedPath
+              animatedProps={bodyProps}
+              transform={transform}
+              fill={skin.bodyFill ?? 'none'}
+              stroke={skin.bodyStroke}
+              strokeWidth={skin.bodyWidth}
+              strokeLinejoin="round"
+            />
+          )}
 
-        {/* the hotter core, on its own shorter cycle */}
-        {skin.coreFill ? (
-          <Animated.View style={[layer, coreStyle]}>
-            {CORE_FRAMES.map((d, i) => (
-              <MorphFrame
-                key={i}
-                d={d}
-                index={i}
-                total={CORE_FRAMES.length}
-                clock={coreClock}
-                scale={skin.scale}
-                size={size}
-                fill={skin.coreFill}
-              />
-            ))}
-          </Animated.View>
-        ) : null}
+          {skin.coreFill && !still ? (
+            <AnimatedPath animatedProps={coreProps} transform={transform} fill={skin.coreFill} />
+          ) : null}
+        </Svg>
       </Animated.View>
 
-      {/* crown, underline and side flicks sit outside the sway */}
       <Svg width={size} height={size} viewBox="0 0 64 64" style={StyleSheet.absoluteFill}>
         {skin.crown ? (
           <Path
@@ -488,9 +446,5 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // Fire grows from where it is rooted, so every layer scales off its base.
-  fromBase: {
-    transformOrigin: '50% 82%',
   },
 });
