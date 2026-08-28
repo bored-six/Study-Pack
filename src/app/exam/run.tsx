@@ -33,7 +33,9 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
 import { ExamSheet } from '@/components/ExamSheet';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
-import { DayTint, EmberDrift, PageCount, PencilProgress, type DeskMood } from '@/components/deskdress';
+import { ModeCrest } from '@/components/ModeCrest';
+import { ModeHud, clockText } from '@/components/ModeHud';
+import { DayTint, EmberDrift, type DeskMood } from '@/components/deskdress';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
@@ -42,39 +44,9 @@ import { tapThud, tapTier } from '@/lib/haptics';
 import { playSfx } from '@/lib/sfx';
 import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
-import { MODES, questionSeconds, SURVIVAL_STRIKES } from '@/lib/mode';
+import { MODES, questionSeconds } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
 import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
-
-function clock(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
-}
-
-/** Lives left, as hearts that go out one at a time. */
-function Hearts({ strikes }: { strikes: number }) {
-  const isDark = useThemeStore((s) => s.isDark);
-  const colors = getColors(isDark);
-  const styles = getStyles(colors);
-
-  return (
-    <View style={styles.hearts}>
-      {Array.from({ length: SURVIVAL_STRIKES }, (_, i) => {
-        const alive = i < SURVIVAL_STRIKES - strikes;
-        return (
-          <Icon
-            key={i}
-            name="heart"
-            size={17}
-            color={alive ? colors.coral : colors.disabledText}
-            fill={alive ? colors.coralWash : 'none'}
-            strokeWidth={2}
-          />
-        );
-      })}
-    </View>
-  );
-}
 
 export default function ExamRunScreen() {
   const isDark = useThemeStore((s) => s.isDark);
@@ -417,13 +389,6 @@ export default function ExamRunScreen() {
         ? 0
         : index / items.length;
 
-  const counterText =
-    spec.repetition === 'until_retired'
-      ? `${queue.length} left in the pile`
-      : spec.repetition === 'until_out'
-        ? `${results.length} answered`
-        : `${index + 1} / ${items.length}`;
-
   const questionLeft = itemDeadline == null ? null : itemDeadline - now;
   const questionShare =
     questionLeft == null ? 0 : Math.max(0, questionLeft) / (questionSeconds(item.format) * 1000);
@@ -458,24 +423,22 @@ export default function ExamRunScreen() {
             <Icon name="cross" size={14} color={colors.textDim} strokeWidth={2.6} />
           </Pressable>
 
-          {spec.repetition === 'until_out' ? (
-            <Hearts strikes={strikes} />
-          ) : (
-            <PencilProgress progress={progress} combo={combo} />
-          )}
-
-          {spec.repetition === 'once' ? (
-            <PageCount count={index + 1} total={items.length} />
-          ) : (
-            <Text style={styles.counter}>{counterText}</Text>
-          )}
-
-
-          {paperLeft != null ? (
-            <Text style={[styles.timer, paperLeft < 60_000 && styles.timerLow]}>
-              {clock(paperLeft)}
-            </Text>
-          ) : null}
+          <ModeHud
+            spec={spec}
+            state={{
+              progress,
+              combo,
+              index,
+              total: items.length,
+              remaining: queue.length,
+              retired,
+              strikes,
+              answered: results.length,
+              paperLeft,
+              questionLeft:
+                questionLeft == null ? null : Math.max(0, Math.ceil(questionLeft / 1000)),
+            }}
+          />
 
           {spec.feedback === 'deferred' ? (
             <Pressable
@@ -530,9 +493,7 @@ export default function ExamRunScreen() {
               strokeWidth={2.2}
             />
           </View>
-          <Text style={styles.deckName} numberOfLines={1}>
-            {spec.name} · {deck?.name}
-          </Text>
+          <ModeCrest spec={spec} detail={deck?.name} style={styles.crest} />
         </View>
 
         <ScrollView
@@ -559,6 +520,9 @@ export default function ExamRunScreen() {
               format={item.format}
               title={FORMAT_LABEL[item.format]}
               accent={FORMAT_META[item.format].ink}
+              stock={spec.paper}
+              stamp={spec.stamp}
+              stampInk={spec.ink}
               smudges={wrongByItem[item.id] ?? 0}
               stars={stars}
               idle={idle}
@@ -872,6 +836,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.2,
     color: colors.accentDeep,
+  },
+  crest: {
+    flex: 1,
   },
   deckName: {
     flexShrink: 1,

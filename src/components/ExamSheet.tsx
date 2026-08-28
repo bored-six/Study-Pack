@@ -17,6 +17,7 @@ import { Icon } from '@/components/Icon';
 import { DeskProp, type DeskMood } from '@/components/deskdress';
 import { Squiggle } from '@/components/notebook';
 import type { ExamFormat } from '@/lib/exam';
+import type { PaperStock } from '@/lib/mode';
 import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
@@ -34,6 +35,16 @@ interface Props {
   idle?: boolean;
   /** The deskmate's mood — leaning in, wincing, or watching. */
   mood?: DeskMood;
+  /**
+   * The stationery this mode prints on. One blank white page for all five
+   * modes meant a screenshot of a sprint and a screenshot of a sealed paper
+   * were the same picture.
+   */
+  stock?: PaperStock;
+  /** The mode's rubber stamp, printed in the corner of the page. */
+  stamp?: string;
+  /** The stamp's ink — the mode's colour, not the page's. */
+  stampInk?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -52,6 +63,9 @@ export function ExamSheet({
   stars = 0,
   idle = false,
   mood = 'watch',
+  stock = 'ruled',
+  stamp,
+  stampInk,
   style,
 }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
@@ -61,7 +75,8 @@ export function ExamSheet({
   const shownStars = Math.min(stars, 7);
   return (
     <View style={[styles.board, style]}>
-      <View style={styles.page}>
+      <View style={[styles.page, stock === 'card' && styles.pageCard]}>
+        <Stock kind={stock} accent={accent} />
         <View style={styles.pageHead}>
           <Text style={styles.pageTitle}>{title}</Text>
           <Squiggle width={96} color={accent} />
@@ -72,6 +87,12 @@ export function ExamSheet({
         ))}
 
         <View style={styles.content}>{children}</View>
+
+        {stamp ? (
+          <View style={[styles.stamp, { borderColor: stampInk ?? accent }]} pointerEvents="none">
+            <Text style={[styles.stampText, { color: stampInk ?? accent }]}>{stamp}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.dogEar} />
         <View style={styles.dogEarShade} />
@@ -95,6 +116,95 @@ export function ExamSheet({
     </View>
   );
 }
+
+/**
+ * What is printed on the page under the question.
+ *
+ * Deliberately faint: this has to say which game you are in at a glance
+ * and then get out of the way of the words, so nothing here goes above
+ * ~9% ink.
+ */
+function Stock({ kind, accent }: { kind: PaperStock; accent: string }) {
+  if (kind === 'card') return null;
+
+  if (kind === 'ticket') {
+    // Perforations down both edges — this page is torn off a roll.
+    return (
+      <View style={stockStyles.fill} pointerEvents="none">
+        {Array.from({ length: 14 }, (_, i) => (
+          <View key={`l${i}`} style={[stockStyles.perf, { left: -5, top: 18 + i * 26 }]} />
+        ))}
+        {Array.from({ length: 14 }, (_, i) => (
+          <View key={`r${i}`} style={[stockStyles.perf, { right: -5, top: 18 + i * 26 }]} />
+        ))}
+      </View>
+    );
+  }
+
+  if (kind === 'grid') {
+    return (
+      <View style={stockStyles.fill} pointerEvents="none">
+        {Array.from({ length: 18 }, (_, i) => (
+          <View key={`h${i}`} style={[stockStyles.hair, { top: i * 24 }]} />
+        ))}
+        {Array.from({ length: 14 }, (_, i) => (
+          <View key={`v${i}`} style={[stockStyles.hairV, { left: i * 24 }]} />
+        ))}
+      </View>
+    );
+  }
+
+  // ruled and foolscap share the rules; foolscap adds the red margin.
+  return (
+    <View style={stockStyles.fill} pointerEvents="none">
+      {Array.from({ length: 18 }, (_, i) => (
+        <View key={i} style={[stockStyles.rule, { top: 56 + i * 26 }]} />
+      ))}
+      {kind === 'foolscap' ? (
+        <View style={[stockStyles.margin, { backgroundColor: accent, opacity: 0.22 }]} />
+      ) : null}
+    </View>
+  );
+}
+
+const stockStyles = StyleSheet.create({
+  fill: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  rule: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(46, 111, 163, 0.075)',
+  },
+  hair: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(39, 54, 43, 0.055)',
+  },
+  hairV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(39, 54, 43, 0.055)',
+  },
+  margin: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 34,
+    width: 1.5,
+  },
+  perf: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(39, 54, 43, 0.07)',
+  },
+});
 
 /** A landed star that keeps twinkling — a slow shimmer, phased per star. */
 function TwinkleStar({ index, newest }: { index: number; newest: boolean }) {
@@ -158,6 +268,26 @@ const getStyles = (colors: any) => StyleSheet.create({
     borderRadius: radius.card,
     overflow: 'hidden',
     ...shadow.card,
+  },
+  pageCard: {
+    borderWidth: 3,
+    borderColor: colors.edge,
+  },
+  stamp: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    borderWidth: 2,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    opacity: 0.4,
+    transform: [{ rotate: '-8deg' }],
+  },
+  stampText: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 8,
+    letterSpacing: 1.1,
   },
   pageHead: {
     alignItems: 'center',
