@@ -303,3 +303,78 @@ describe('option order', () => {
     expect(first).toEqual(second);
   });
 });
+
+/**
+ * Real notes that produced nonsense.
+ *
+ * Every case here is a question a student actually got asked, written down
+ * so it cannot be asked again.
+ */
+describe('notes that used to break it', () => {
+  const promptsOf = (text: string) => parseNotes(text).questions.map((q) => q.prompt);
+  const answersOf = (text: string) =>
+    parseNotes(text).questions.flatMap((q) => [q.correctAnswer, ...q.answers]);
+
+  it('never splits a list inside a bracketed aside', () => {
+    const result = parseNotes(
+      'Energy Types: Potential (stored energy, like a stretched rubber band) and Kinetic (motion energy, like a rolling ball).'
+    );
+    const list = result.questions.find((q) => q.kind === 'enumeration');
+    // Two things, not four fragments of the explanations after them.
+    expect(list?.answers).toEqual(['Potential', 'Kinetic']);
+    expect(list?.prompt).toBe('List the 2: Energy Types');
+  });
+
+  it('drops the "and" an Oxford comma leaves on the last item', () => {
+    const list = parseNotes(
+      'Human Body Basics: Hearts pump blood, lungs absorb oxygen, and brains control body functions.'
+    ).questions.find((q) => q.kind === 'enumeration');
+    expect(list?.answers).toEqual([
+      'Hearts pump blood',
+      'lungs absorb oxygen',
+      'brains control body functions',
+    ]);
+  });
+
+  it('reads a paste that lost its line breaks as separate facts', () => {
+    const prompts = promptsOf(
+      'Water Cycle: Evaporation happens first.Solar System: The Sun is a star at the centre of it.Seasons: Caused by the tilt of the axis of Earth.'
+    );
+    expect(prompts).toHaveLength(3);
+    for (const prompt of prompts) expect(prompt).not.toContain('Solar System:');
+  });
+
+  it('keeps an abbreviation whole rather than splitting inside it', () => {
+    const prompts = promptsOf('Capital: The U.S.A. has its seat of government in Washington.');
+    expect(prompts.join(' ')).not.toContain('S.A.');
+  });
+
+  it('strips markup a paste dragged in with it', () => {
+    const prompts = promptsOf(
+      'Water Cycle: Evaporation $\\rightarrow$ Condensation $\\rightarrow$ Precipitation falls.'
+    );
+    expect(prompts.join(' ')).not.toContain('rightarrow');
+    expect(prompts.join(' ')).not.toContain('$');
+  });
+
+  it('refuses a meaning too long to read as a question', () => {
+    const long = Array.from({ length: 45 }, (_, i) => `word${i}`).join(' ');
+    expect(promptsOf(`Photosynthesis: ${long}.`)).toHaveLength(0);
+  });
+
+  it('never offers an answer with a line break in it', () => {
+    const answers = answersOf(
+      'Energy & Matter\nAtom: The smallest unit of an element, made of protons and electrons.'
+    );
+    for (const answer of answers) expect(answer).not.toContain('\n');
+  });
+
+  it('still refuses a two-item list when nothing says it is one', () => {
+    // "A and B" is how most sentences are written; only a named category
+    // of things is evidence enough.
+    const list = parseNotes(
+      'Photosynthesis: Plants take in carbon dioxide and give out oxygen.'
+    ).questions.find((q) => q.kind === 'enumeration');
+    expect(list).toBeUndefined();
+  });
+});

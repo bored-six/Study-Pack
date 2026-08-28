@@ -1,4 +1,4 @@
-import { checkAnswer, checkEnumeration, normalizeAnswer } from '../grade';
+import { checkAnswer, checkEnumeration, looseAnswer, normalizeAnswer } from '../grade';
 
 describe('normalizeAnswer', () => {
   it('strips case, padding, quotes and trailing punctuation', () => {
@@ -86,5 +86,33 @@ describe('checkEnumeration', () => {
       true
     );
     expect(inOrder.correct).toBe(true);
+  });
+});
+
+describe('the same answer, written differently', () => {
+  it('accepts singular against plural, and agreement with it', () => {
+    // The note said "Hearts pump blood"; the student wrote what they knew.
+    expect(checkAnswer('Heart pumps blood', 'Hearts pump blood').correct).toBe(true);
+    expect(checkAnswer('Brain controls body functions', 'brains control body functions').correct).toBe(
+      true
+    );
+    expect(checkAnswer('Lungs absorb Oxygen', 'lungs absorb oxygen').correct).toBe(true);
+  });
+
+  it('still refuses a different word that happens to be close', () => {
+    expect(checkAnswer('meiosis', 'mitosis').correct).toBe(false);
+    expect(checkAnswer('kinetic', 'potential').correct).toBe(false);
+  });
+
+  it('leaves a double s alone, so "glass" is not "glas"', () => {
+    expect(looseAnswer('glass jars')).toBe('glass jar');
+  });
+
+  it('does not strip the s off a short word', () => {
+    expect(looseAnswer('gas is')).toBe('gas is');
+  });
+
+  it('keeps numbers exact', () => {
+    expect(checkAnswer('35', '36').correct).toBe(false);
   });
 });

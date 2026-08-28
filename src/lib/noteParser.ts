@@ -183,12 +183,20 @@ const WEAK_SUBJECTS = new Set([
 // --- helpers ------------------------------------------------------------
 
 function normalize(text: string): string {
-  return text
-    .replace(/\r\n?/g, '\n')
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/–|—/g, '-')
-    .replace(/[ \t]+/g, ' ');
+  return (
+    text
+      .replace(/\r\n?/g, '\n')
+      .replace(/[‘’]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/–|—/g, '-')
+      // Notes pasted out of a doc or a chat carry markup the student never
+      // typed. Left alone, "$\\rightarrow$" ends up read out inside a
+      // question as if it were part of the fact.
+      .replace(/\\(?:rightarrow|to|Rightarrow|longrightarrow)\b/g, '→')
+      .replace(/\$+/g, ' ')
+      .replace(/\*\*|__|`/g, '')
+      .replace(/[ \t]+/g, ' ')
+  );
 }
 
 /** A note line, remembering how it was marked up before cleaning. */
@@ -582,6 +590,16 @@ const NUMBER_WORD: Record<string, number> = {
 
 export const ENUM_LIMITS = { min: 3, max: 6 } as const;
 
+/**
+ * A title that names a category of things, so what follows is a list of them
+ * rather than a sentence that happens to contain "and".
+ */
+export const CATEGORY_TITLE =
+  /\b(?:types?|kinds?|stages?|parts?|steps?|phases?|categories|category|forms?|classes|classifications?|layers?|branches|components?|elements?|properties)$/i;
+
+/** Under a named category, two is a list. Anywhere else it is a sentence. */
+export const CATEGORY_MIN = 2;
+
 interface EnumDraft {
   title: string;
   items: string[];
@@ -669,15 +687,38 @@ function findInlineSeries(line: string): EnumDraft | null {
   if (!title || STRUCTURAL.has(firstWord)) return null;
 
   const tail = match[2].replace(/\.$/, '');
-  if (!/,/.test(tail)) return null;
 
-  const items = tail
+  /**
+   * A bracketed aside explains an item; it is never an item itself. Left in,
+   * "Potential (stored energy, like a stretched rubber band) and Kinetic
+   * (motion energy, like a rolling ball)" split on its inner commas into four
+   * fragments — "Potential (stored energy", "like a stretched rubber band)" —
+   * and became a four-item list of nonsense.
+   */
+  const listable = tail.replace(/\s*\([^)]*\)/g, '').replace(/\s{2,}/g, ' ').trim();
+
+  /**
+   * A comma is the usual evidence that a line is a list. "Energy Types:
+   * Potential and Kinetic" has none, and treating every "A and B" as a list
+   * would turn most ordinary prose into one — but a title that names a
+   * category is evidence in its own right, and a two-item list under one is
+   * exactly what the student wrote down.
+   */
+  const named = CATEGORY_TITLE.test(title);
+  if (!/,/.test(listable) && !(named && /\s+(?:and|or)\s+/i.test(listable))) return null;
+
+  const items = listable
     .split(/\s*,\s*|\s+and\s+|\s+or\s+/i)
     .map((s) => s.trim())
+    // "A, B, and C" splits on the comma first and leaves "and C" behind.
+    .map((s) => s.replace(/^(?:and|or)\s+/i, '').trim())
     .filter(Boolean);
 
-  if (items.length < ENUM_LIMITS.min || items.length > ENUM_LIMITS.max) return null;
+  const min = named ? CATEGORY_MIN : ENUM_LIMITS.min;
+  if (items.length < min || items.length > ENUM_LIMITS.max) return null;
   if (!items.every(plausibleItem)) return null;
+  // A stray bracket in an item is proof the split landed mid-aside.
+  if (items.some((item) => /[()]/.test(item))) return null;
 
   // When the title states a count, it must agree — otherwise we split wrong.
   if (stated != null && stated !== items.length) return null;
@@ -685,10 +726,19 @@ function findInlineSeries(line: string): EnumDraft | null {
   return { title, items, ordered: false, source: line };
 }
 
-/** Splits a line into sentences, keeping abbreviations intact enough. */
+/**
+ * Splits a line into sentences, keeping abbreviations intact enough.
+ *
+ * The second pattern is for notes that lost their line breaks on the way in:
+ * "…(rain/snow falls).Solar System: The Sun is…" is two facts with no space
+ * between them, and treating it as one produced a sixty-word question. It
+ * only fires after a lower-case letter, a digit or a closing bracket, so
+ * "U.S.A." and "No. 4" stay whole.
+ */
 function splitSentences(line: string): string[] {
   return line
     .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .flatMap((part) => part.split(/(?<=[a-z0-9)\]"'][.!?])(?=[A-Z])/))
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -751,7 +801,16 @@ export function parseNotes(input: string): ParseResult {
 
   for (let index = 0; index < rawLines.length; index++) {
     if (consumed.has(index)) continue;
-    const line = rawLines[index];
+
+    /**
+     * Notes pasted without their line breaks arrive as one long line holding
+     * several facts — "…(rain/snow falls).Solar System: The Sun is…". Only
+     * the list check used to look inside such a line, so a run-on paragraph
+     * produced one unreadable definition, or once its length was capped,
+     * nothing at all. Every sentence is its own candidate.
+     */
+    const facts = splitSentences(rawLines[index]);
+    for (const line of facts.length > 1 ? facts : [rawLines[index]]) {
 
     if (wordCount(line) < LIMITS.minWordsPerLine) {
       skipped.push({ text: line, reason: 'too_short' });
@@ -783,7 +842,13 @@ export function parseNotes(input: string): ParseResult {
     }
 
     const definition = matchDefinition(line);
-    if (definition && wordCount(definition.term) <= LIMITS.maxAnswerWords) {
+    // The term was length-checked and the meaning never was, so a run-on
+    // line became a sixty-word "Which term means…?" nobody could read.
+    if (
+      definition &&
+      wordCount(definition.term) <= LIMITS.maxAnswerWords &&
+      wordCount(definition.meaning) <= LIMITS.maxSentenceWords
+    ) {
       drafts.push({
         prompt: definitionPrompt(definition),
         answer: definition.term,
@@ -800,11 +865,8 @@ export function parseNotes(input: string): ParseResult {
       continue;
     }
 
-    // Cloze: split the line into sentences and try each.
-    const sentences = line
-      .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+    // Cloze: try each sentence this line still holds.
+    const sentences = splitSentences(line);
 
     let used = false;
     let reason: SkipReason = 'no_fact';
@@ -840,10 +902,14 @@ export function parseNotes(input: string): ParseResult {
 
     if (used) linesUsed++;
     else skipped.push({ text: line, reason });
+    }
   }
 
   // Extra distractor material: capitalised terms anywhere in the notes.
-  for (const match of text.matchAll(/\b[A-Z][a-z]{3,}(?:\s+[A-Z][a-z]{2,}){0,2}\b/g)) {
+  // The gap between words is spaces only — \s would match the newline
+  // between a heading and the line under it, and offer "Matter\nAtom" as an
+  // answer you could pick.
+  for (const match of text.matchAll(/\b[A-Z][a-z]{3,}(?:[ \t]+[A-Z][a-z]{2,}){0,2}\b/g)) {
     const term = cleanTerm(match[0]);
     if (!term) continue;
     const lower = term.toLowerCase();

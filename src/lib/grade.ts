@@ -21,6 +21,23 @@ export function normalizeAnswer(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/**
+ * The same answer with its plurals and verb agreement levelled out.
+ *
+ * "Heart pumps blood" and "Hearts pump blood" are one fact written two ways,
+ * and marking the second wrong teaches nothing except to copy the note
+ * verbatim. Spelling still matters — this only strips a trailing s, so
+ * "mitosis" and "meiosis" stay different words.
+ */
+export function looseAnswer(value: string): string {
+  return normalizeAnswer(value)
+    .split(' ')
+    .map((word) =>
+      word.length > 3 && word.endsWith('s') && !word.endsWith('ss') ? word.slice(0, -1) : word
+    )
+    .join(' ');
+}
+
 /** Levenshtein distance, capped — we only care about "nearly right". */
 function editDistance(a: string, b: string, cap = 3): number {
   if (Math.abs(a.length - b.length) > cap) return cap + 1;
@@ -54,6 +71,8 @@ export function checkAnswer(typed: string, expected: string): AnswerCheck {
   const b = normalizeAnswer(expected);
   if (!a) return { correct: false, nearMiss: false };
   if (a === b) return { correct: true, nearMiss: false };
+  // Singular against plural, "pumps" against "pump" — the same answer.
+  if (looseAnswer(typed) === looseAnswer(expected)) return { correct: true, nearMiss: false };
 
   // Numbers are exact or nothing; "36" and "35" are different facts.
   if (/^\d+$/.test(b)) return { correct: false, nearMiss: false };

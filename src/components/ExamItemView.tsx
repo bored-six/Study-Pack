@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
   FadeInDown,
@@ -603,12 +610,18 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
     setDraft({ ...draft, activeTerm: activeTerm === i ? null : i });
   };
 
-  const box = (e: { nativeEvent: { layout: { x: number; y: number; width: number; height: number } } }): ChipBox => ({
-    x: e.nativeEvent.layout.x,
-    y: e.nativeEvent.layout.y,
-    w: e.nativeEvent.layout.width,
-    h: e.nativeEvent.layout.height,
-  });
+  /**
+   * A measured chip, or null when the event has nothing to measure.
+   *
+   * onLayout can fire with a null nativeEvent — a chip laid out as the view
+   * is going away, or a recycled event. Reading through it crashed the whole
+   * matching question, which is a hard failure for a missing pen line.
+   */
+  const box = (e: LayoutChangeEvent): ChipBox | null => {
+    const layout = e?.nativeEvent?.layout;
+    if (!layout) return null;
+    return { x: layout.x, y: layout.y, w: layout.width, h: layout.height };
+  };
 
   return (
     <View style={styles.body}>
@@ -619,7 +632,12 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
       </Text>
 
       <View style={styles.matchCols}>
-        <View style={styles.matchCol} onLayout={(e) => setCols((c) => ({ ...c, left: box(e) }))}>
+        <View
+          style={styles.matchCol}
+          onLayout={(e) => {
+            const b = box(e);
+            if (b) setCols((c) => ({ ...c, left: b }));
+          }}>
           {item.terms.map((term, i) => {
             const paired = pairs[i] != null;
             const good = checked && pairs[i] === item.correctIndexFor[i];
@@ -629,7 +647,10 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
               <Pressable
                 key={term}
                 disabled={checked}
-                onLayout={(e) => setTermBoxes((b) => ({ ...b, [i]: box(e) }))}
+                onLayout={(e) => {
+                  const measured = box(e);
+                  if (measured) setTermBoxes((b) => ({ ...b, [i]: measured }));
+                }}
                 onPress={() => tapTerm(i)}
                 style={({ pressed }) => [
                   styles.matchChip,
@@ -656,7 +677,12 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
           })}
         </View>
 
-        <View style={styles.matchCol} onLayout={(e) => setCols((c) => ({ ...c, right: box(e) }))}>
+        <View
+          style={styles.matchCol}
+          onLayout={(e) => {
+            const b = box(e);
+            if (b) setCols((c) => ({ ...c, right: b }));
+          }}>
           {item.meanings.map((meaning, j) => {
             const pairedTerm = Object.entries(pairs).find(([, v]) => v === j)?.[0];
             const tone = pairedTerm != null ? toneFor(Number(pairedTerm)) : null;
@@ -664,7 +690,10 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
               <Pressable
                 key={meaning}
                 disabled={checked || activeTerm == null || takenMeanings.has(j)}
-                onLayout={(e) => setMeaningBoxes((b) => ({ ...b, [j]: box(e) }))}
+                onLayout={(e) => {
+                  const measured = box(e);
+                  if (measured) setMeaningBoxes((b) => ({ ...b, [j]: measured }));
+                }}
                 onPress={() => {
                   if (activeTerm == null) return;
                   tapSelect();
