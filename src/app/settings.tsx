@@ -52,14 +52,14 @@ function DerpToggle({ value, onChange, label }: { value: boolean; onChange: (on:
       onPress={() => onChange(!value)}
       style={[
         styles.derpToggle,
-        { backgroundColor: value ? colors.accent : colors.surface, borderColor: isDark ? '#1A211C' : colors.ink }
+        { backgroundColor: value ? colors.accent : colors.surface, borderColor: colors.ink }
       ]}>
       <View style={[
         styles.derpToggleThumb,
         { 
           left: value ? 22 : 2, 
-          backgroundColor: value ? colors.surface : (isDark ? '#1A211C' : colors.ink),
-          borderColor: value ? (isDark ? '#1A211C' : colors.ink) : 'transparent',
+          backgroundColor: value ? colors.surface : colors.ink,
+          borderColor: value ? colors.ink : 'transparent',
           borderWidth: value ? 2 : 0,
         }
       ]} />
@@ -75,7 +75,7 @@ function SettingRow({ icon, label, sub, right }: { icon?: IconName; label: strin
     <View style={styles.settingRow}>
       {icon && (
         <View style={styles.settingIconWrap}>
-          <Icon name={icon} size={24} color="#1A211C" />
+          <Icon name={icon} size={24} color={colors.ink} />
         </View>
       )}
       <View style={{ flex: 1 }}>
@@ -94,7 +94,7 @@ function DangerRow({ icon, label, sub, onPress }: { icon: IconName; label: strin
   return (
     <View style={styles.settingRow}>
       <View style={styles.settingIconWrap}>
-        <Icon name={icon} size={24} color="#1A211C" />
+        <Icon name={icon} size={24} color={colors.ink} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.settingLabel}>{label}</Text>
@@ -429,7 +429,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   cardTitle: {
     fontFamily: font.hero,
     fontSize: 26,
-    color: '#1A211C',
+    color: colors.ink,
     top: 2,
   },
   settingRow: {
@@ -448,7 +448,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   settingLabel: {
     fontFamily: font.bodyHeavy,
     fontSize: 16,
-    color: '#1A211C',
+    color: colors.ink,
   },
   settingSub: {
     fontFamily: font.bodyBold,
@@ -478,7 +478,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.6)',
     borderWidth: 2,
-    borderColor: '#1A211C',
+    borderColor: colors.edge,
     borderRadius: 12,
     alignItems: 'center',
     paddingVertical: 14,
@@ -486,7 +486,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   statBig: {
     fontFamily: font.hero,
     fontSize: 26,
-    color: '#1A211C',
+    color: colors.ink,
   },
   statSmall: {
     fontFamily: font.bodyHeavy,

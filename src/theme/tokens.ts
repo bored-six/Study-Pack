@@ -39,31 +39,51 @@ export const lightColors = {
   disabledText: '#A5AF9E',
 } as const;
 
+/**
+ * The same page, at night.
+ *
+ * The first attempt sat at #1A211C — near black, with cards only 1.29:1
+ * above it and washes barely 1.1:1, so every tinted card read as a hole
+ * punched in the screen rather than a sticker on paper. This is lifted
+ * well clear of black and keeps a faint olive cast, because the light
+ * theme is warm cream and a cold grey dark mode belongs to a different
+ * app. Each level steps ~1.28:1 above the last, so a card sits on the
+ * page and a nested card sits on the card.
+ *
+ * Every colour pairing the UI actually renders clears 4.5:1, checked
+ * rather than eyeballed. disabledText against disabledBg is the one
+ * exception at 3.7:1 — disabled controls are meant to recede.
+ */
 export const darkColors = {
-  bg: '#1A211C',
-  surface: '#27362B',
-  surface2: '#1F2A21',
-  ink: '#E2E5E0',
-  edge: 'rgba(226, 229, 224, 0.22)',
-  line: 'rgba(226, 229, 224, 0.14)',
-  lineSoft: 'rgba(226, 229, 224, 0.09)',
-  text: '#E2E5E0',
-  textDim: '#A5AF9E',
-  textFaint: '#82927F',
-  accent: '#5FD184',
-  accentEdge: '#38A75F',
-  accentDeep: '#5FD184',
-  onAccent: '#0E3018',
-  accentWash: '#1F3324',
-  leaf: '#5FD184',
-  leafWash: '#1C3322',
-  coral: '#E57373',
-  coralWash: '#3A1C1C',
-  gold: '#FFD54F',
-  goldWash: '#332910',
-  track: '#2C3A30',
-  disabledBg: '#2A362C',
-  disabledText: '#5D6F5C',
+  // ground: three steps, each visibly above the last
+  bg: '#2E332B',
+  surface: '#3D443A',
+  surface2: '#4B5347',
+  ink: '#EFF1EE',
+  edge: 'rgba(239, 241, 238, 0.26)',
+  line: 'rgba(239, 241, 238, 0.16)',
+  lineSoft: 'rgba(239, 241, 238, 0.10)',
+  // text
+  text: '#EFF1EE',
+  textDim: '#C3C9BE',
+  textFaint: '#ADB5A7',
+  // accent (hero green)
+  accent: '#6FDD93',
+  accentEdge: '#4CBE72',
+  accentDeep: '#9CE9B6',
+  onAccent: '#12301B',
+  accentWash: '#3C5B46',
+  // semantics — washes lifted so a tinted card still reads as paper
+  leaf: '#A6E08F',
+  leafWash: '#43603A',
+  coral: '#F7B3A1',
+  coralWash: '#5E3F37',
+  gold: '#F3CE74',
+  goldWash: '#5E5133',
+  // controls
+  track: '#555D50',
+  disabledBg: '#3F463C',
+  disabledText: '#9AA294',
 } as const;
 
 interface ThemeState {

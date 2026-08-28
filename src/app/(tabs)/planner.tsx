@@ -102,14 +102,14 @@ function DerpToggle({ value, onChange, label }: { value: boolean; onChange: (on:
       onPress={() => onChange(!value)}
       style={[
         styles.derpToggle,
-        { backgroundColor: value ? colors.accent : colors.surface, borderColor: isDark ? '#1A211C' : colors.ink }
+        { backgroundColor: value ? colors.accent : colors.surface, borderColor: colors.ink }
       ]}>
       <View style={[
         styles.derpToggleThumb,
         {
           left: value ? 22 : 2,
-          backgroundColor: value ? colors.surface : (isDark ? '#1A211C' : colors.ink),
-          borderColor: value ? (isDark ? '#1A211C' : colors.ink) : 'transparent',
+          backgroundColor: value ? colors.surface : colors.ink,
+          borderColor: value ? colors.ink : 'transparent',
           borderWidth: value ? 2 : 0,
         }
       ]} />
@@ -202,7 +202,7 @@ export default function PlannerScreen() {
     else if (isDone) statusText = 'Done for today';
 
     const tileWash = !schedule.enabled
-      ? colors.surface2
+      ? '#DEDDD4'
       : isNext
         ? '#FBD5CC'
         : isDone
