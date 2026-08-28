@@ -173,7 +173,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     title: 'All of it, steady',
     icon: 'star',
     family: 'knowledge',
-    earned: (c) => c.subjectCount >= 2 && c.subjectPercents.every((p) => p >= 60),
+    earned: (c) => c.subjectPercents.length >= 2 && c.subjectPercents.every((p) => p >= 60),
     notes: [
       'Every subject above sixty. No weak flank, nothing you’re quietly avoiding. This is what prepared feels like.',
     ],
@@ -275,7 +275,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     title: 'All of it, solid',
     icon: 'planet',
     family: 'knowledge',
-    earned: (c) => c.subjectCount >= 2 && c.subjectPercents.every((p) => p >= 85),
+    earned: (c) => c.subjectPercents.length >= 2 && c.subjectPercents.every((p) => p >= 85),
     notes: [
       'Every subject above eighty-five. There is no weak one to worry about on the way in. Whatever they ask, you have already answered it.',
     ],

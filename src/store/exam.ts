@@ -22,6 +22,9 @@ import {
   type ExamRequest,
 } from '@/lib/exam';
 import type { AnswerRecord } from '@/lib/mastery';
+import { retireSessionForDeck } from '@/lib/notifications';
+import { useAchievementsStore } from '@/store/achievements';
+import { useMomentsStore } from '@/store/moments';
 import {
   advanceQueue,
   DEFAULT_MODE,
@@ -192,6 +195,28 @@ export const useExamStore = create<ExamState>((set, get) => {
     // Which questions were missed is what mastery and the need-weighted
     // picker read; the score alone could never tell them apart.
     await saveAnswers(attemptId, deck.id, answerLog);
+
+    // Everything below used to happen only for trivia, which meant a
+    // student working through their own notes -- the actual study path --
+    // never earned a sticker, never got a moment, and still got nagged by
+    // a reminder for a sitting they had just finished.
+    await useMomentsStore.getState().recordForAttempt({
+      deckId: deck.id,
+      deckName: deck.name,
+      score,
+      total: results.length,
+      completedAt,
+      answers: answerLog,
+    });
+
+    await useAchievementsStore.getState().checkAfterAttempt({
+      deckId: deck.id,
+      score,
+      total: results.length,
+      completedAt,
+    });
+
+    await retireSessionForDeck(deck.id, completedAt);
   };
 
   /**
