@@ -307,9 +307,16 @@ interface Definition {
   acronym: boolean;
 }
 
+/**
+ * "ATP stands for adenosine triphosphate". Exported so the paste box's live
+ * read can agree with the parser about what counts, instead of keeping a
+ * second copy that drifts.
+ */
+export const ABBREVIATION =
+  /^(.{1,40}?)\s+(?:stands for|is short for|is an acronym for)\s+(.+)$/i;
+
 function matchDefinitionShape(line: string): Definition | null {
-  // "ATP stands for adenosine triphosphate"
-  const stands = /^(.{1,40}?)\s+(?:stands for|is short for|is an acronym for)\s+(.+)$/i.exec(line);
+  const stands = ABBREVIATION.exec(line);
   if (stands) {
     const term = cleanTerm(stands[1]);
     const meaning = stripIllustration(cleanTerm(stands[2]));
