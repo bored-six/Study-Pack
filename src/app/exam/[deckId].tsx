@@ -21,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CartridgeLoad } from '@/components/CartridgeLoad';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { DerpCheck, DerpMinus, DerpPlus } from '@/components/DerpIcons';
 import { Icon } from '@/components/Icon';
@@ -391,11 +392,14 @@ export default function ExamSetupScreen() {
   const [step, setStep] = useState<'mode' | 'counts'>('mode');
   /** The cartridge being inspected, before it is committed to. */
   const [peek, setPeek] = useState<ExamMode | null>(null);
+  /** The cartridge going into the slot. Null when nothing is loading. */
+  const [loading, setLoading] = useState<ExamMode | null>(null);
 
   useEffect(() => {
     if (deckId) {
       setStep('mode');
       setPeek(null);
+      setLoading(null);
       void load(deckId);
     }
   }, [deckId, load]);
@@ -429,9 +433,18 @@ export default function ExamSetupScreen() {
     if (useExamStore.getState().status === 'active') router.push('/exam/run');
   }, [status, deckId, wantMode, wantFormat, setMode, setOnly, start]);
 
+  /**
+   * Puts the cartridge in. What it loads into — the build form, or the
+   * first question for a mode that picks its own paper — is swapped while
+   * the screen is covered, so the change is never seen happening.
+   */
   const chooseMode = (id: ExamMode) => {
     setPeek(null);
     setMode(id);
+    setLoading(id);
+  };
+
+  const commitMode = (id: ExamMode) => {
     if (MODES[id].autoBuild) begin();
     else setStep('counts');
   };
@@ -551,6 +564,14 @@ export default function ExamSetupScreen() {
             </Pressable>
           </Pressable>
         </Modal>
+
+        {loading ? (
+          <CartridgeLoad
+            spec={MODES[loading]}
+            onCovered={() => commitMode(loading)}
+            onDone={() => setLoading(null)}
+          />
+        ) : null}
       </View>
     );
   }
@@ -679,6 +700,14 @@ export default function ExamSetupScreen() {
           />
         </View>
       </View>
+
+      {loading ? (
+        <CartridgeLoad
+            spec={MODES[loading]}
+            onCovered={() => commitMode(loading)}
+            onDone={() => setLoading(null)}
+        />
+      ) : null}
     </View>
   );
 }

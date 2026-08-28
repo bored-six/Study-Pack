@@ -14,6 +14,19 @@ jest.mock('expo-router', () => ({
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+/**
+ * Choosing a mode now plays the cartridge into a slot, and the step only
+ * changes once the screen is covered. This suite is about the form, so the
+ * load hands over at once here; the animation's own contract — cover,
+ * swap, reveal, and never strand anyone — is CartridgeLoad.test.tsx.
+ */
+jest.mock('@/components/CartridgeLoad', () => ({
+  CartridgeLoad: ({ onCovered, onDone }: { onCovered: () => void; onDone: () => void }) => {
+    onCovered();
+    onDone();
+    return null;
+  },
+}));
 jest.mock('@/lib/db', () => ({
   getDeckById: jest.fn(),
   listQuestions: jest.fn(),
