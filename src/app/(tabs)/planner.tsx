@@ -288,7 +288,7 @@ export default function PlannerScreen() {
             ) : null}
 
             <View style={styles.remCard}>
-              <Icon name="bell" size={20} color="#1A211C" fill={colors.goldWash} />
+              <Icon name="bell" size={20} color={colors.ink} fill={colors.goldWash} />
               <Text style={styles.remLabel}>REMIND ME</Text>
               <View style={styles.leadChips}>
                 {AVAILABLE_LEADS.map((lead) => {

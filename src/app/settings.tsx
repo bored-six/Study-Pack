@@ -37,7 +37,7 @@ import { useDecksStore } from '@/store/decks';
 import { useNotesStore } from '@/store/notes';
 import { usePlannerStore } from '@/store/planner';
 import { useProgressStore } from '@/store/progress';
-import { derpRadius, font, getColors, useThemeStore } from '@/theme/tokens';
+import { derpRadius, font, getColors, lightColors, useThemeStore } from '@/theme/tokens';
 
 type Pending = 'trivia' | 'history' | 'erase' | 'eraseReally';
 
@@ -75,7 +75,7 @@ function SettingRow({ icon, label, sub, right }: { icon?: IconName; label: strin
     <View style={styles.settingRow}>
       {icon && (
         <View style={styles.settingIconWrap}>
-          <Icon name={icon} size={24} color={colors.ink} />
+          <Icon name={icon} size={24} color={lightColors.ink} />
         </View>
       )}
       <View style={{ flex: 1 }}>
@@ -94,7 +94,7 @@ function DangerRow({ icon, label, sub, onPress }: { icon: IconName; label: strin
   return (
     <View style={styles.settingRow}>
       <View style={styles.settingIconWrap}>
-        <Icon name={icon} size={24} color={colors.ink} />
+        <Icon name={icon} size={24} color={lightColors.ink} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.settingLabel}>{label}</Text>
@@ -429,7 +429,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   cardTitle: {
     fontFamily: font.hero,
     fontSize: 26,
-    color: colors.ink,
+    color: lightColors.ink,
     top: 2,
   },
   settingRow: {
@@ -448,7 +448,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   settingLabel: {
     fontFamily: font.bodyHeavy,
     fontSize: 16,
-    color: colors.ink,
+    color: lightColors.ink,
   },
   settingSub: {
     fontFamily: font.bodyBold,
@@ -478,7 +478,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(255,255,255,0.6)',
     borderWidth: 2,
-    borderColor: colors.edge,
+    borderColor: lightColors.edge,
     borderRadius: 12,
     alignItems: 'center',
     paddingVertical: 14,
@@ -486,7 +486,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   statBig: {
     fontFamily: font.hero,
     fontSize: 26,
-    color: colors.ink,
+    color: lightColors.ink,
   },
   statSmall: {
     fontFamily: font.bodyHeavy,

@@ -390,7 +390,7 @@ export default function ProgressScreen() {
             {/* ---- weak spots ---- */}
             {weakCount > 0 ? (
               <View style={styles.tripCard}>
-                <Icon name="bolt" size={24} color="#1A211C" fill={colors.coralWash} />
+                <Icon name="bolt" size={24} color={colors.ink} fill={colors.coralWash} />
                 <View style={styles.tripText}>
                   <Text style={styles.tripNum}>
                     {weakCount} {weakCount === 1 ? 'question' : 'questions'}
@@ -826,12 +826,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontFamily: font.hero,
     fontSize: 20,
     lineHeight: 22,
-    color: '#1A211C',
+    color: colors.text,
   },
   tripLabel: {
     fontFamily: font.bodySemibold,
     fontSize: 11,
-    color: '#BC5A2E',
+    color: colors.coral,
   },
 
   mRow: {

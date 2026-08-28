@@ -45,7 +45,7 @@ export const lightColors = {
  * The first attempt sat at #1A211C — near black, with cards only 1.29:1
  * above it and washes barely 1.1:1, so every tinted card read as a hole
  * punched in the screen rather than a sticker on paper. This is lifted
- * well clear of black and keeps a faint olive cast, because the light
+ * clear of black and keeps a faint olive cast, because the light
  * theme is warm cream and a cold grey dark mode belongs to a different
  * app. Each level steps ~1.28:1 above the last, so a card sits on the
  * page and a nested card sits on the card.
@@ -56,34 +56,34 @@ export const lightColors = {
  */
 export const darkColors = {
   // ground: three steps, each visibly above the last
-  bg: '#2E332B',
-  surface: '#3D443A',
-  surface2: '#4B5347',
-  ink: '#EFF1EE',
-  edge: 'rgba(239, 241, 238, 0.26)',
-  line: 'rgba(239, 241, 238, 0.16)',
-  lineSoft: 'rgba(239, 241, 238, 0.10)',
+  bg: '#373D33',
+  surface: '#464E41',
+  surface2: '#555E4F',
+  ink: '#F2F4F0',
+  edge: 'rgba(242, 244, 240, 0.28)',
+  line: 'rgba(242, 244, 240, 0.18)',
+  lineSoft: 'rgba(242, 244, 240, 0.12)',
   // text
-  text: '#EFF1EE',
-  textDim: '#C3C9BE',
-  textFaint: '#ADB5A7',
+  text: '#F2F4F0',
+  textDim: '#CBD1C5',
+  textFaint: '#BCC3B6',
   // accent (hero green)
   accent: '#6FDD93',
   accentEdge: '#4CBE72',
-  accentDeep: '#9CE9B6',
+  accentDeep: '#A6EDBE',
   onAccent: '#12301B',
-  accentWash: '#3C5B46',
+  accentWash: '#456650',
   // semantics — washes lifted so a tinted card still reads as paper
-  leaf: '#A6E08F',
-  leafWash: '#43603A',
-  coral: '#F7B3A1',
-  coralWash: '#5E3F37',
-  gold: '#F3CE74',
-  goldWash: '#5E5133',
+  leaf: '#BCEBAA',
+  leafWash: '#4C6B42',
+  coral: '#F9BBAA',
+  coralWash: '#6B483E',
+  gold: '#F6D584',
+  goldWash: '#6B5C3B',
   // controls
-  track: '#555D50',
-  disabledBg: '#3F463C',
-  disabledText: '#9AA294',
+  track: '#5F6859',
+  disabledBg: '#484F43',
+  disabledText: '#A3AB9C',
 } as const;
 
 interface ThemeState {
