@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 
 import { Icon, type IconName } from '@/components/Icon';
 import { FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
-import { colors, font } from '@/theme/tokens';
+import { font, getColors, useThemeStore , lightColors } from '@/theme/tokens';
 
 /**
  * One visual identity per exam format — same icon and colour on the
@@ -14,12 +14,12 @@ export const FORMAT_META: Record<
   { icon: IconName; wash: string; ink: string }
 > = {
   multiple_choice: { icon: 'cards', wash: '#DBEEFB', ink: '#2E6FA3' },
-  true_false: { icon: 'check', wash: colors.leafWash, ink: colors.leaf },
-  modified_true_false: { icon: 'pencil', wash: colors.coralWash, ink: colors.coral },
-  identification: { icon: 'bulb', wash: colors.goldWash, ink: colors.gold },
+  true_false: { icon: 'check', wash: lightColors.leafWash, ink: lightColors.leaf },
+  modified_true_false: { icon: 'pencil', wash: lightColors.coralWash, ink: lightColors.coral },
+  identification: { icon: 'bulb', wash: lightColors.goldWash, ink: lightColors.gold },
   fill_blank: { icon: 'bolt', wash: '#EAE2FA', ink: '#6C51A8' },
   matching: { icon: 'dice', wash: '#FFE5D2', ink: '#BC5A2E' },
-  enumeration: { icon: 'calculator', wash: colors.accentWash, ink: colors.accentDeep },
+  enumeration: { icon: 'calculator', wash: lightColors.accentWash, ink: lightColors.accentDeep },
 };
 
 interface Props {
@@ -29,6 +29,10 @@ interface Props {
 }
 
 export function FormatBadge({ format, size = 'sm', style }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const meta = FORMAT_META[format];
   const large = size === 'lg';
 
@@ -54,7 +58,7 @@ export function FormatBadge({ format, size = 'sm', style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

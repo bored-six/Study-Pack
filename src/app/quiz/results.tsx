@@ -11,7 +11,7 @@ import { AchievementModal } from '@/components/AchievementModal';
 import { useAchievementsStore } from '@/store/achievements';
 import { useMomentsStore } from '@/store/moments';
 import { useQuizStore } from '@/store/quiz';
-import { colors, font, outline, radius, shadow, textPop } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, textPop, useThemeStore } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
@@ -21,6 +21,10 @@ function formatDuration(ms: number): string {
 }
 
 export default function ResultsScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   const { deck, questions, score, durationMs } = useQuizStore();
   const moment = useMomentsStore((s) => s.latest);
@@ -128,7 +132,7 @@ export default function ResultsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,

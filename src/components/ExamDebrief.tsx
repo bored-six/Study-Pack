@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Tape } from '@/components/notebook';
 import type { Debrief, DebriefNote, NextStep } from '@/lib/debrief';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 /**
  * The marker's note under the score.
@@ -14,6 +14,10 @@ import { colors, font, outline, radius, shadow } from '@/theme/tokens';
  */
 
 function Line({ label, notes, ink }: { label: string; notes: DebriefNote[]; ink: string }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   // Nothing true to put here means nothing goes here.
   const note = notes[0];
   if (!note) return null;
@@ -32,6 +36,10 @@ export function ExamDebrief({
   debrief: Debrief;
   onAction: (next: NextStep) => void;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const { wrong, strengths, weaknesses, next } = debrief;
   const anything = wrong.length + strengths.length + weaknesses.length > 0;
 
@@ -63,7 +71,7 @@ export function ExamDebrief({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   card: {
     marginTop: 14,
     backgroundColor: colors.surface,

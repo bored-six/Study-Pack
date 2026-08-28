@@ -16,7 +16,7 @@ import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { SKIP_LABEL, type ParsedQuestion, type SkippedLine } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
-import { candy, colors, font, outline, radius, shadow, subjectInkFor } from '@/theme/tokens';
+import { candy, font, getColors, outline, radius, shadow, subjectInkFor, useThemeStore } from '@/theme/tokens';
 
 function QuestionCard({
   question,
@@ -29,6 +29,10 @@ function QuestionCard({
   onRevise: (index: number, patch: Partial<ParsedQuestion>) => void;
   onRemove: (index: number) => void;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const [editing, setEditing] = useState(false);
 
   const editAnswer = (previous: string, next: string) => {
@@ -129,6 +133,10 @@ function QuestionCard({
 }
 
 function SkippedPanel({ skipped }: { skipped: SkippedLine[] }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const [open, setOpen] = useState(false);
   if (skipped.length === 0) return null;
 
@@ -163,6 +171,10 @@ function SkippedPanel({ skipped }: { skipped: SkippedLine[] }) {
 }
 
 export default function ReviewNotesScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   const {
     draft,
@@ -364,7 +376,7 @@ export default function ReviewNotesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,

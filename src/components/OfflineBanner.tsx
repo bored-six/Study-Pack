@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 
 import { Icon } from '@/components/Icon';
 import { useOnline } from '@/hooks/useOnline';
-import { colors, font, radius } from '@/theme/tokens';
+import { font, getColors, radius, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   message?: string;
@@ -14,6 +14,10 @@ interface Props {
  * offline is a supported state to reassure about, not an error.
  */
 export function OfflineBanner({ message = 'Offline — showing device content', style }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const online = useOnline();
   if (online) return null;
 
@@ -25,7 +29,7 @@ export function OfflineBanner({ message = 'Offline — showing device content', 
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   banner: {
     flexDirection: 'row',
     alignItems: 'center',

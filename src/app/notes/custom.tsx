@@ -23,7 +23,7 @@ import {
 } from '@/lib/customQuestion';
 import { suggestDistractors } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
-import { colors, font, outline, radius, shadow, subjectInkFor } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, subjectInkFor, useThemeStore } from '@/theme/tokens';
 
 const BLANK_DECOYS = ['', '', ''];
 
@@ -31,6 +31,10 @@ const BLANK_DECOYS = ['', '', ''];
 const MISTAKES: CustomIssue[] = ['repeated_option', 'prompt_too_long', 'answer_too_long'];
 
 export default function CustomQuestionScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   const { subjects, targetId, setTarget, poolFor, stageCustom, refresh } = useNotesStore();
 
@@ -304,7 +308,7 @@ export default function CustomQuestionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   flex: {
     flex: 1,
   },

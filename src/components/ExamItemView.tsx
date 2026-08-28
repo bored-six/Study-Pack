@@ -28,7 +28,7 @@ import type {
   TypedItem,
 } from '@/lib/exam';
 import { checkAnswer, checkEnumeration } from '@/lib/grade';
-import { candy, colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { candy, font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   item: ExamItem;
@@ -72,6 +72,10 @@ function Verdict({
   detail?: string;
   onNext: () => void;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   // The moment the verdict appears is the moment that deserves the sound —
   // every format funnels through here, so no type is ever silent.
   useEffect(() => {
@@ -99,6 +103,10 @@ function Verdict({
 }
 
 function BlinkRing() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const pulse = useSharedValue(0);
   const reduced = useReducedMotion();
 
@@ -114,10 +122,10 @@ function BlinkRing() {
   const style = useAnimatedStyle(() => ({ opacity: 0.25 + pulse.value * 0.5 }));
 
   // Sits behind the empty answer line, breathing like a cursor.
-  return <Animated.View pointerEvents="none" style={[blinkStyles.ring, style]} />;
+  return <Animated.View pointerEvents="none" style={[getBlinkStyles(colors).ring, style]} />;
 }
 
-const blinkStyles = StyleSheet.create({
+const getBlinkStyles = (colors: any) => StyleSheet.create({
   ring: {
     position: 'absolute',
     left: -3,
@@ -131,11 +139,19 @@ const blinkStyles = StyleSheet.create({
 });
 
 function Prompt({ text }: { text: string }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   return <Text style={styles.prompt}>{text}</Text>;
 }
 
 /** Standing in for the verdict while answers are being withheld. */
 function Recorded({ answered }: { answered: boolean }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   return (
     <Text style={styles.hint}>
       {answered ? 'Answer saved — you can change it before you submit.' : 'Nothing down yet'}
@@ -146,6 +162,10 @@ function Recorded({ answered }: { answered: boolean }) {
 // --- multiple choice ----------------------------------------------------
 
 function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'choice'>) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const picked = draft.picked;
   const revealed = reveal && picked != null;
   const correct = picked === item.correctAnswer;
@@ -221,6 +241,10 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
 // --- true / false -------------------------------------------------------
 
 function TrueFalse({ item, draft, setDraft, reveal, onDone }: Field<TrueFalseItem, 'tf'>) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const picked = draft.picked;
   const revealed = reveal && picked != null;
   const correct = picked === item.isTrue;
@@ -299,6 +323,10 @@ function ModifiedTrueFalse({
   reveal,
   onDone,
 }: Field<ModifiedTrueFalseItem, 'mtf'>) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const { saidTrue, wordIndex, typed, done } = draft;
 
   // Calling a false statement true (or vice versa) ends it immediately —
@@ -453,6 +481,10 @@ function ModifiedTrueFalse({
 // --- typed answers ------------------------------------------------------
 
 function Typed({ item, draft, setDraft, reveal, onDone }: Field<TypedItem, 'typed'>) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const checked = reveal && draft.checked;
   const result = checkAnswer(draft.text, item.correctAnswer);
 
@@ -537,6 +569,10 @@ function penPath(from: { x: number; y: number }, to: { x: number; y: number }): 
 }
 
 function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem, 'matching'>) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const { pairs, activeTerm } = draft;
   const checked = reveal && draft.checked;
 
@@ -702,6 +738,10 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
 // --- enumeration --------------------------------------------------------
 
 function Enumeration({ item, draft, setDraft, reveal, onDone }: Field<EnumerationItem, 'enum'>) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const checked = reveal && draft.checked;
   const result = checkEnumeration(draft.entries, item.items, item.ordered);
 
@@ -782,6 +822,10 @@ function coerce<K extends DraftValue['kind']>(
 }
 
 export function ExamItemView({ item, value, onChange, reveal = true, onDone }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   // Only used when the parent doesn't hold the answer itself. Keyed on the
   // item so advancing to the next question starts clean even if this
   // component is reused rather than remounted.
@@ -819,7 +863,7 @@ export function ExamItemView({ item, value, onChange, reveal = true, onDone }: P
   }
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   hand: {
     flexDirection: 'row',
     flexWrap: 'wrap',

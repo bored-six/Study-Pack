@@ -13,7 +13,7 @@ import Animated, {
 import { Icon } from '@/components/Icon';
 import { playSfx } from '@/lib/sfx';
 import { Squiggle, Tape } from '@/components/notebook';
-import { colors, font, outline, shadow, textPop } from '@/theme/tokens';
+import { font, getColors, outline, shadow, textPop, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   onDone: () => void;
@@ -43,6 +43,10 @@ function Dot({
   delay,
   reduced,
 }: (typeof DOTS)[number] & { reduced: boolean }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const scale = useSharedValue(reduced ? 1 : 0);
 
   useEffect(() => {
@@ -70,6 +74,10 @@ function Dot({
  * app. Tap anywhere to skip; honors the system reduce-motion setting.
  */
 export function IntroOverlay({ onDone }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const reduced = useReducedMotion();
   const doneRef = useRef(false);
 
@@ -147,7 +155,7 @@ export function IntroOverlay({ onDone }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: colors.bg,

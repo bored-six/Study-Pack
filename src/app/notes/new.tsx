@@ -18,7 +18,7 @@ import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { LIMITS } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 const PLACEHOLDER = `Chlorophyll: the green pigment that absorbs light
 ATP stands for adenosine triphosphate
@@ -28,6 +28,10 @@ Mitochondria produce 36 ATP per glucose molecule.`;
 const SCAN_MS = 900;
 
 export default function NewNotesScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   const { refresh, parse } = useNotesStore();
   const [body, setBody] = useState('');
@@ -192,7 +196,7 @@ export default function NewNotesScreen() {
 const LINE_H = 26;
 const PAGE_PAD = 14;
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   flex: {
     flex: 1,
   },

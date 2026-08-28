@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 
 import { Icon, type IconName } from '@/components/Icon';
-import { buttonEdge, colors, font, outline, radius } from '@/theme/tokens';
+import { buttonEdge, font, getColors, outline, radius, useThemeStore } from '@/theme/tokens';
 
 type Variant = 'primary' | 'soft' | 'paper';
 type Size = 'sm' | 'md' | 'lg';
@@ -25,9 +25,10 @@ interface Props {
   style?: StyleProp<ViewStyle>;
 }
 
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+
 /**
- * Chunky 3D button: a colored "edge" shell with a face that drops down
- * onto it while pressed. Pure layout (no transforms), constant height.
+ * Chunky 3D button: a colored "edge" shell with a face that smoothly presses down.
  */
 export function ChunkyButton({
   label,
@@ -39,19 +40,43 @@ export function ChunkyButton({
   labelColor,
   style,
 }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+  const shellStyles = shellStylesFor(colors);
+  const faceStyles = faceStylesFor(colors);
+  const labelStyles = labelStylesFor(colors);
+
   const contentColor = disabled
     ? colors.disabledText
     : (labelColor ?? labelStyles[variant].color);
+
+  const pressY = useSharedValue(0);
+
+  const animatedFaceStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: pressY.value }],
+  }));
+
   return (
-    <Pressable onPress={onPress} disabled={disabled} style={style}>
-      {({ pressed }) => (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={style}
+      onPressIn={() => {
+        if (!disabled) pressY.value = withSpring(buttonEdge, { stiffness: 500, damping: 25 });
+      }}
+      onPressOut={() => {
+        if (!disabled) pressY.value = withSpring(0, { stiffness: 500, damping: 25 });
+      }}
+    >
+      {() => (
         <View style={[styles.shell, shellStyles[variant], disabled && styles.shellDisabled]}>
-          <View
+          <Animated.View
             style={[
               styles.face,
               faceSizes[size],
               faceStyles[variant],
-              pressed && !disabled ? styles.facePressed : styles.faceRaised,
+              animatedFaceStyle,
               disabled && styles.faceDisabled,
             ]}>
             {icon ? (
@@ -72,16 +97,17 @@ export function ChunkyButton({
               ]}>
               {label}
             </Text>
-          </View>
+          </Animated.View>
         </View>
       )}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   shell: {
     borderRadius: radius.control,
+    paddingBottom: buttonEdge, // Reserve the 3D edge space
   },
   shellDisabled: {
     backgroundColor: colors.disabledBg,
@@ -93,15 +119,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  faceRaised: {
-    marginBottom: buttonEdge,
-  },
-  facePressed: {
-    marginTop: buttonEdge,
-  },
   faceDisabled: {
     backgroundColor: colors.disabledBg,
     borderWidth: 0,
+    transform: [{ translateY: buttonEdge }], // disabled state is permanently flat
   },
   label: {
     fontFamily: font.heading,
@@ -111,23 +132,23 @@ const styles = StyleSheet.create({
   },
 });
 
-const shellStyles: Record<Variant, ViewStyle> = {
+const shellStylesFor = (colors: any): Record<Variant, ViewStyle> => ({
   primary: { backgroundColor: colors.accentEdge },
   soft: { backgroundColor: '#BCDDB9' },
   paper: { backgroundColor: '#DCD5C0' },
-};
+});
 
-const faceStyles: Record<Variant, ViewStyle> = {
+const faceStylesFor = (colors: any): Record<Variant, ViewStyle> => ({
   primary: { backgroundColor: colors.accent, ...outline },
   soft: { backgroundColor: colors.accentWash, ...outline },
   paper: { backgroundColor: colors.surface, ...outline },
-};
+});
 
-const labelStyles = {
+const labelStylesFor = (colors: any) => ({
   primary: { color: colors.ink },
   soft: { color: colors.accentDeep },
   paper: { color: colors.text },
-} as const;
+});
 
 const faceSizes: Record<Size, ViewStyle> = {
   sm: { paddingHorizontal: 14, paddingVertical: 7 },

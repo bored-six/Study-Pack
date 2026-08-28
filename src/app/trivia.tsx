@@ -18,7 +18,7 @@ import { RuledPaper } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useOnline } from '@/hooks/useOnline';
 import { DIFFICULTIES, DIFFICULTY_LABEL, type Deck, type Difficulty } from '@/lib/types';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 import { useDecksStore } from '@/store/decks';
 
 /** What each difficulty actually means, so the levels aren't just labels. */
@@ -29,6 +29,10 @@ const DIFFICULTY_HINT: Record<Difficulty, string> = {
 };
 
 export default function TriviaScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   const online = useOnline();
   const { decks, status, error, fromCache, refresh, downloading, downloadDeck, removeDownload } =
@@ -204,7 +208,7 @@ export default function TriviaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,

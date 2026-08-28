@@ -22,7 +22,7 @@ import { correctText, draftText, itemPrompt, type DraftValue } from '@/lib/draft
 import { FORMAT_LABEL, type ExamFormat, type ExamItem } from '@/lib/exam';
 import { MODES } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 function formatDuration(ms: number): string {
   const total = Math.round(ms / 1000);
@@ -44,6 +44,10 @@ function MarkedRow({
   ok: boolean;
   number?: number;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   return (
     <View style={styles.paperRow}>
       <View style={[styles.paperMark, ok ? styles.markGood : styles.markBad]}>
@@ -74,6 +78,10 @@ function MarkedRow({
 
 /** A gold-foil glint sweeping across the A+ stamp. */
 function Shimmer() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const sweep = useSharedValue(-1);
   useEffect(() => {
     sweep.value = withRepeat(
@@ -106,6 +114,10 @@ const shimmerStyles = StyleSheet.create({
 });
 
 export default function ExamResultsScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   const {
     status,
@@ -394,7 +406,7 @@ export default function ExamResultsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,

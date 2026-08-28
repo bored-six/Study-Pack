@@ -8,7 +8,7 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon } from '@/components/Icon';
 import { formatClock } from '@/lib/schedule';
 import { REPEATS, REPEAT_LABEL, type Deck, type Repeat } from '@/lib/types';
-import { colors, font, radius } from '@/theme/tokens';
+import { font, radius, getColors, useThemeStore } from '@/theme/tokens';
 
 export interface PlanDraft {
   deckId: string;
@@ -19,7 +19,6 @@ export interface PlanDraft {
 
 interface Props {
   visible: boolean;
-  /** The student's own subjects — the only thing worth planning. */
   subjects: readonly Deck[];
   onCancel: () => void;
   onSave: (draft: PlanDraft) => void;
@@ -30,13 +29,16 @@ function startOfDay(timestamp: number): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
-/** Rolls to tomorrow when the chosen time has already gone by today. */
 function firstDateFor(timeOfDay: number, now: number): number {
   const today = startOfDay(now);
   return today + timeOfDay * 60_000 <= now ? today + 86_400_000 : today;
 }
 
 export function PlanQuizSheet({ visible, subjects, onCancel, onSave }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const [deckId, setDeckId] = useState<string | null>(null);
   const [timeOfDay, setTimeOfDay] = useState(19 * 60);
   const [repeat, setRepeat] = useState<Repeat>('daily');
@@ -82,29 +84,31 @@ export function PlanQuizSheet({ visible, subjects, onCancel, onSave }: Props) {
               <ChunkyButton label="Got it" size="lg" onPress={onCancel} style={styles.fullBtn} />
             </View>
           ) : (
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.label}>Subject</Text>
-              {subjects.map((subject) => {
-                const active = subject.id === selected;
-                return (
-                  <Pressable
-                    key={subject.id}
-                    onPress={() => setDeckId(subject.id)}
-                    style={styles.subjectRow}>
-                    <Text style={[styles.subjectName, active && styles.subjectNameActive]}>
-                      {subject.name}
-                    </Text>
-                    {active ? (
-                      <Icon name="check" size={17} color={colors.accentDeep} strokeWidth={2.6} />
-                    ) : null}
-                  </Pressable>
-                );
-              })}
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              
+              <Text style={styles.sectionTitle}>1. Pick a subject</Text>
+              <View style={styles.chipRow}>
+                {subjects.map((subject) => {
+                  const active = subject.id === selected;
+                  return (
+                    <Pressable
+                      key={subject.id}
+                      onPress={() => setDeckId(subject.id)}
+                      style={[styles.chip, active && styles.chipActive]}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {subject.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
-              <Text style={styles.label}>Time</Text>
-              <Pressable onPress={() => setPicking(true)} style={styles.timeRow}>
-                <Text style={styles.timeText}>{formatClock(timeValue.getTime())}</Text>
-                <Text style={styles.timeHint}>change</Text>
+              <Text style={styles.sectionTitle}>2. Pick a time</Text>
+              <Pressable onPress={() => setPicking(true)} style={styles.timeBox}>
+                <View style={styles.timeBoxInner}>
+                  <Text style={styles.timeText}>{formatClock(timeValue.getTime())}</Text>
+                  <Icon name="pencil" size={20} color={colors.ink} />
+                </View>
               </Pressable>
 
               {picking ? (
@@ -116,8 +120,8 @@ export function PlanQuizSheet({ visible, subjects, onCancel, onSave }: Props) {
                 />
               ) : null}
 
-              <Text style={styles.label}>Repeat</Text>
-              <View style={styles.chips}>
+              <Text style={styles.sectionTitle}>3. How often?</Text>
+              <View style={styles.chipRow}>
                 {REPEATS.map((option) => {
                   const active = option === repeat;
                   return (
@@ -147,111 +151,105 @@ export function PlanQuizSheet({ visible, subjects, onCancel, onSave }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(39, 54, 43, 0.3)',
+    backgroundColor: 'rgba(26, 33, 28, 0.4)',
     justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: colors.bg,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderColor: '#1A211C',
     paddingHorizontal: 24,
     paddingTop: 12,
     paddingBottom: 32,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   grabber: {
     alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.line,
-    marginBottom: 18,
+    width: 48,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#1A211C',
+    marginBottom: 24,
   },
-  label: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 11,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    color: colors.textFaint,
-    marginTop: 26,
-    marginBottom: 6,
-  },
-  subjectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lineSoft,
-  },
-  subjectName: {
-    fontFamily: font.bodyBold,
-    fontSize: 16,
-    color: colors.textDim,
-  },
-  subjectNameActive: {
+  sectionTitle: {
     fontFamily: font.hero,
-    fontSize: 20,
+    fontSize: 22,
     color: colors.text,
+    marginTop: 20,
+    marginBottom: 12,
   },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  timeText: {
-    fontFamily: font.hero,
-    fontSize: 44,
-    lineHeight: 54,
-    color: colors.text,
-  },
-  timeHint: {
-    fontFamily: font.bodyBold,
-    fontSize: 13,
-    color: colors.accentDeep,
-  },
-  chips: {
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 12,
   },
   chip: {
-    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.ink,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 9,
-    backgroundColor: colors.surface2,
+    paddingVertical: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 0, elevation: 2,
   },
   chipActive: {
-    backgroundColor: colors.accent,
+    backgroundColor: '#DDF3DC',
+    borderColor: '#1A211C',
+    transform: [{ rotate: '-2deg' }],
   },
   chipText: {
     fontFamily: font.bodyBold,
-    fontSize: 13.5,
-    color: colors.textDim,
+    fontSize: 16,
+    color: colors.text,
   },
   chipTextActive: {
-    color: colors.ink,
+    color: '#1A211C',
+  },
+  timeBox: {
+    backgroundColor: '#FCEBC0',
+    borderWidth: 3,
+    borderColor: '#1A211C',
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '1deg' }],
+  },
+  timeBoxInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  timeText: {
+    fontFamily: font.hero,
+    fontSize: 48,
+    color: '#1A211C',
   },
   fullBtn: {
-    marginTop: 32,
+    marginTop: 40,
   },
   empty: {
-    paddingVertical: 12,
+    paddingVertical: 20,
+    alignItems: 'center',
   },
   emptyTitle: {
     fontFamily: font.hero,
-    fontSize: 24,
+    fontSize: 28,
     color: colors.text,
   },
   emptyBody: {
-    fontFamily: font.body,
-    fontSize: 14.5,
-    lineHeight: 20,
-    color: colors.textDim,
-    marginTop: 6,
+    fontFamily: font.bodyBold,
+    fontSize: 16,
+    color: colors.textFaint,
+    marginTop: 10,
+    textAlign: 'center',
   },
 });

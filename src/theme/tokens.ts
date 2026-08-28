@@ -1,3 +1,4 @@
+import { create } from 'zustand';
 /**
  * Flipp design tokens — soft sticker book.
  * Warm paper ground; surfaces are gentle "stickers": soft warm-ink edges,
@@ -6,7 +7,7 @@
  * black shadows. Gold is reserved for streaks and the offline banner.
  * Single light theme by design.
  */
-export const colors = {
+export const lightColors = {
   // ground
   bg: '#FAF3E1',
   surface: '#FFFFFF',
@@ -37,6 +38,56 @@ export const colors = {
   disabledBg: '#EDE6D2',
   disabledText: '#A5AF9E',
 } as const;
+
+export const darkColors = {
+  bg: '#1A211C',
+  surface: '#27362B',
+  surface2: '#1F2A21',
+  ink: '#E2E5E0',
+  edge: 'rgba(226, 229, 224, 0.22)',
+  line: 'rgba(226, 229, 224, 0.14)',
+  lineSoft: 'rgba(226, 229, 224, 0.09)',
+  text: '#E2E5E0',
+  textDim: '#A5AF9E',
+  textFaint: '#82927F',
+  accent: '#5FD184',
+  accentEdge: '#38A75F',
+  accentDeep: '#5FD184',
+  onAccent: '#0E3018',
+  accentWash: '#1F3324',
+  leaf: '#5FD184',
+  leafWash: '#1C3322',
+  coral: '#E57373',
+  coralWash: '#3A1C1C',
+  gold: '#FFD54F',
+  goldWash: '#332910',
+  track: '#2C3A30',
+  disabledBg: '#2A362C',
+  disabledText: '#5D6F5C',
+} as const;
+
+interface ThemeState {
+  isDark: boolean;
+  toggleTheme: () => void;
+}
+
+export const useThemeStore = create<ThemeState>((set) => ({
+  isDark: false,
+  toggleTheme: () => set((state) => ({ isDark: !state.isDark })),
+}));
+
+/**
+ * Sets the theme without going through the toggle, so the stored
+ * preference can be restored on launch. Without this the switch worked
+ * but forgot itself the moment the app closed.
+ */
+export function setDarkMode(on: boolean): void {
+  useThemeStore.setState({ isDark: on });
+}
+
+export const getColors = (isDark: boolean) => isDark ? darkColors : lightColors;
+export const colors = lightColors; // Fallback for static files
+
 
 /** Candy washes rotated across deck cards for sticker-sheet variety. */
 export const candy = [
@@ -74,6 +125,14 @@ export const subjectPalette = [
   { wash: '#D9F0EA', ink: '#2F7D6D' }, // aqua
   { wash: '#C9E9E4', ink: '#2C6F68' }, // teal
   { wash: '#E2E5E0', ink: '#5C6A5B' }, // stone
+  { wash: '#FF1493', ink: '#8B008B' }, // deep pink
+  { wash: '#FF4500', ink: '#8B0000' }, // orange red
+  { wash: '#FFD700', ink: '#8B6508' }, // gold
+  { wash: '#00FF7F', ink: '#006400' }, // spring green
+  { wash: '#00BFFF', ink: '#00008B' }, // deep sky blue
+  { wash: '#9370DB', ink: '#4B0082' }, // medium purple
+  { wash: '#FF69B4', ink: '#C71585' }, // hot pink
+  { wash: '#7FFF00', ink: '#556B2F' }, // chartreuse
 ] as const;
 
 /** The deep ink paired with a wash; falls back to plain ink. */

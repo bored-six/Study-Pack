@@ -28,7 +28,7 @@ import { FORMAT_HOWTO, FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib
 import { MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
 import { playSfx } from '@/lib/sfx';
 import { useExamStore } from '@/store/exam';
-import { colors, derpRadius, font, outline, radius, shadow } from '@/theme/tokens';
+import { derpRadius, font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 /** A drill sent here by the results note asks for this many of one format. */
 const DRILL_COUNT = 12;
@@ -50,6 +50,10 @@ function FormatChip({
   onPress: () => void;
   index: number;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const off = max === 0;
 
   const scale = useSharedValue(1);
@@ -130,6 +134,10 @@ function StepBtn({
   onPress: (delta: number) => void;
   children: React.ReactNode;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const scale = useSharedValue(1);
   const iconScale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -184,6 +192,10 @@ function AmountRow({
   onChange: (next: number) => void;
   index: number;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const [draft, setDraft] = useState(String(count));
   const baseRot = index % 2 === 0 ? 0.5 : -0.5;
   const numScale = useSharedValue(1);
@@ -304,6 +316,10 @@ function Cartridge({
   last?: boolean;
   onPress: () => void;
 }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const dials = dialsOf(spec);
   return (
     <Pressable
@@ -339,6 +355,10 @@ function Cartridge({
 }
 
 export default function ExamSetupScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   // `mode` and `format` are how the results note hands a student straight to
   // the thing it just told them to do, without making them find it again.
@@ -631,7 +651,7 @@ export default function ExamSetupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,

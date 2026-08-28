@@ -7,7 +7,7 @@ import { Icon } from '@/components/Icon';
 import { Tape } from '@/components/notebook';
 import { achievementById, LOCKED_NOTE, type Unlock } from '@/lib/achievements';
 import { playSfx } from '@/lib/sfx';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -41,6 +41,10 @@ export function AchievementModal({
   onNext,
   onClose,
 }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const unlock = unlocks[index];
   const def = unlock ? achievementById(unlock.id) : undefined;
   const hasMore = index < unlocks.length - 1;
@@ -101,7 +105,7 @@ export function AchievementModal({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(39, 54, 43, 0.5)',

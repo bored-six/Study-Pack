@@ -6,18 +6,15 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
-  type StyleProp,
-  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon, type IconName } from '@/components/Icon';
-import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
+import { RuledPaper } from '@/components/notebook';
 import {
   clearPracticeHistory,
   clearTriviaDownloads,
@@ -29,6 +26,7 @@ import {
   DEFAULT_PREFS,
   loadPrefs,
   setBriefings,
+  setDark,
   setIntro,
   setSound,
   setVibration,
@@ -39,77 +37,73 @@ import { useDecksStore } from '@/store/decks';
 import { useNotesStore } from '@/store/notes';
 import { usePlannerStore } from '@/store/planner';
 import { useProgressStore } from '@/store/progress';
-import { derpRadius, font, outline, radius, shadow, useThemeStore, getColors } from '@/theme/tokens';
+import { derpRadius, font, getColors, useThemeStore } from '@/theme/tokens';
 
-/** Which destructive action is waiting on a yes. */
 type Pending = 'trivia' | 'history' | 'erase' | 'eraseReally';
 
-/**
- * One line of a settings card. Rows are grouped inside a single card with
- * hairlines between them rather than each floating on its own sticker —
- * five choices should read as one short list, not nine separate objects.
- */
-function Row({
-  icon,
-  title,
-  hint,
-  right,
-  onPress,
-  tone,
-  style,
-}: {
-  icon: IconName;
-  title: string;
-  hint?: string;
-  right?: React.ReactNode;
-  onPress?: () => void;
-  tone?: 'danger' | 'info';
-  style?: StyleProp<ViewStyle>;
-}) {
+function DerpToggle({ value, onChange, label }: { value: boolean; onChange: (on: boolean) => void; label: string }) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
   const styles = getStyles(colors);
-
-  const ink = tone === 'danger' ? colors.coral : colors.ink;
-  const body = (
-    <>
-      <Icon
-        name={icon}
-        size={19}
-        color={ink}
-        fill={tone === 'danger' ? colors.coralWash : colors.surface2}
-        strokeWidth={1.9}
-      />
-      <View style={styles.rowText}>
-        <Text style={[styles.rowTitle, tone === 'danger' && styles.rowTitleDanger]}>{title}</Text>
-        {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
-      </View>
-      {right}
-    </>
-  );
-
-  if (!onPress) return <View style={[styles.row, style]}>{body}</View>;
+  
   return (
     <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, style, pressed && styles.pressed]}>
-      {body}
+      accessibilityLabel={label}
+      onPress={() => onChange(!value)}
+      style={[
+        styles.derpToggle,
+        { backgroundColor: value ? colors.accent : colors.surface, borderColor: isDark ? '#1A211C' : colors.ink }
+      ]}>
+      <View style={[
+        styles.derpToggleThumb,
+        { 
+          left: value ? 22 : 2, 
+          backgroundColor: value ? colors.surface : (isDark ? '#1A211C' : colors.ink),
+          borderColor: value ? (isDark ? '#1A211C' : colors.ink) : 'transparent',
+          borderWidth: value ? 2 : 0,
+        }
+      ]} />
     </Pressable>
   );
 }
 
-function Toggle({ value, onChange, label }: { value: boolean; onChange: (on: boolean) => void; label: string }) {
+function SettingRow({ icon, label, sub, right }: { icon?: IconName; label: string; sub?: string; right?: React.ReactNode }) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
-
+  const styles = getStyles(colors);
   return (
-    <Switch
-      value={value}
-      onValueChange={onChange}
-      accessibilityLabel={label}
-      trackColor={{ true: colors.accent, false: colors.track }}
-      thumbColor={colors.surface}
-    />
+    <View style={styles.settingRow}>
+      {icon && (
+        <View style={styles.settingIconWrap}>
+          <Icon name={icon} size={24} color="#1A211C" />
+        </View>
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={styles.settingLabel}>{label}</Text>
+        {sub ? <Text style={styles.settingSub}>{sub}</Text> : null}
+      </View>
+      {right}
+    </View>
+  );
+}
+
+function DangerRow({ icon, label, sub, onPress }: { icon: IconName; label: string; sub: string; onPress: () => void }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+  return (
+    <View style={styles.settingRow}>
+      <View style={styles.settingIconWrap}>
+        <Icon name={icon} size={24} color="#1A211C" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.settingLabel}>{label}</Text>
+        <Text style={styles.settingSub}>{sub}</Text>
+      </View>
+      <Pressable onPress={onPress} style={({ pressed }) => [styles.dangerBtn, pressed && { opacity: 0.8 }]}>
+        <Text style={styles.dangerBtnText}>TRASH</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -119,6 +113,7 @@ export default function SettingsScreen() {
   const colors = getColors(isDark);
   const styles = getStyles(colors);
   const insets = useSafeAreaInsets();
+  
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [storage, setStorage] = useState<StorageSummary | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -138,8 +133,6 @@ export default function SettingsScreen() {
     readStorage();
   }, [readStorage]);
 
-  // One writer for every switch: flip the UI now, persist after, so a
-  // toggle never feels like it lagged behind the thumb.
   const change = useCallback(
     <K extends keyof Prefs>(key: K, write: (on: boolean) => Promise<void>) =>
       (on: boolean) => {
@@ -154,12 +147,9 @@ export default function SettingsScreen() {
     if (result === 'denied') {
       setNotice({
         title: 'Still off',
-        message:
-          "Android is holding the permission. Open Flipp's notification settings on your phone to let reminders through.",
+        message: "Android is holding the permission. Open Flipp's notification settings on your phone to let reminders through.",
       });
-      void Linking.openSettings().catch(() => {
-        /* a phone with no settings intent is not an error */
-      });
+      void Linking.openSettings().catch(() => {});
     }
   }, [askPermission]);
 
@@ -167,8 +157,6 @@ export default function SettingsScreen() {
     const action = pending;
     if (!action) return;
 
-    // The second yes is a separate question, not a second click of the
-    // same one — deleting everything is the one thing with no way back.
     if (action === 'erase') {
       setPending('eraseReally');
       return;
@@ -211,160 +199,122 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
       <RuledPaper />
-      <View style={styles.navRow}>
+      
+      <View style={[styles.navRow, { paddingHorizontal: 16 }]}>
         <Pressable
           onPress={() => router.back()}
           hitSlop={10}
           accessibilityLabel="Back"
-          style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
+          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.8 }]}>
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
-        <View>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>Your</Text>
-            <View style={styles.titleSticker}>
-              <Text style={styles.titleStickerText}>settings!</Text>
-            </View>
-          </View>
-          <Squiggle width={94} style={styles.squiggle} />
-        </View>
+        <Text style={styles.title}>Settings</Text>
       </View>
 
       <ScrollView
         style={styles.fill}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28, paddingHorizontal: 16 }]}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.card}>
-          <Row
-            icon="bulb"
-            title="Dark mode"
-            hint="Switch to dark paper"
-            right={<Toggle label="Dark mode" value={isDark} onChange={toggleTheme} />}
-            style={styles.divided}
-          />
-          <Row
-            icon="sound"
-            title="Sound effects"
-            right={<Toggle label="Sound effects" value={prefs.sound} onChange={change('sound', setSound)} />}
-            style={styles.divided}
-          />
-          <Row
-            icon="smartphone"
-            title="Vibration"
-            right={
-              <Toggle
-                label="Vibration"
-                value={prefs.vibration}
-                onChange={change('vibration', setVibration)}
-              />
-            }
-            style={styles.divided}
-          />
-          <Row
-            icon="star"
-            title="Opening animation"
-            right={<Toggle label="Opening animation" value={prefs.intro} onChange={change('intro', setIntro)} />}
-            style={styles.divided}
-          />
-          <Row
-            icon="question"
-            title="Format how-tos"
-            hint="Shown the first time a format appears"
-            right={
-              <Toggle
-                label="Format how-tos"
-                value={prefs.briefings}
-                onChange={change('briefings', setBriefings)}
-              />
-            }
-            style={styles.divided}
-          />
-          {capability === 'denied' ? (
-            <Row
-              icon="bell"
-              title="Reminders"
-              hint="Allow notifications and Flipp can nudge you"
-              right={<ChunkyButton label="Turn on" variant="paper" size="sm" onPress={() => void askForReminders()} />}
+        
+        {/* VIBES */}
+        <View style={styles.stickyWrapper}>
+          <View style={[styles.stickyCard, { backgroundColor: '#FCEBC0', transform: [{ rotate: '-1deg' }] }]}>
+            <View style={styles.cardHeader}>
+              <Icon name="star" size={28} color="#1A211C" />
+              <Text style={styles.cardTitle}>Vibes</Text>
+            </View>
+
+            <SettingRow 
+              icon="bulb"
+              label="Dark Mode" 
+              sub="Switch to dark paper" 
+              right={<DerpToggle label="Dark Mode" value={prefs.dark} onChange={change('dark', setDark)} />} 
             />
-          ) : (
-            <Row
+            <SettingRow 
+              icon="sound"
+              label="Derp Sounds" 
+              sub="Pops and boops" 
+              right={<DerpToggle label="Sound effects" value={prefs.sound} onChange={change('sound', setSound)} />} 
+            />
+            <SettingRow 
+              icon="smartphone"
+              label="Vibration" 
+              sub="Haptic feedback" 
+              right={<DerpToggle label="Vibration" value={prefs.vibration} onChange={change('vibration', setVibration)} />} 
+            />
+            <SettingRow 
+              icon="star"
+              label="Opening Animation" 
+              sub="The Flipp intro" 
+              right={<DerpToggle label="Opening animation" value={prefs.intro} onChange={change('intro', setIntro)} />} 
+            />
+            <SettingRow 
+              icon="question"
+              label="Format How-tos" 
+              sub="Hints for new formats" 
+              right={<DerpToggle label="Format how-tos" value={prefs.briefings} onChange={change('briefings', setBriefings)} />} 
+            />
+            <SettingRow 
               icon="bell"
-              title="Reminders"
+              label="Reminders" 
+              sub={capability === 'denied' ? 'Allow notifications' : reminderValue} 
               right={
-                <View style={styles.value}>
-                  <Text style={styles.valueText}>{reminderValue}</Text>
-                  {capability === 'approximate' ? (
-                    <Icon name="play" size={13} color={colors.accentDeep} />
-                  ) : null}
-                </View>
-              }
-              onPress={capability === 'approximate' ? () => router.push('/planner') : undefined}
+                capability === 'denied' 
+                  ? <ChunkyButton label="Turn on" variant="paper" size="sm" onPress={() => void askForReminders()} />
+                  : ( capability === 'approximate' 
+                      ? <Pressable onPress={() => router.push('/planner')}><Icon name="play" size={24} color="#1A211C" /></Pressable>
+                      : <Icon name="check" size={24} color="#1A211C" />
+                    )
+              } 
             />
-          )}
+          </View>
         </View>
 
-        <View style={styles.card}>
-          <Row
-            icon="bulb"
-            title="Dark mode"
-            hint="Switch to dark paper"
-            right={<Toggle label="Dark mode" value={isDark} onChange={toggleTheme} />}
-            style={styles.divided}
-          />
-          <View style={styles.storageHead}>
-            <Tape rotate="-3deg" />
-            <Text style={styles.storageTitle}>Everything is stored here</Text>
-            <Text style={styles.storageBody}>
-              No account, no cloud. Uninstalling Flipp takes your notes with it.
-            </Text>
-            {storage && storage.subjects + storage.noteQuestions + storage.sittings > 0 ? (
-            <View style={styles.statRow}>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>{storage?.subjects ?? 0}</Text>
-                <Text style={styles.statLabel}>subjects</Text>
+        {/* YOUR STUFF */}
+        <View style={styles.stickyWrapper}>
+          <View style={[styles.stickyCard, { backgroundColor: '#DDF3DC', transform: [{ rotate: '1deg' }] }]}>
+            <View style={styles.cardHeader}>
+              <Icon name="cards" size={28} color="#1A211C" />
+              <Text style={styles.cardTitle}>Your Stuff</Text>
+            </View>
+            
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statBig}>{storage?.subjects ?? 0}</Text>
+                <Text style={styles.statSmall}>SUBJECTS</Text>
               </View>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>{storage?.noteQuestions ?? 0}</Text>
-                <Text style={styles.statLabel}>questions</Text>
+              <View style={styles.statBox}>
+                <Text style={styles.statBig}>{storage?.noteQuestions ?? 0}</Text>
+                <Text style={styles.statSmall}>QUESTIONS</Text>
               </View>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>{storage?.sittings ?? 0}</Text>
-                <Text style={styles.statLabel}>sittings</Text>
+              <View style={styles.statBox}>
+                <Text style={styles.statBig}>{storage?.sittings ?? 0}</Text>
+                <Text style={styles.statSmall}>SITTINGS</Text>
               </View>
             </View>
-            ) : null}
           </View>
+        </View>
 
-          {storage && storage.triviaDecks > 0 ? (
-            <Row
-              icon="dice"
-              title="Remove saved trivia"
-              hint={`${storage.triviaDecks} deck${storage.triviaDecks === 1 ? '' : 's'} kept offline`}
-              onPress={() => setPending('trivia')}
-              style={styles.dividedTop}
-            />
-          ) : null}
-          <Row
-            icon="chart"
-            title="Clear practice history"
-            hint="Scores and streak. Your notes stay."
-            tone="danger"
-            onPress={() => setPending('history')}
-            style={styles.dividedTop}
-          />
-          <Row
-            icon="trash"
-            title="Delete everything"
-            hint="Notes, plans, and history."
-            tone="danger"
-            onPress={() => setPending('erase')}
-            style={styles.dividedTop}
-          />
+        {/* DANGER ZONE */}
+        <View style={styles.stickyWrapper}>
+          <View style={[styles.stickyCard, { backgroundColor: '#FBD5CC', transform: [{ rotate: '-1deg' }] }]}>
+            <View style={styles.cardHeader}>
+              <Icon name="trash" size={28} color="#1A211C" />
+              <Text style={styles.cardTitle}>Danger Zone</Text>
+            </View>
+            
+            {storage && storage.triviaDecks > 0 ? (
+              <DangerRow icon="dice" label="Remove saved trivia" sub={`${storage.triviaDecks} deck${storage.triviaDecks === 1 ? '' : 's'} kept offline`} onPress={() => setPending('trivia')} />
+            ) : null}
+            <DangerRow icon="chart" label="Clear practice history" sub="Scores and streak. Your notes stay." onPress={() => setPending('history')} />
+            <DangerRow icon="trash" label="Delete everything" sub="No undo. Wipes the app." onPress={() => setPending('erase')} />
+          </View>
         </View>
 
         <Text style={styles.footer}>Flipp v{version} · made to work offline</Text>
       </ScrollView>
 
+      {/* MODALS */}
       <ConfirmModal
         visible={pending === 'trivia'}
         title="Remove saved trivia?"
@@ -416,159 +366,146 @@ const getStyles = (colors: any) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
-    paddingHorizontal: 16,
   },
   fill: {
     flex: 1,
   },
   content: {
-    paddingTop: 6,
+    paddingTop: 10,
+    overflow: 'visible',
   },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 20,
   },
   backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: colors.surface,
-    ...outline,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#1A211C',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadow.card,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 0, elevation: 4,
   },
   backArrow: {
     fontFamily: font.heading,
     fontSize: 19,
     lineHeight: 24,
-    color: colors.ink,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    color: '#1A211C',
+    fontWeight: '800',
   },
   title: {
     fontFamily: font.hero,
-    fontSize: 26,
-    lineHeight: 34,
+    fontSize: 34,
     color: colors.text,
   },
-  titleSticker: {
-    backgroundColor: colors.accentWash,
-    ...outline,
-    borderRadius: 11,
-    paddingHorizontal: 9,
-    paddingVertical: 1,
-    transform: [{ rotate: '-2.5deg' }],
-    ...shadow.card,
+  stickyWrapper: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
   },
-  titleStickerText: {
-    fontFamily: font.hero,
-    fontSize: 21,
-    lineHeight: 28,
-    color: colors.ink,
-  },
-  squiggle: {
-    marginTop: 1,
-    marginLeft: 2,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    ...outline,
-    borderRadius: radius.card,
-    marginBottom: 14,
-    ...shadow.card,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 15,
-    paddingVertical: 13,
-    minHeight: 56,
-  },
-  // Hairlines instead of gaps: one list, not a stack of stickers.
-  divided: {
-    borderBottomWidth: 1.5,
-    borderBottomColor: colors.lineSoft,
-  },
-  dividedTop: {
-    borderTopWidth: 1.5,
-    borderTopColor: colors.lineSoft,
-  },
-  rowText: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontFamily: font.heading,
-    fontSize: 15.5,
-    lineHeight: 20,
-    color: colors.text,
-  },
-  rowTitleDanger: {
-    color: colors.coral,
-  },
-  rowHint: {
-    fontFamily: font.bodySemibold,
-    fontSize: 11.5,
-    lineHeight: 15.5,
-    color: colors.textFaint,
-  },
-  value: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  valueText: {
-    fontFamily: font.bodyBold,
-    fontSize: 12.5,
-    color: colors.textDim,
-  },
-  storageHead: {
-    padding: 15,
-  },
-  storageTitle: {
-    fontFamily: font.heading,
-    fontSize: 16,
-    lineHeight: 21,
-    color: colors.text,
-  },
-  storageBody: {
-    fontFamily: font.bodySemibold,
-    fontSize: 12,
-    lineHeight: 16.5,
-    color: colors.textDim,
-    marginTop: 1,
-  },
-  statRow: {
-    flexDirection: 'row',
-    gap: 9,
-    marginTop: 12,
-  },
-  stat: {
-    flex: 1,
-    backgroundColor: colors.surface2,
+  stickyCard: {
+    borderWidth: 2,
+    borderColor: '#1A211C',
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 0, elevation: 6,
     ...derpRadius,
-    borderWidth: 1.5,
-    borderColor: colors.edge,
+    borderTopLeftRadius: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    gap: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: 'rgba(26, 33, 28, 0.2)',
+    borderStyle: 'dashed',
+    paddingBottom: 10,
+    marginBottom: 18,
   },
-  statNumber: {
+  cardTitle: {
     fontFamily: font.hero,
-    fontSize: 22,
-    lineHeight: 27,
-    color: colors.text,
+    fontSize: 26,
+    color: '#1A211C',
+    top: 2,
   },
-  statLabel: {
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  settingIconWrap: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingLabel: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 16,
+    color: '#1A211C',
+  },
+  settingSub: {
+    fontFamily: font.bodyBold,
+    fontSize: 12,
+    color: 'rgba(26, 33, 28, 0.65)',
+    marginTop: 2,
+  },
+  derpToggle: {
+    width: 48,
+    height: 28,
+    borderWidth: 2,
+    borderRadius: 20,
+    justifyContent: 'center',
+  },
+  derpToggleThumb: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 4,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    borderWidth: 2,
+    borderColor: '#1A211C',
+    borderRadius: 12,
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  statBig: {
+    fontFamily: font.hero,
+    fontSize: 26,
+    color: '#1A211C',
+  },
+  statSmall: {
     fontFamily: font.bodyHeavy,
     fontSize: 10,
-    letterSpacing: 0.8,
-    color: colors.textFaint,
+    color: 'rgba(26, 33, 28, 0.7)',
+    letterSpacing: 1,
+  },
+  dangerBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#1A211C',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  dangerBtnText: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 12,
+    color: '#1A211C',
   },
   footer: {
     fontFamily: font.bodySemibold,
@@ -576,8 +513,5 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.textFaint,
     textAlign: 'center',
     marginTop: 2,
-  },
-  pressed: {
-    opacity: 0.8,
   },
 });

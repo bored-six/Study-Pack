@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon, type IconName } from '@/components/Icon';
 import { DIFFICULTY_LABEL, type Deck } from '@/lib/types';
-import { candy, colors, derpRadius, font, outline, radius, shadow } from '@/theme/tokens';
+import { candy, derpRadius, font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   deck: Deck;
@@ -58,6 +58,10 @@ function deckCandy(id: string) {
 }
 
 export function DeckCard({ deck, tilt, downloading, onDownload, onRemove, onStartQuiz }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const downloaded = deck.downloadedAt != null;
   const tone = deckCandy(deck.id);
 
@@ -122,7 +126,7 @@ export function DeckCard({ deck, tilt, downloading, onDownload, onRemove, onStar
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     ...outline,

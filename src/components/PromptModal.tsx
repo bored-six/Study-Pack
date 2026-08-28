@@ -12,7 +12,7 @@ import {
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Squiggle, Tape } from '@/components/notebook';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -40,6 +40,10 @@ export function PromptModal({
   onCancel,
   onConfirm,
 }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const [value, setValue] = useState('');
 
   // Start empty every time it opens.
@@ -105,7 +109,7 @@ export function PromptModal({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(39, 54, 43, 0.45)',

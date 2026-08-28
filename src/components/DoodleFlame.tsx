@@ -317,11 +317,18 @@ interface Props {
   size?: number;
   /** False draws the unlit cold coal, perfectly still. */
   lit?: boolean;
+  /**
+   * False parks the animation. Tab screens stay mounted in the
+   * navigator, so without this the fire keeps redrawing at the display
+   * refresh rate while the student is on another tab — a constant drain
+   * for something nobody is looking at.
+   */
+  active?: boolean;
 }
 
-export function DoodleFlame({ tier, size = 72, lit = true }: Props) {
+export function DoodleFlame({ tier, size = 72, lit = true, active = true }: Props) {
   const reduced = useReducedMotion();
-  const still = !lit || !!reduced;
+  const still = !lit || !active || !!reduced;
 
   const form = lit ? formFor(tier) : formFor({ ...tier, from: -1 } as FireTier);
 

@@ -9,9 +9,13 @@ import { Icon } from '@/components/Icon';
 import { RuledPaper } from '@/components/notebook';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { useQuizStore } from '@/store/quiz';
-import { candy, colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { candy, font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 export default function QuizScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const { status, deck, questions, index, selected, error, start, choose, advance } =
@@ -176,7 +180,7 @@ export default function QuizScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,

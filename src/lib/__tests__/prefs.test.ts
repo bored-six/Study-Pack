@@ -33,6 +33,7 @@ describe('reading preferences', () => {
       vibration: true,
       intro: true,
       briefings: true,
+      dark: false,
     });
   });
 

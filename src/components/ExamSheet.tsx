@@ -17,7 +17,7 @@ import { Icon } from '@/components/Icon';
 import { DeskProp, type DeskMood } from '@/components/deskdress';
 import { Squiggle } from '@/components/notebook';
 import type { ExamFormat } from '@/lib/exam';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   format: ExamFormat;
@@ -54,6 +54,10 @@ export function ExamSheet({
   mood = 'watch',
   style,
 }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const shownStars = Math.min(stars, 7);
   return (
     <View style={[styles.board, style]}>
@@ -94,6 +98,10 @@ export function ExamSheet({
 
 /** A landed star that keeps twinkling — a slow shimmer, phased per star. */
 function TwinkleStar({ index, newest }: { index: number; newest: boolean }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const reduced = useReducedMotion();
   const shimmer = useSharedValue(0);
 
@@ -136,7 +144,7 @@ const SMUDGE_SPOTS: ViewStyle[] = [
   { top: '48%', right: 14, transform: [{ rotate: '-5deg' }] },
 ];
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   board: {
     backgroundColor: 'rgba(151, 106, 44, 0.12)',
     borderRadius: radius.card + 8,

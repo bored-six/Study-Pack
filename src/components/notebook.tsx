@@ -1,7 +1,7 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { colors } from '@/theme/tokens';
+import { colors, getColors, useThemeStore } from '@/theme/tokens';
 
 /**
  * Notebook furniture: faint ruled paper, washi tape strips, and squiggly
@@ -14,12 +14,17 @@ const RULE_COUNT = 40;
 
 /** Faint blue ruling + red margin line. Put first inside a screen View. */
 export function RuledPaper() {
+  const isDark = useThemeStore((s) => s.isDark);
+  // Ruling drawn in ink on cream is invisible on a dark page, so the
+  // lines lift to a pale wash instead of staying blue.
+  const rule = isDark ? 'rgba(226, 229, 224, 0.07)' : 'rgba(46, 111, 163, 0.09)';
+  const margin = isDark ? 'rgba(229, 115, 115, 0.22)' : 'rgba(194, 78, 56, 0.13)';
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {Array.from({ length: RULE_COUNT }, (_, i) => (
-        <View key={i} style={[styles.rule, { top: 74 + i * RULE_SPACING }]} />
+        <View key={i} style={[styles.rule, { top: 74 + i * RULE_SPACING, backgroundColor: rule }]} />
       ))}
-      <View style={styles.margin} />
+      <View style={[styles.margin, { backgroundColor: margin }]} />
     </View>
   );
 }

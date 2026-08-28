@@ -1,7 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -30,6 +30,10 @@ export function ConfirmModal({
   onCancel,
   onConfirm,
 }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   return (
     <Modal
       visible={visible}
@@ -76,7 +80,7 @@ export function ConfirmModal({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(39, 54, 43, 0.45)',

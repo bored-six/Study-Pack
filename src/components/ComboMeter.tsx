@@ -16,7 +16,7 @@ import Animated, {
 
 import { Icon, type IconName } from '@/components/Icon';
 import { msSinceJuice } from '@/lib/juice';
-import { colors, font, shadow } from '@/theme/tokens';
+import { font, getColors, shadow, useThemeStore , lightColors } from '@/theme/tokens';
 
 interface Props {
   combo: number;
@@ -33,9 +33,9 @@ interface Tier {
 
 /** Escalates as the run grows; below 3 nothing shows at all. */
 const TIERS: Tier[] = [
-  { from: 3, icon: 'spark', color: '#C9A227', wash: colors.goldWash, word: null },
-  { from: 5, icon: 'flameSmall', color: '#D9832B', wash: colors.goldWash, word: null },
-  { from: 10, icon: 'flame', color: colors.coral, wash: colors.coralWash, word: 'hot!' },
+  { from: 3, icon: 'spark', color: '#C9A227', wash: lightColors.goldWash, word: null },
+  { from: 5, icon: 'flameSmall', color: '#D9832B', wash: lightColors.goldWash, word: null },
+  { from: 10, icon: 'flame', color: lightColors.coral, wash: lightColors.coralWash, word: 'hot!' },
   { from: 20, icon: 'flameBig', color: '#6C51A8', wash: '#EAE2FA', word: 'ON FIRE' },
 ];
 
@@ -51,6 +51,10 @@ function tierFor(combo: number): Tier {
 }
 
 function Fleck({ angle, color, nonce }: { angle: number; color: string; nonce: number }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const p = useSharedValue(0);
   useEffect(() => {
     if (nonce === 0) return;
@@ -75,6 +79,10 @@ function Fleck({ angle, color, nonce }: { angle: number; color: string; nonce: n
  * plus a flare that jumps out over the page each time it grows.
  */
 export function ComboMeter({ combo, idle = false }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const reduced = useReducedMotion();
   const prev = useRef(0);
   const [broke, setBroke] = useState(false);
@@ -247,7 +255,7 @@ export function ComboMeter({ combo, idle = false }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   badge: {
     position: 'absolute',
     top: -14,

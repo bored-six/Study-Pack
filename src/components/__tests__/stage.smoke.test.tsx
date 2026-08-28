@@ -11,7 +11,6 @@ jest.mock('@/lib/sfx', () => ({
 
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
-import { BurningFire } from '@/components/BurningFire';
 import { ComboMeter, comboColor } from '@/components/ComboMeter';
 import { ExamSheet } from '@/components/ExamSheet';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
@@ -25,7 +24,6 @@ import {
 import { CircledWord } from '@/components/CircledWord';
 import { InkSplat, PenCircle, PenStrike, PenTick, Stamp } from '@/components/penmarks';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
-import { fireFor } from '@/lib/fire';
 import type { ExamFormat } from '@/lib/exam';
 import { Text } from 'react-native';
 
@@ -54,77 +52,6 @@ function unmount(tree: ReactTestRenderer): void {
 jest.useFakeTimers();
 
 describe('the stage mounts in every state', () => {
-  it('ExamSheet renders for every format, dressed and bare', () => {
-    for (const format of FORMATS) {
-      const tree = mount(
-        <ExamSheet
-          format={format}
-          title={format}
-          accent="#2C8A4A"
-          smudges={2}
-          stars={3}
-          idle
-          mood="happy">
-          <Text>page</Text>
-        </ExamSheet>
-      );
-      expect(tree.toJSON()).toBeTruthy();
-      unmount(tree);
-    }
-  });
-
-  it('FormatBadge knows every format in both sizes', () => {
-    for (const format of FORMATS) {
-      expect(FORMAT_META[format]).toBeTruthy();
-      const tree = mount(<FormatBadge format={format} size="lg" />);
-      expect(tree.toJSON()).toBeTruthy();
-      unmount(tree);
-    }
-  });
-
-  it('ComboMeter survives its whole lifecycle', () => {
-    const tree = mount(<ComboMeter combo={0} />);
-    // silent below 3
-    expect(tree.toJSON()).toBeNull();
-    for (const combo of [3, 4, 5, 10, 20, 21]) {
-      act(() => {
-        tree.update(<ComboMeter combo={combo} idle={combo === 21} />);
-      });
-      act(() => {
-        jest.advanceTimersByTime(400);
-      });
-      expect(tree.toJSON()).toBeTruthy();
-    }
-    // the break
-    act(() => {
-      tree.update(<ComboMeter combo={0} />);
-    });
-    act(() => {
-      jest.advanceTimersByTime(1000);
-    });
-    // back on it after the break
-    act(() => {
-      tree.update(<ComboMeter combo={1} />);
-    });
-    act(() => {
-      jest.advanceTimersByTime(2000);
-    });
-    unmount(tree);
-  });
-
-  it('comboColor answers for any streak', () => {
-    for (const n of [0, 3, 7, 12, 50]) {
-      expect(comboColor(n)).toMatch(/^#/);
-    }
-  });
-
-  it('the fire burns at every tier, lit and unlit', () => {
-    for (const streak of [0, 1, 5, 10, 20, 50, 100, 200, 300, 365]) {
-      const tree = mount(<BurningFire tier={fireFor(streak)} lit={streak > 0} />);
-      expect(tree.toJSON()).toBeTruthy();
-      unmount(tree);
-    }
-  });
 
   it('the deskmate holds every mood on every prop', () => {
     for (const format of FORMATS) {

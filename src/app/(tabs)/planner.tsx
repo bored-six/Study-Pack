@@ -21,7 +21,62 @@ import { usePlannerStore } from '@/store/planner';
 import { derpRadius, font, outline, shadow, tabClearance, getColors, useThemeStore } from '@/theme/tokens';
 
 function clockFor(timeOfDay: number): string {
-  return formatClock(new Date().setHours(Math.floor(timeOfDay / 60), timeOfDay % 60, 0, 0));
+  const d = new Date();
+  d.setHours(Math.floor(timeOfDay / 60), timeOfDay % 60, 0, 0);
+  return formatClock(d.getTime());
+}
+
+function formatTimeTile(timeOfDay: number): { time: string; period: string } {
+  const d = new Date();
+  d.setHours(Math.floor(timeOfDay / 60), timeOfDay % 60, 0, 0);
+
+  try {
+    const formatter = new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    const parts = formatter.formatToParts(d);
+    let hour = '';
+    let minute = '';
+    let dayPeriod = '';
+    let separator = ':';
+
+    for (const part of parts) {
+      if (part.type === 'hour') hour = part.value;
+      else if (part.type === 'minute') minute = part.value;
+      else if (part.type === 'dayPeriod') dayPeriod = part.value;
+      else if (part.type === 'literal' && part.value.trim() && !dayPeriod) separator = part.value;
+    }
+
+    if (hour && minute) {
+      return {
+        time: `${hour}${separator.trim() || ':'}${minute}`,
+        period: dayPeriod ? dayPeriod.toUpperCase() : '',
+      };
+    }
+  } catch {
+    // Fallback if formatToParts is unavailable
+  }
+
+  const raw = formatClock(d.getTime());
+  const normalized = raw.replace(/[\u202F\u00A0\s]+/g, ' ').trim();
+  const match = normalized.match(/^([0-9]{1,2}:[0-9]{2})\s*([A-Za-z]+)?$/);
+  if (match) {
+    return {
+      time: match[1],
+      period: match[2] ? match[2].toUpperCase() : '',
+    };
+  }
+
+  const parts = normalized.split(' ');
+  if (parts.length >= 2) {
+    if (/\d/.test(parts[0])) {
+      return { time: parts[0], period: parts[1].toUpperCase() };
+    }
+    return { time: parts[1], period: parts[0].toUpperCase() };
+  }
+
+  return { time: normalized, period: '' };
 }
 
 function countdown(timestamp: number, now: number): string {
@@ -154,8 +209,7 @@ export default function PlannerScreen() {
           ? '#E2E5E0'
           : '#DDF3DC';
 
-    const timeStr = clockFor(schedule.timeOfDay);
-    const split = timeStr.split(' ');
+    const { time, period } = formatTimeTile(schedule.timeOfDay);
 
     return (
       <Pressable
@@ -168,8 +222,8 @@ export default function PlannerScreen() {
           !schedule.enabled && styles.rowOff,
         ]}>
         <View style={[styles.timeTile, { backgroundColor: tileWash }]}>
-          <Text style={styles.timeNum}>{split[0]}</Text>
-          {split.length > 1 ? <Text style={styles.timeAmPm}>{split[1]}</Text> : null}
+          <Text style={styles.timeNum} numberOfLines={1} adjustsFontSizeToFit>{time}</Text>
+          {period ? <Text style={styles.timeAmPm} numberOfLines={1}>{period}</Text> : null}
         </View>
         <View style={styles.rowMid}>
           <Text
@@ -377,8 +431,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   rowTiltRight: { transform: [{ rotate: '0.3deg' }] },
   rowOff: { opacity: 0.55 },
   timeTile: {
-    width: 58,
+    width: 62,
     height: 52,
+    paddingHorizontal: 4,
     borderWidth: 1.5,
     borderColor: colors.edge,
     borderTopLeftRadius: 13,
@@ -391,15 +446,17 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   timeNum: {
     fontFamily: font.hero,
-    fontSize: 19,
-    lineHeight: 21,
+    fontSize: 16.5,
+    lineHeight: 19,
     color: '#1A211C',
   },
   timeAmPm: {
     fontFamily: font.bodyHeavy,
-    fontSize: 9,
+    fontSize: 9.5,
+    lineHeight: 11,
     letterSpacing: 0.8,
     color: '#1A211C',
+    marginTop: 1,
   },
   rowMid: {
     flex: 1,

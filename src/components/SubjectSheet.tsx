@@ -16,7 +16,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { Tape } from '@/components/notebook';
 import { Icon, type IconName } from '@/components/Icon';
 import type { Deck } from '@/lib/types';
-import { colors, font, outline, radius, subjectPalette } from '@/theme/tokens';
+import { font, getColors, outline, radius, subjectPalette, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -39,7 +39,7 @@ const ICON_SHELVES: { key: string; label: string; icons: IconName[] }[] = [
     label: 'School',
     icons: [
       'book', 'note', 'pencil', 'calculator', 'flask', 'globe',
-      'museum', 'monitor', 'chart', 'cards', 'question',
+      'museum', 'monitor', 'chart', 'cards', 'question', 'apple', 'atom', 'planet'
     ],
   },
   {
@@ -47,7 +47,7 @@ const ICON_SHELVES: { key: string; label: string; icons: IconName[] }[] = [
     label: 'Nature',
     icons: [
       'leaf', 'sprout', 'flower', 'paw', 'star', 'spark',
-      'burst', 'flame', 'flameSmall', 'flameBig', 'flameCrown', 'heart',
+      'burst', 'flame', 'flameSmall', 'flameBig', 'flameCrown', 'heart', 'cat'
     ],
   },
   {
@@ -55,7 +55,7 @@ const ICON_SHELVES: { key: string; label: string; icons: IconName[] }[] = [
     label: 'Fun',
     icons: [
       'palette', 'gamepad', 'dice', 'clapper', 'tv', 'trophy',
-      'smartphone', 'car', 'plane', 'flag', 'bolt',
+      'smartphone', 'car', 'plane', 'flag', 'bolt', 'ghost', 'music'
     ],
   },
   {
@@ -63,7 +63,7 @@ const ICON_SHELVES: { key: string; label: string; icons: IconName[] }[] = [
     label: 'Day',
     icons: [
       'clock', 'calendar', 'bell', 'bulb', 'check',
-      'cross', 'play', 'download', 'alert',
+      'cross', 'play', 'download', 'alert', 'plus', 'trash', 'derpBrain'
     ],
   },
 ];
@@ -78,6 +78,10 @@ function shelfFor(icon: string | null): string {
 }
 
 export function SubjectSheet({ visible, subject, onClose, onSave, onDelete }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const [name, setName] = useState('');
   const [color, setColor] = useState<string | null>(null);
   const [icon, setIcon] = useState<string | null>(null);
@@ -230,7 +234,7 @@ export function SubjectSheet({ visible, subject, onClose, onSave, onDelete }: Pr
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(39, 54, 43, 0.3)',

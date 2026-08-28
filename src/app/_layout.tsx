@@ -18,15 +18,20 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { IntroOverlay } from '@/components/IntroOverlay';
+import { DebugFab } from '@/components/DebugFab';
 import { initDb } from '@/lib/db';
 import { initPrefs } from '@/lib/prefs';
-import { colors, font } from '@/theme/tokens';
+import { font, getColors, useThemeStore } from '@/theme/tokens';
 
 SplashScreen.preventAutoHideAsync();
 
 type DbState = 'pending' | 'ready' | 'error';
 
 export default function RootLayout() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const [fontsLoaded, fontError] = useFonts({
     PatrickHand_400Regular,
     Baloo2_600SemiBold,
@@ -96,14 +101,16 @@ export default function RootLayout() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
+          animation: 'slide_from_right',
         }}
       />
       {playIntro && !introDone ? <IntroOverlay onDone={() => setIntroDone(true)} /> : null}
+      <DebugFab />
     </>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   errorScreen: {
     flex: 1,
     backgroundColor: colors.bg,

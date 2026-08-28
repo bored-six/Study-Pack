@@ -1,5 +1,5 @@
 /**
- * The four things a student can switch about the app itself, in one place.
+ * The five things a student can switch about the app itself, in one place.
  *
  * Everything here lives in the same `settings` table the rest of the app
  * uses, so a preference survives a reinstall exactly as well as the notes
@@ -13,6 +13,7 @@ import { FORMAT_ORDER } from './exam';
 import { readSetting, writeSetting } from './db';
 import { setHapticsEnabled } from './haptics';
 import { setSfxEnabled } from './sfx';
+import { setDarkMode } from '@/theme/tokens';
 
 export interface Prefs {
   /** Blups, boings, and the sad trombone. */
@@ -23,6 +24,8 @@ export interface Prefs {
   intro: boolean;
   /** Auto-show the how-to the first time a format appears in a paper. */
   briefings: boolean;
+  /** Paper at night. */
+  dark: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -30,6 +33,7 @@ export const DEFAULT_PREFS: Prefs = {
   vibration: true,
   intro: true,
   briefings: true,
+  dark: false,
 };
 
 const SOUND_KEY = 'sfx_muted';
@@ -37,6 +41,12 @@ const VIBRATION_KEY = 'haptics_muted';
 const INTRO_KEY = 'intro_skip';
 /** Shared with the exam runner, which reads it as "formats to skip". */
 const BRIEFINGS_KEY = 'briefing_skip';
+/**
+ * Unlike its neighbours this one is stored the plain way round: '1' means
+ * dark. There is no legacy value to stay compatible with, and inverting it
+ * for consistency's sake would only make it easier to read backwards.
+ */
+const DARK_KEY = 'dark_mode';
 
 /** A '1'/'0' flag where the stored value means *off*. */
 function readFlag(raw: string | null): boolean {
@@ -59,17 +69,19 @@ function readBriefings(raw: string | null): boolean {
 }
 
 export async function loadPrefs(): Promise<Prefs> {
-  const [sound, vibration, intro, briefings] = await Promise.all([
+  const [sound, vibration, intro, briefings, dark] = await Promise.all([
     readSetting(SOUND_KEY),
     readSetting(VIBRATION_KEY),
     readSetting(INTRO_KEY),
     readSetting(BRIEFINGS_KEY),
+    readSetting(DARK_KEY),
   ]);
   return {
     sound: readFlag(sound),
     vibration: readFlag(vibration),
     intro: readFlag(intro),
     briefings: readBriefings(briefings),
+    dark: dark === '1',
   };
 }
 
@@ -77,6 +89,7 @@ export async function loadPrefs(): Promise<Prefs> {
 export function applyPrefs(prefs: Prefs): void {
   setSfxEnabled(prefs.sound);
   setHapticsEnabled(prefs.vibration);
+  setDarkMode(prefs.dark);
 }
 
 /** Reads and applies in one go — what the app does on launch. */
@@ -106,4 +119,9 @@ export async function setIntro(on: boolean): Promise<void> {
  */
 export async function setBriefings(on: boolean): Promise<void> {
   await writeSetting(BRIEFINGS_KEY, JSON.stringify(on ? [] : FORMAT_ORDER));
+}
+
+export async function setDark(on: boolean): Promise<void> {
+  setDarkMode(on);
+  await writeSetting(DARK_KEY, on ? '1' : '0');
 }

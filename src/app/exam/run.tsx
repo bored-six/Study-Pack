@@ -44,7 +44,7 @@ import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
 import { MODES, questionSeconds, SURVIVAL_STRIKES } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
-import { colors, font, outline, radius, shadow } from '@/theme/tokens';
+import { font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 function clock(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -53,6 +53,10 @@ function clock(ms: number): string {
 
 /** Lives left, as hearts that go out one at a time. */
 function Hearts({ strikes }: { strikes: number }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   return (
     <View style={styles.hearts}>
       {Array.from({ length: SURVIVAL_STRIKES }, (_, i) => {
@@ -73,6 +77,10 @@ function Hearts({ strikes }: { strikes: number }) {
 }
 
 export default function ExamRunScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+
   const insets = useSafeAreaInsets();
   const store = useExamStore();
   const {
@@ -710,7 +718,7 @@ export default function ExamRunScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   bell: {
     flexDirection: 'row',
     alignItems: 'center',
