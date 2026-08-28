@@ -392,6 +392,18 @@ export default function ExamRunScreen() {
   const questionLeft = itemDeadline == null ? null : itemDeadline - now;
   const questionShare =
     questionLeft == null ? 0 : Math.max(0, questionLeft) / (questionSeconds(item.format) * 1000);
+  /**
+   * The countdown, in whole seconds.
+   *
+   * Rounded up, so it reads 1 right until the moment it is over — but
+   * capped at the allowance, because the deadline is set in an effect a
+   * tick after `now` was read, which made a 15-second question open by
+   * flashing 16.
+   */
+  const questionSecondsLeft =
+    questionLeft == null
+      ? null
+      : Math.min(questionSeconds(item.format), Math.max(0, Math.ceil(questionLeft / 1000)));
   const paperLeft = paperDeadline == null ? null : paperDeadline - now;
   itemIdRef.current = item.id;
   const isFlagged = flagged.includes(item.id);
@@ -435,8 +447,7 @@ export default function ExamRunScreen() {
               strikes,
               answered: results.length,
               paperLeft,
-              questionLeft:
-                questionLeft == null ? null : Math.max(0, Math.ceil(questionLeft / 1000)),
+              questionLeft: questionSecondsLeft,
             }}
           />
 
