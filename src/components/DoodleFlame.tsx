@@ -114,7 +114,8 @@ export function coreOutline(t: number, amp: number): string {
 }
 
 /** A doodled crown, for the tiers that have earned one. */
-const CROWN = 'M24.5 22.5l3.2 3.6 4.3-4.7 4.3 4.7 3.2-3.6v4.5H24.5z';
+/** Sits above the tip, which now reaches y=18.5 at full stretch. */
+const CROWN = 'M25 12l3 3.4 4-4.4 4 4.4 3-3.4v4.2H25z';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -364,7 +365,7 @@ export function DoodleFlame({ tier, size = 72, lit = true }: Props) {
       {skin.rays ? (
         <Svg width={size} height={size} viewBox="0 0 64 64" style={StyleSheet.absoluteFill}>
           <Path
-            d="M32 10v5M14 18l3.4 3.4M50 18l-3.4 3.4M8 34h5M51 34h5M15 50l3.2-3.2M49 50l-3.2-3.2"
+            d="M13 20l3.4 3.4M51 20l-3.4 3.4M7 36h5M52 36h5M15 51l3.2-3.2M49 51l-3.2-3.2"
             stroke={skin.rays}
             strokeWidth={2}
             strokeLinecap="round"
