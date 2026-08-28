@@ -101,6 +101,16 @@ beforeEach(() => {
   db.listAnswersForDeck.mockResolvedValue([]);
 });
 
+/**
+ * Picking a mode is two taps now: the cartridge opens its detail sheet,
+ * and the sheet is where you commit. Tests say what they mean by going
+ * through both.
+ */
+function chooseMode(tree: ReactTestRenderer, name: string) {
+  press(tree, name);
+  press(tree, 'Choose questions');
+}
+
 async function open(): Promise<ReactTestRenderer> {
   let tree!: ReactTestRenderer;
   await act(async () => {
@@ -112,13 +122,13 @@ async function open(): Promise<ReactTestRenderer> {
 describe('the exam setup screen', () => {
   it('opens on the mode picker', async () => {
     const tree = await open();
-    expect(texts(tree)).toContain('How do you want to sit it?');
+    expect(texts(tree)).toContain('Pick your game');
     expect(texts(tree)).toContain('Take your time');
   });
 
   it('shows the type chips, and an amount for what is ticked', async () => {
     const tree = await open();
-    press(tree, 'Take your time');
+    chooseMode(tree, 'Take your time');
 
     const shown = texts(tree);
     expect(shown).toContain('WHICH TYPES?');
@@ -132,7 +142,7 @@ describe('the exam setup screen', () => {
 
   it('swaps to a true/false paper in two taps', async () => {
     const tree = await open();
-    press(tree, 'Take your time');
+    chooseMode(tree, 'Take your time');
     press(tree, 'True or False');
     press(tree, 'Multiple choice');
 
@@ -144,7 +154,7 @@ describe('the exam setup screen', () => {
 
   it('sets each ticked type to its own amount', async () => {
     const tree = await open();
-    press(tree, 'Take your time');
+    chooseMode(tree, 'Take your time');
     press(tree, 'True or False');
     type(tree, 'How many Multiple choice', '10');
     type(tree, 'How many True or False', '3');
@@ -157,7 +167,7 @@ describe('the exam setup screen', () => {
 
   it('does not touch one type when another is added', async () => {
     const tree = await open();
-    press(tree, 'Take your time');
+    chooseMode(tree, 'Take your time');
     type(tree, 'How many Multiple choice', '25');
     press(tree, 'True or False');
     expect(useExamStore.getState().counts.multiple_choice).toBe(25);
@@ -166,7 +176,7 @@ describe('the exam setup screen', () => {
 
   it('nudges one type without disturbing the other', async () => {
     const tree = await open();
-    press(tree, 'Take your time');
+    chooseMode(tree, 'Take your time');
     press(tree, 'Identification');
     pressLabelled(tree, 'More Identification');
     pressLabelled(tree, 'More Identification');
@@ -179,14 +189,14 @@ describe('the exam setup screen', () => {
 
   it('fills a type to the brim from its Max', async () => {
     const tree = await open();
-    press(tree, 'Take your time');
+    chooseMode(tree, 'Take your time');
     press(tree, 'Max 30');
     expect(useExamStore.getState().counts.multiple_choice).toBe(30);
   });
 
   it('offers to even the types out, once there is more than one', async () => {
     const tree = await open();
-    press(tree, 'Take your time');
+    chooseMode(tree, 'Take your time');
     expect(texts(tree)).not.toContain('Even them out');
 
     press(tree, 'True or False');
@@ -200,7 +210,7 @@ describe('the exam setup screen', () => {
 
   it('reopens on the paper the last sitting started', async () => {
     const first = await open();
-    press(first, 'Beat the clock');
+    chooseMode(first, 'Beat the clock');
     press(first, 'True or False');
     press(first, 'Multiple choice');
     type(first, 'How many True or False', '20');
@@ -209,7 +219,7 @@ describe('the exam setup screen', () => {
     act(() => useExamStore.getState().reset());
     const again = await open();
     expect(texts(again)).toContain('LAST TIME');
-    press(again, 'Take your time');
+    chooseMode(again, 'Take your time');
     expect(useExamStore.getState().counts.true_false).toBe(20);
     expect(texts(again)).toContain('20 questions · about 10 min');
   });

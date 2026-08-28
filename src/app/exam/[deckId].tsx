@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { DerpArrow, DerpCheck, DerpMinus, DerpPlus, DerpScribbleLine } from '@/components/DerpIcons';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 import { FORMAT_HOWTO, FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib/exam';
 import { MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
 import { playSfx } from '@/lib/sfx';
@@ -255,38 +256,84 @@ function AmountRow({
 }
 
 /** One way of sitting the exam, as a sticker card. */
-function ModeCard({
+/** The three dials a mode sets, as the picker shows them. */
+function dialsOf(spec: ModeSpec) {
+  return [
+    {
+      on: spec.clock !== 'none',
+      icon: (spec.clock === 'none' ? 'clockClassic' : 'clock') as IconName,
+      label: spec.clock === 'none' ? 'No clock' : spec.clock === 'whole' ? 'Whole paper' : 'Per question',
+      caption: 'CLOCK',
+    },
+    {
+      on: spec.feedback === 'instant',
+      icon: 'check' as IconName,
+      label: spec.feedback === 'instant' ? 'Straight away' : 'At the end',
+      caption: 'MARKS',
+    },
+    {
+      on: spec.repetition !== 'once',
+      icon: (spec.repetition === 'once' ? 'play' : 'spark') as IconName,
+      label:
+        spec.repetition === 'once'
+          ? 'One pass'
+          : spec.repetition === 'until_retired'
+            ? 'Until retired'
+            : 'Three lives',
+      caption: 'REPEATS',
+    },
+  ];
+}
+
+/**
+ * A mode as a game cartridge.
+ *
+ * The grid shows all five at once and the three dials as small stamps,
+ * so two modes can be told apart without reading either tagline. Tapping
+ * one opens the detail sheet rather than starting immediately — the
+ * sheet is where the dials are spelled out in words.
+ */
+function Cartridge({
   spec,
-  detail,
+  wide,
   last,
   onPress,
 }: {
   spec: ModeSpec;
-  detail?: string;
-  /** The mode this subject was last sat in. */
+  wide?: boolean;
   last?: boolean;
   onPress: () => void;
 }) {
+  const dials = dialsOf(spec);
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.modeCard, pressed && styles.pressed]}>
-      <View style={[styles.modeBadge, { backgroundColor: spec.wash }]}>
-        <Icon name={spec.icon} size={24} color={spec.ink} fill={spec.wash} strokeWidth={1.9} />
-      </View>
-      <View style={styles.rowText}>
-        <View style={styles.modeNameRow}>
-          <Text style={styles.modeName}>{spec.name}</Text>
-          {last ? (
-            <View style={styles.lastPill}>
-              <Text style={styles.lastText}>LAST TIME</Text>
-            </View>
-          ) : null}
+      accessibilityLabel={spec.name}
+      style={({ pressed }) => [styles.cart, wide && styles.cartWide, pressed && styles.pressed]}>
+      <View style={styles.cartGrooves} />
+      <View style={[styles.cartFace, { backgroundColor: spec.wash }, wide && styles.cartFaceWide]}>
+        <Icon name={spec.icon} size={wide ? 26 : 30} color={spec.ink} fill="#FFFFFF" strokeWidth={1.9} />
+        <View style={wide ? styles.cartWideText : undefined}>
+          <Text style={[styles.cartName, wide && styles.cartNameWide]} numberOfLines={2}>
+            {spec.name}
+          </Text>
+          <Text style={[styles.cartTag, wide && styles.cartTagWide]} numberOfLines={2}>
+            {spec.tagline}
+          </Text>
         </View>
-        <Text style={styles.rowHow}>{spec.tagline}</Text>
-        {detail ? <Text style={[styles.modeDetail, { color: spec.ink }]}>{detail}</Text> : null}
+        <View style={styles.cartDials}>
+          {dials.map((d, i) => (
+            <View key={i} style={[styles.cartDial, !d.on && styles.cartDialOff]}>
+              <Icon name={d.icon} size={12} color={spec.ink} strokeWidth={2} />
+            </View>
+          ))}
+        </View>
       </View>
-      <Text style={styles.modeArrow}>›</Text>
+      {last ? (
+        <View style={styles.lastPill}>
+          <Text style={styles.lastText}>LAST TIME</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -321,10 +368,13 @@ export default function ExamSetupScreen() {
 
   /** Mode first, then the paper itself. */
   const [step, setStep] = useState<'mode' | 'counts'>('mode');
+  /** The cartridge being inspected, before it is committed to. */
+  const [peek, setPeek] = useState<ExamMode | null>(null);
 
   useEffect(() => {
     if (deckId) {
       setStep('mode');
+      setPeek(null);
       void load(deckId);
     }
   }, [deckId, load]);
@@ -359,6 +409,7 @@ export default function ExamSetupScreen() {
   }, [status, deckId, wantMode, wantFormat, setMode, setOnly, start]);
 
   const chooseMode = (id: ExamMode) => {
+    setPeek(null);
     setMode(id);
     if (MODES[id].autoBuild) begin();
     else setStep('counts');
@@ -385,12 +436,7 @@ export default function ExamSetupScreen() {
   }
 
   if (step === 'mode') {
-    const detail: Partial<Record<ExamMode, string>> = {
-      mastery: 'Ends when the pile is empty',
-      rapid: 'Seconds per question',
-      simulation: 'Flag, revisit, submit',
-      survival: 'Endless · three lives',
-    };
+    const peeked = peek ? MODES[peek] : null;
 
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
@@ -402,23 +448,26 @@ export default function ExamSetupScreen() {
             <Text style={styles.backArrow}>←</Text>
           </Pressable>
           <View style={styles.headText}>
-            <Text style={styles.title}>How do you want to sit it?</Text>
+            <Text style={styles.title}>Pick your game</Text>
             <Text style={styles.sub} numberOfLines={1}>
               {deck?.name} · {deck?.questionCount} questions
             </Text>
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {MODE_ORDER.map((id) => (
-            <ModeCard
-              key={id}
-              spec={MODES[id]}
-              detail={detail[id]}
-              last={id === lastMode}
-              onPress={() => chooseMode(id)}
-            />
-          ))}
+        <ScrollView contentContainerStyle={styles.shelf} showsVerticalScrollIndicator={false}>
+          <View style={styles.cartGrid}>
+            {MODE_ORDER.map((id, i) => (
+              <Cartridge
+                key={id}
+                spec={MODES[id]}
+                // an odd count leaves the last one room to breathe
+                wide={i === MODE_ORDER.length - 1 && MODE_ORDER.length % 2 === 1}
+                last={id === lastMode}
+                onPress={() => setPeek(id)}
+              />
+            ))}
+          </View>
 
           <View style={styles.note}>
             <Icon name="bulb" size={16} color={colors.gold} strokeWidth={2.2} />
@@ -428,6 +477,53 @@ export default function ExamSetupScreen() {
             </Text>
           </View>
         </ScrollView>
+
+        {/* The detail sits over the shelf rather than replacing it, so
+            backing out costs one tap and the other four stay in sight. */}
+        <Modal
+          visible={peeked != null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPeek(null)}>
+          <Pressable style={styles.peekBack} onPress={() => setPeek(null)}>
+            <Pressable style={styles.peekSheet} onPress={(e) => e.stopPropagation()}>
+              {peeked ? (
+                <>
+                  <View style={[styles.peekFace, { backgroundColor: peeked.wash }]}>
+                    <Icon name={peeked.icon} size={44} color={peeked.ink} fill="#FFFFFF" strokeWidth={1.8} />
+                    <Text style={styles.peekName}>{peeked.name}</Text>
+                    <Text style={styles.peekTag}>{peeked.tagline}</Text>
+                  </View>
+
+                  <View style={styles.peekDials}>
+                    {dialsOf(peeked).map((d, i) => (
+                      <View key={i} style={styles.peekDial}>
+                        <Icon
+                          name={d.icon}
+                          size={17}
+                          color={d.on ? peeked.ink : colors.textFaint}
+                          strokeWidth={2}
+                        />
+                        <Text style={styles.peekDialCap}>{d.caption}</Text>
+                        <Text style={styles.peekDialVal}>{d.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <ChunkyButton
+                    label={peeked.autoBuild ? 'Start' : 'Choose questions'}
+                    size="lg"
+                    onPress={() => chooseMode(peeked.id)}
+                    style={styles.peekStart}
+                  />
+                  <Pressable onPress={() => setPeek(null)} hitSlop={8} style={styles.peekBackBtn}>
+                    <Text style={styles.peekBackText}>Pick another</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     );
   }
@@ -755,6 +851,162 @@ const styles = StyleSheet.create({
   },
 
   // --- modes ------------------------------------------------------------
+  shelf: {
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+  },
+  cartGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+  },
+  cart: {
+    width: '48.5%',
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.ink,
+    borderTopLeftRadius: 13,
+    borderTopRightRadius: 13,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+    paddingHorizontal: 9,
+    paddingTop: 12,
+    paddingBottom: 10,
+    ...shadow.pop,
+  },
+  cartWide: { width: '100%' },
+  cartGrooves: {
+    position: 'absolute',
+    top: 5,
+    left: 14,
+    right: 14,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.line,
+  },
+  cartFace: {
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    gap: 5,
+  },
+  cartFaceWide: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 14,
+  },
+  cartWideText: { flex: 1 },
+  cartName: {
+    fontFamily: font.hero,
+    fontSize: 18,
+    lineHeight: 20,
+    color: '#1A211C',
+    textAlign: 'center',
+  },
+  cartNameWide: { textAlign: 'left', fontSize: 20 },
+  cartTag: {
+    fontFamily: font.bodySemibold,
+    fontSize: 9.5,
+    lineHeight: 12,
+    color: colors.textDim,
+    textAlign: 'center',
+  },
+  cartTagWide: { textAlign: 'left', fontSize: 11, lineHeight: 14 },
+  cartDials: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 2,
+  },
+  cartDial: {
+    width: 21,
+    height: 21,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartDialOff: { opacity: 0.32 },
+
+  peekBack: {
+    flex: 1,
+    backgroundColor: 'rgba(39, 54, 43, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  peekSheet: {
+    backgroundColor: colors.bg,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+    borderColor: colors.ink,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 30,
+    gap: 14,
+  },
+  peekFace: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: 6,
+  },
+  peekName: {
+    fontFamily: font.hero,
+    fontSize: 28,
+    lineHeight: 31,
+    color: '#1A211C',
+  },
+  peekTag: {
+    fontFamily: font.bodySemibold,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: colors.textDim,
+    textAlign: 'center',
+  },
+  peekDials: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  peekDial: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    gap: 2,
+  },
+  peekDialCap: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 8,
+    letterSpacing: 0.8,
+    color: colors.textFaint,
+  },
+  peekDialVal: {
+    fontFamily: font.heading,
+    fontSize: 10.5,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  peekStart: { marginTop: 2 },
+  peekBackBtn: { alignSelf: 'center', paddingVertical: 4 },
+  peekBackText: {
+    fontFamily: font.bodyBold,
+    fontSize: 13,
+    color: colors.textFaint,
+  },
+
   modeCard: {
     flexDirection: 'row',
     alignItems: 'center',
