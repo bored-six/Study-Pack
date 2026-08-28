@@ -76,7 +76,7 @@ export function ExamSheet({
   return (
     <View style={[styles.board, style]}>
       <View style={[styles.page, stock === 'card' && styles.pageCard]}>
-        <Stock kind={stock} accent={accent} />
+        <StockLines kind={stock} accent={accent} />
         <View style={styles.pageHead}>
           <Text style={styles.pageTitle}>{title}</Text>
           <Squiggle width={96} color={accent} />
@@ -124,7 +124,7 @@ export function ExamSheet({
  * and then get out of the way of the words, so nothing here goes above
  * ~9% ink.
  */
-function Stock({ kind, accent }: { kind: PaperStock; accent: string }) {
+export function StockLines({ kind, accent }: { kind: PaperStock; accent: string }) {
   if (kind === 'card') return null;
 
   if (kind === 'ticket') {

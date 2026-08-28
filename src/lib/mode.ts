@@ -64,6 +64,8 @@ export interface ModeSpec {
   countsHint: string;
   /** Which progress readout the run screen puts in the header. */
   hud: HudKind;
+  /** Heading on the card at the end — a survival run is not a report card. */
+  reportTitle: string;
 }
 
 /** The stage's stationery — what the paper under the question looks like. */
@@ -91,6 +93,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     stamp: 'NO CLOCK',
     countsHint: 'How many pages you sit, once each.',
     hud: 'pages',
+    reportTitle: 'REPORT CARD',
     autoBuild: false,
   },
   mastery: {
@@ -111,6 +114,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     stamp: 'UNTIL IT STICKS',
     countsHint: 'How many go in the pile. Each one comes back until it sticks.',
     hud: 'pile',
+    reportTitle: 'THE PILE',
     autoBuild: false,
   },
   rapid: {
@@ -131,6 +135,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     stamp: 'ON THE CLOCK',
     countsHint: 'How many tickets. Each one has its own countdown.',
     hud: 'fuse',
+    reportTitle: 'TIME SHEET',
     autoBuild: false,
   },
   simulation: {
@@ -151,6 +156,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     stamp: 'SEALED',
     countsHint: 'How long the paper is. You can go back and change answers.',
     hud: 'paper',
+    reportTitle: 'MARKED PAPER',
     autoBuild: false,
   },
   survival: {
@@ -171,6 +177,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     stamp: 'THREE LIVES',
     countsHint: 'Survival deals its own questions — nothing to choose.',
     hud: 'lives',
+    reportTitle: 'HOW FAR YOU GOT',
     autoBuild: true,
   },
 };

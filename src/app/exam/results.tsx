@@ -15,7 +15,9 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ExamDebrief } from '@/components/ExamDebrief';
+import { StockLines } from '@/components/ExamSheet';
 import { Icon } from '@/components/Icon';
+import { ModeCrest } from '@/components/ModeCrest';
 import { buildDebrief, missedQuestions, type NextStep } from '@/lib/debrief';
 import { playSfx } from '@/lib/sfx';
 import { correctText, draftText, itemPrompt, type DraftValue } from '@/lib/draft';
@@ -271,11 +273,16 @@ export default function ExamResultsScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 20 }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.reportRule} />
-          <Text style={styles.reportKicker}>REPORT CARD</Text>
+        <View style={[styles.card, { borderColor: spec.edge }]}>
+          {/* The paper this was sat on, so the card and the sitting match. */}
+          <StockLines kind={spec.paper} accent={spec.ink} />
+          <View style={[styles.reportRule, { backgroundColor: spec.edge }]} />
+          <Text style={[styles.reportKicker, styles.onStock]}>{spec.reportTitle}</Text>
+          <View style={[styles.modeStamp, { borderColor: spec.ink }]} pointerEvents="none">
+            <Text style={[styles.modeStampText, { color: spec.ink }]}>{spec.stamp}</Text>
+          </View>
 
-          <View style={styles.reportRow}>
+          <View style={[styles.reportRow, styles.onStock]}>
             <View style={styles.reportLeft}>
               <Text style={styles.score}>{hero.big}</Text>
               <Text style={styles.pct}>{hero.small}</Text>
@@ -294,11 +301,13 @@ export default function ExamResultsScreen() {
             </Animated.View>
           </View>
 
-          <Text style={styles.teacherNote}>"{debrief.headline}"</Text>
+          <Text style={[styles.teacherNote, styles.onStock]}>"{debrief.headline}"</Text>
 
-          <Text style={styles.meta}>
-            {spec.name} · {deck.name} · {formatDuration(durationMs)}
-          </Text>
+          <ModeCrest
+            spec={spec}
+            detail={`${deck.name} · ${formatDuration(durationMs)}`}
+            style={styles.crest}
+          />
           <Text style={styles.saved}>Saved to Progress on this device</Text>
 
           {stars > 0 ? (
@@ -385,7 +394,7 @@ export default function ExamResultsScreen() {
 
       <View style={[styles.actions, { paddingBottom: insets.bottom + 14 }]}>
         <ChunkyButton
-          label="Another exam"
+          label="Pick another game"
           variant="soft"
           size="lg"
           onPress={() => {
@@ -419,14 +428,37 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignSelf: 'stretch',
     height: 2,
     borderRadius: 1,
-    backgroundColor: 'rgba(194, 78, 56, 0.35)',
+    opacity: 0.5,
     marginBottom: 2,
+  },
+  modeStamp: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    borderWidth: 2,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    opacity: 0.4,
+    transform: [{ rotate: '-8deg' }],
+  },
+  modeStampText: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 8,
+    letterSpacing: 1.1,
+  },
+  crest: {
+    marginTop: 10,
   },
   reportKicker: {
     fontFamily: font.bodyHeavy,
     fontSize: 10.5,
     letterSpacing: 1.8,
     color: colors.textFaint,
+  },
+  onStock: {
+    // above the stationery layer, which fills the card
+    position: 'relative',
   },
   reportRow: {
     alignSelf: 'stretch',
@@ -486,6 +518,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     padding: 26,
     alignItems: 'center',
     gap: 5,
+    // the mode's stationery is printed behind the card's contents
+    overflow: 'hidden',
     ...shadow.pop,
   },
   badge: {
