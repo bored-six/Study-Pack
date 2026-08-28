@@ -1,5 +1,5 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { Text } from 'react-native';
+import { Text, TextInput } from 'react-native';
 
 import ExamSetupScreen from '../exam/[deckId]';
 import { useExamStore } from '@/store/exam';
@@ -139,18 +139,67 @@ describe('the exam setup screen', () => {
     expect(texts(tree)).toContain('Take your time');
   });
 
-  it('shows the type chips, and an amount for what is ticked', async () => {
+  it('lists every type once, with an amount only on what is ticked', async () => {
     const tree = await open();
     chooseMode(tree, 'Take your time');
 
     const shown = texts(tree);
-    expect(shown).toContain('WHICH TYPES?');
-    expect(shown).toContain('HOW MANY OF EACH?');
-    expect(shown).toContain('Multiple choice');
-    expect(shown).toContain('True or False');
+    // One list now, not a grid of chips and then the same types again.
+    expect(shown).toContain('WHAT GOES ON THE PAPER');
+    expect(shown).not.toContain('WHICH TYPES?');
+    expect(shown).not.toContain('HOW MANY OF EACH?');
+    expect(shown.filter((text) => text === 'Multiple choice')).toHaveLength(1);
+    expect(shown.filter((text) => text === 'True or False')).toHaveLength(1);
     expect(shown).toContain('10 questions · about 5 min');
-    // One row, because one type is ticked.
+    // A ticked row swaps "N ready" for its ceiling; an untouched one keeps it.
     expect(shown.filter((text) => text === 'Max 30')).toHaveLength(1);
+    expect(shown).toContain('30 ready');
+    expect(shown).toContain('not in these notes');
+  });
+
+  it('says which rows are on, which are off, and which cannot be used', async () => {
+    const tree = await open();
+    chooseMode(tree, 'Take your time');
+
+    // The row is a checkbox now, so it has to announce its state.
+    const box = (label: string) =>
+      tree.root.findAll(
+        (n) => n.props?.accessibilityRole === 'checkbox' && n.props?.accessibilityLabel === label,
+        { deep: false }
+      )[0];
+
+    expect(box('Multiple choice').props.accessibilityState.checked).toBe(true);
+    expect(box('True or False').props.accessibilityState.checked).toBe(false);
+    // A format the notes cannot fill stays on the list, but is not tappable.
+    expect(box('Fill in the blank').props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('opens the stepper on the row you tick, and only there', async () => {
+    const tree = await open();
+    chooseMode(tree, 'Take your time');
+
+    const steppers = () =>
+      tree.root.findAllByType(TextInput).map((n) => n.props.accessibilityLabel as string);
+
+    expect(steppers()).toEqual(['How many Multiple choice']);
+
+    press(tree, 'True or False');
+    expect(steppers()).toEqual([
+      'How many Multiple choice',
+      'How many True or False',
+    ]);
+
+    press(tree, 'Multiple choice');
+    expect(steppers()).toEqual(['How many True or False']);
+  });
+
+  it('offers an unticked row as something to add, and never an unusable one', async () => {
+    const tree = await open();
+    chooseMode(tree, 'Take your time');
+
+    const shown = texts(tree);
+    // Four formats these notes can fill; one is already on the paper.
+    expect(shown.filter((text) => text === 'TAP TO ADD')).toHaveLength(3);
   });
 
   it('swaps to a true/false paper in two taps', async () => {

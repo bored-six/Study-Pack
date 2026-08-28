@@ -13,24 +13,21 @@ import {
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withDelay,
-  withRepeat,
   withSequence,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartridgeLoad } from '@/components/CartridgeLoad';
 import { ChunkyButton } from '@/components/ChunkyButton';
-import { DerpCheck, DerpMinus, DerpPlus } from '@/components/DerpIcons';
+import { DerpMinus, DerpPlus } from '@/components/DerpIcons';
 import { Icon } from '@/components/Icon';
 import { ModeCrest, dialsOf } from '@/components/ModeCrest';
-import { FORMAT_HOWTO, FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib/exam';
+import { FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib/exam';
 import { estimateLabel, MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
 import { playSfx } from '@/lib/sfx';
 import { useExamStore } from '@/store/exam';
-import { derpRadius, font, getColors, onWash, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, onWash, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 /** A drill sent here by the results note asks for this many of one format. */
 const DRILL_COUNT = 12;
@@ -38,112 +35,22 @@ const DRILL_COUNT = 12;
 /** The − and + nudge by one; the field itself is there for a real jump. */
 const STEP = 1;
 
-/** One question type, as a sticker you tick. */
-function FormatChip({
-  format,
-  max,
-  on,
-  onPress,
-  index,
-  spec,
-}: {
-  format: ExamFormat;
-  max: number;
-  on: boolean;
-  onPress: () => void;
-  index: number;
-  /** A ticked chip wears the mode's colour, not a fixed green. */
-  spec: ModeSpec;
-}) {
-  const isDark = useThemeStore((s) => s.isDark);
-  const colors = getColors(isDark);
-  const styles = getStyles(colors);
-
-  const off = max === 0;
-
-  const scale = useSharedValue(1);
-  const baseRot = index % 2 === 0 ? -2.5 : 1.5;
-  const iconScale = useSharedValue(1);
-
-  useEffect(() => {
-    iconScale.value = withDelay(
-      index * 200,
-      withRepeat(
-        withSequence(
-          withTiming(1.05, { duration: 1500 }),
-          withTiming(1, { duration: 1500 })
-        ),
-        -1,
-        true
-      )
-    );
-  }, [index, iconScale]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { rotate: `${baseRot}deg` }],
-  }));
-
-  const animatedIconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: on ? iconScale.value : 1 }],
-  }));
-
-  const handlePress = () => {
-    if (off) return;
-    playSfx('derp_pop');
-    scale.value = withSequence(withSpring(1.08), withSpring(1));
-    onPress();
-  };
-
-  return (
-    <Animated.View style={[animatedStyle, { width: '48%' }]}>
-      <Pressable
-        disabled={off}
-        onPress={handlePress}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: on, disabled: off }}
-        style={({ pressed }) => [
-          styles.chip,
-          on && { backgroundColor: spec.wash, borderColor: spec.edge },
-          off && styles.chipOff,
-          pressed && styles.pressed,
-        ]}>
-        <View style={[styles.tape, { transform: [{ rotate: index % 2 === 0 ? '-4deg' : '2deg' }] }]} />
-        <View style={styles.tickboxContainer}>
-          <Animated.View style={animatedIconStyle}>
-            <DerpCheck checked={on} style={styles.derpCheckSvg} />
-          </Animated.View>
-        </View>
-        <Text
-          style={[
-            styles.chipName,
-            on && styles.chipNameOn,
-            off && styles.chipTextOff,
-          ]}
-          numberOfLines={2}>
-          {FORMAT_LABEL[format]}
-        </Text>
-        <Text style={[styles.chipRoom, on && styles.chipRoomOn, off && styles.chipTextOff]}>
-          {off ? 'not in these notes' : `${max} ready`}
-        </Text>
-      </Pressable>
-    </Animated.View>
-  );
-}
-
+/** The − and + on a row. Hand-drawn glyphs carry no text, so it says what it does. */
 function StepBtn({
   delta,
   count,
   max,
   onPress,
   label,
+  ink,
   children,
 }: {
   delta: number;
   count: number;
   max: number;
   onPress: (delta: number) => void;
-  /** Hand-drawn glyphs carry no text, so the button says what it does. */
   label: string;
+  ink: string;
   children: React.ReactNode;
 }) {
   const isDark = useThemeStore((s) => s.isDark);
@@ -151,21 +58,8 @@ function StepBtn({
   const styles = getStyles(colors);
 
   const scale = useSharedValue(1);
-  const iconScale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const animatedIconStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
   const disabled = delta > 0 ? count >= max : count <= 1;
-
-  useEffect(() => {
-    iconScale.value = withRepeat(
-      withSequence(
-        withTiming(1.05, { duration: 1500 }),
-        withTiming(1, { duration: 1500 })
-      ),
-      -1,
-      true
-    );
-  }, [iconScale]);
 
   const handlePress = () => {
     if (disabled) return;
@@ -178,123 +72,159 @@ function StepBtn({
       <Pressable
         onPress={handlePress}
         disabled={disabled}
-        hitSlop={6}
+        hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled }}
         style={({ pressed }) => [
           styles.stepBtn,
+          { borderColor: ink },
           disabled && styles.stepBtnOff,
           pressed && styles.pressed,
         ]}>
-        <Animated.View style={[{ opacity: disabled ? 0.3 : 1 }, animatedIconStyle]}>{children}</Animated.View>
+        <View style={{ opacity: disabled ? 0.3 : 1 }}>{children}</View>
       </Pressable>
     </Animated.View>
   );
 }
 
-/** How many of one ticked format, set exactly. */
-function AmountRow({
+/**
+ * One question type, as one row.
+ *
+ * This used to be two lists: a grid of taped cards to tick, and then the
+ * ticked ones again underneath with their amounts. The same seven things,
+ * said twice, in two shapes — and in a third visual language from the
+ * crest above them. Ticking a type now opens its stepper on the same row,
+ * so the whole paper is one screen you can take in at once.
+ */
+function FormatRow({
   format,
   count,
   max,
-  onChange,
-  index,
+  on,
   spec,
+  onToggle,
+  onChange,
 }: {
   format: ExamFormat;
   count: number;
   max: number;
-  onChange: (next: number) => void;
-  index: number;
+  on: boolean;
   spec: ModeSpec;
+  onToggle: () => void;
+  onChange: (next: number) => void;
 }) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
   const styles = getStyles(colors);
 
+  const off = max === 0;
   const [draft, setDraft] = useState(String(count));
-  const baseRot = index % 2 === 0 ? 0.5 : -0.5;
-  const numScale = useSharedValue(1);
 
-  // Keep the field in step when − + or Max changes the number underneath it.
-  useEffect(() => {
-    setDraft(String(count));
-    numScale.value = withSequence(withSpring(1.3), withSpring(1));
-  }, [count, numScale]);
+  // Keep the field in step when − + or Max moves the number underneath it.
+  useEffect(() => setDraft(String(count)), [count]);
 
   const commit = () => {
     const parsed = parseInt(draft.replace(/[^0-9]/g, ''), 10);
     onChange(Number.isNaN(parsed) ? 0 : parsed);
   };
 
-  const animatedNumStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: numScale.value }, { rotate: '-3deg' }],
-  }));
-
-  const handleMax = () => {
-    playSfx('derp_boing');
-    onChange(max);
-  };
-
-  const handleStep = (delta: number) => {
-    playSfx('tap');
-    onChange(count + delta);
+  const handleToggle = () => {
+    if (off) return;
+    playSfx('derp_pop');
+    onToggle();
   };
 
   return (
-    <View style={[styles.amountRow, { transform: [{ rotate: `${baseRot}deg` }] }]}>
-      <View style={[styles.tape, { left: -10, top: '50%', marginTop: -8, width: 30, transform: [{ rotate: '85deg' }] }]} />
-      <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>{FORMAT_LABEL[format]}</Text>
-        <Text style={styles.rowHow} numberOfLines={2}>
-          {FORMAT_HOWTO[format]}
-        </Text>
-        <Pressable
-          onPress={handleMax}
-          hitSlop={6}
-          accessibilityLabel={`All ${max} ${FORMAT_LABEL[format]}`}
-          style={({ pressed }) => [
-            styles.maxBtn,
-            { backgroundColor: spec.wash },
-            pressed && styles.pressed,
+    <View style={[styles.frow, on && { backgroundColor: spec.wash }, off && styles.frowOff]}>
+      <Pressable
+        onPress={handleToggle}
+        disabled={off}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: on, disabled: off }}
+        accessibilityLabel={FORMAT_LABEL[format]}
+        style={({ pressed }) => [styles.frowMain, pressed && styles.pressed]}>
+        <View
+          style={[
+            styles.tickbox,
+            { borderColor: off ? colors.edge : spec.edge },
+            on && { backgroundColor: spec.ink, borderColor: spec.ink },
           ]}>
-          <Text style={[styles.maxText, { color: spec.ink }]}>Max {max}</Text>
-        </Pressable>
-      </View>
+          {on ? <Icon name="check" size={12} color="#FFFFFF" strokeWidth={3.2} /> : null}
+        </View>
 
-      <StepBtn
-        delta={-STEP}
-        count={count}
-        max={max}
-        onPress={handleStep}
-        label={`Fewer ${FORMAT_LABEL[format]}`}>
-        <DerpMinus width={42} height={42} />
-      </StepBtn>
+        <View style={styles.frowText}>
+          <Text
+            style={[styles.frowName, on && styles.frowNameOn, off && styles.frowTextOff]}
+            numberOfLines={2}>
+            {FORMAT_LABEL[format]}
+          </Text>
 
-      <Animated.View style={animatedNumStyle}>
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          onBlur={commit}
-          onSubmitEditing={commit}
-          keyboardType="number-pad"
-          returnKeyType="done"
-          selectTextOnFocus
-          maxLength={3}
-          accessibilityLabel={`How many ${FORMAT_LABEL[format]}`}
-          style={[styles.countInput, { transform: [] }]}
-        />
-      </Animated.View>
+          {off ? (
+            <Text style={[styles.frowSub, styles.frowTextOff]}>not in these notes</Text>
+          ) : on ? (
+            // Once it is on the paper, the useful number is the ceiling.
+            <Pressable
+              onPress={() => {
+                playSfx('derp_boing');
+                onChange(max);
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`All ${max} ${FORMAT_LABEL[format]}`}
+              style={({ pressed }) => [pressed && styles.pressed]}>
+              <Text style={[styles.frowMax, { color: spec.ink }]}>Max {max}</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.frowSub}>{max} ready</Text>
+          )}
+        </View>
 
-      <StepBtn
-        delta={STEP}
-        count={count}
-        max={max}
-        onPress={handleStep}
-        label={`More ${FORMAT_LABEL[format]}`}>
-        <DerpPlus width={42} height={42} />
-      </StepBtn>
+        {!on && !off ? <Text style={styles.frowHint}>TAP TO ADD</Text> : null}
+      </Pressable>
+
+      {on ? (
+        <View style={styles.stepper}>
+          <StepBtn
+            delta={-STEP}
+            count={count}
+            max={max}
+            ink={spec.ink}
+            onPress={(d) => {
+              playSfx('tap');
+              onChange(count + d);
+            }}
+            label={`Fewer ${FORMAT_LABEL[format]}`}>
+            <DerpMinus width={30} height={30} />
+          </StepBtn>
+
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            onBlur={commit}
+            onSubmitEditing={commit}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            selectTextOnFocus
+            maxLength={3}
+            accessibilityLabel={`How many ${FORMAT_LABEL[format]}`}
+            style={[styles.countInput, { borderBottomColor: spec.ink }]}
+          />
+
+          <StepBtn
+            delta={STEP}
+            count={count}
+            max={max}
+            ink={spec.ink}
+            onPress={(d) => {
+              playSfx('tap');
+              onChange(count + d);
+            }}
+            label={`More ${FORMAT_LABEL[format]}`}>
+            <DerpPlus width={30} height={30} />
+          </StepBtn>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -616,46 +546,32 @@ export default function ExamSetupScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
-        <Text style={[styles.kicker, { color: spec.ink }]}>WHICH TYPES?</Text>
-        <View style={styles.grid}>
-          {FORMAT_ORDER.map((format, i) => (
-            <FormatChip
+        <Text style={[styles.kicker, { color: spec.ink }]}>WHAT GOES ON THE PAPER</Text>
+        <Text style={styles.kickerHint}>{spec.countsHint}</Text>
+
+        <View style={styles.sheet}>
+          {FORMAT_ORDER.map((format) => (
+            <FormatRow
               key={format}
-              index={i}
               format={format}
+              count={counts[format]}
               max={available[format]}
               on={picks.includes(format)}
               spec={spec}
-              onPress={() => toggleFormat(format)}
+              onToggle={() => toggleFormat(format)}
+              onChange={(next) => setCount(format, next)}
             />
           ))}
         </View>
 
-        {picks.length > 0 ? (
-          <>
-            <Text style={[styles.kicker, { color: spec.ink }]}>HOW MANY OF EACH?</Text>
-            <Text style={styles.kickerHint}>{spec.countsHint}</Text>
-            {picks.map((format, i) => (
-              <AmountRow
-                key={format}
-                index={i}
-                format={format}
-                count={counts[format]}
-                max={available[format]}
-                spec={spec}
-                onChange={(next) => setCount(format, next)}
-              />
-            ))}
-            {picks.length > 1 ? (
-              <Pressable
-                onPress={evenSplit}
-                hitSlop={8}
-                accessibilityLabel="Even them out"
-                style={({ pressed }) => [styles.switcher, pressed && styles.pressed]}>
-                <Text style={styles.switcherText}>Even them out</Text>
-              </Pressable>
-            ) : null}
-          </>
+        {picks.length > 1 ? (
+          <Pressable
+            onPress={evenSplit}
+            hitSlop={8}
+            accessibilityLabel="Even them out"
+            style={({ pressed }) => [styles.switcher, pressed && styles.pressed]}>
+            <Text style={styles.switcherText}>Even them out</Text>
+          </Pressable>
         ) : null}
 
         <View style={styles.note}>
@@ -795,158 +711,115 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginBottom: 12,
   },
 
-  // --- type chips -------------------------------------------------------
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  chip: {
-    width: '100%',
-    minHeight: 110, // Ensure height doesn't collapse on web
-    backgroundColor: colors.surface,
-    ...outline,
-    ...derpRadius,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 11,
-    gap: 2,
-    ...shadow.card,
-  },
-  chipOn: {
-    backgroundColor: colors.accentWash,
-    borderColor: colors.accentEdge,
-  },
-  chipOff: {
-    backgroundColor: colors.surface2,
-    opacity: 0.7,
-  },
-  tape: {
-    position: 'absolute',
-    top: -8,
-    alignSelf: 'center',
-    width: 40,
-    height: 16,
-    backgroundColor: 'rgba(239, 229, 203, 0.85)',
-    zIndex: 10,
-    ...derpRadius,
-  },
-  tickboxContainer: {
-    width: 28,
-    height: 28,
-    marginBottom: 6,
-    position: 'relative',
-  },
-  derpCheckSvg: {
-    width: 42,
-    height: 42,
-    position: 'absolute',
-    top: -7,
-    left: -7,
-  },
-  chipName: {
-    fontFamily: font.heading,
-    fontSize: 14.5,
-    lineHeight: 18,
-    color: colors.textDim,
-  },
-  chipNameOn: {
-    color: onWash.ink,
-  },
-  chipRoomOn: {
-    color: onWash.faint,
-  },
-  chipRoom: {
-    fontFamily: font.bodySemibold,
-    fontSize: 11,
-    color: colors.textFaint,
-    fontVariant: ['tabular-nums'],
-  },
-  chipTextOff: {
-    color: colors.disabledText,
-  },
-
-  // --- how many of each -------------------------------------------------
-  amountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  // --- the paper: one row per type ---------------------------------------
+  sheet: {
     backgroundColor: colors.surface,
     ...outline,
     borderRadius: radius.card,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     ...shadow.card,
   },
+  frow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 54,
+    borderRadius: 13,
+    paddingHorizontal: 4,
+    // The rule between rows, so an unticked list still reads as a page.
+    borderBottomWidth: 1.5,
+    borderBottomColor: colors.lineSoft,
+  },
+  frowOff: {
+    opacity: 0.5,
+  },
+  frowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+  },
+  tickbox: {
+    width: 23,
+    height: 23,
+    borderRadius: 8,
+    borderWidth: 2,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  frowText: {
+    flex: 1,
+    gap: 1,
+  },
+  frowName: {
+    fontFamily: font.heading,
+    fontSize: 14,
+    lineHeight: 17,
+    color: colors.text,
+  },
+  frowNameOn: {
+    color: onWash.ink,
+  },
+  frowSub: {
+    fontFamily: font.bodySemibold,
+    fontSize: 10.5,
+    color: colors.textFaint,
+    fontVariant: ['tabular-nums'],
+  },
+  frowMax: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 10.5,
+    letterSpacing: 0.3,
+    fontVariant: ['tabular-nums'],
+  },
+  frowHint: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 9,
+    letterSpacing: 0.9,
+    color: colors.textFaint,
+  },
+  frowTextOff: {
+    color: colors.disabledText,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   stepBtn: {
-    width: 42,
-    height: 42,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    borderWidth: 2,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBtnOff: {
+    borderColor: colors.edge,
   },
-  stepGlyph: {
-    fontFamily: font.heading,
-    fontSize: 23,
-    lineHeight: 28,
-    color: colors.accentDeep,
-  },
-  stepGlyphOff: {
-    color: colors.disabledText,
+  countInput: {
+    width: 40,
+    borderBottomWidth: 2.5,
+    paddingVertical: 3,
+    textAlign: 'center',
+    fontFamily: font.hero,
+    fontSize: 20,
+    color: onWash.ink,
+    fontVariant: ['tabular-nums'],
   },
   switcher: {
     alignSelf: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
   },
   switcherText: {
     fontFamily: font.bodyHeavy,
     fontSize: 12,
     color: colors.textDim,
-  },
-
-  // --- the amount itself ------------------------------------------------
-  rowText: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontFamily: font.heading,
-    fontSize: 15,
-    color: colors.text,
-  },
-  rowHow: {
-    fontFamily: font.body,
-    fontSize: 11.5,
-    lineHeight: 15.5,
-    color: colors.textDim,
-    marginTop: 1,
-  },
-  countInput: {
-    width: 54,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.ink,
-    paddingVertical: 7,
-    textAlign: 'center',
-    fontFamily: font.hero,
-    fontSize: 26,
-    color: colors.text,
-    fontVariant: ['tabular-nums'],
-    transform: [{ rotate: '-3deg' }],
-  },
-  maxBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.accentWash,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginTop: 3,
-  },
-  maxText: {
-    fontFamily: font.bodyHeavy,
-    fontSize: 10.5,
-    color: colors.accentDeep,
-    fontVariant: ['tabular-nums'],
   },
 
   // --- modes ------------------------------------------------------------
