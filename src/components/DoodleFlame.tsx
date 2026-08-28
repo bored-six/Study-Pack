@@ -1,321 +1,321 @@
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import Animated, {
   Easing,
   useAnimatedProps,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withDelay,
   withRepeat,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import type { FireTier } from '@/lib/fire';
 
 /**
- * The streak, drawn as a flame doodled in the margin of the page.
+ * The streak, drawn as fire in the margin of the page.
  *
- * It is the same sketch all the way up, redrawn better as the streak
- * grows: a pencil ghost, then ink, then crayon filled outside the lines,
- * two-tone, gel pen, silver, a doodled crown, and finally gold with pen
- * rays. Nothing glows — the tier reads from the linework, which is what
- * keeps it legible at 19px in the home-screen chip.
+ * ## The form evolves, not just the colour
  *
- * ## How the motion works
+ * A spark is not a small flame — it is a star. An ember is not a flame
+ * at all — it is a coal. Fire only appears at ten days, sitting on that
+ * coal, and from there it keeps gaining parts: a heart, side tongues, a
+ * taller and narrower column, orbiting flamelets, a crown, rays.
  *
- * The outline is *computed every frame*, not picked from a set of
- * drawings. Six control points around the silhouette each drift on their
- * own stack of sine harmonics, so the tip leans and curls while the
- * flanks swell and pinch — continuously, at the display's full refresh
- * rate, never landing on the same shape twice within a cycle.
+ * Each tier is therefore a *recipe of parts* rather than one silhouette
+ * in a different ink. Put the ten side by side as solid black and they
+ * stay tellable apart, which is the test the earlier version failed.
  *
- * Earlier passes at this cycled between a handful of fixed drawings.
- * Cross-fading hid the seams but the silhouette still only changed a few
- * times a second, which is what made it look stepped rather than fluid.
- * Generating the path instead removes the frame rate ceiling entirely.
+ * ## The motion
  *
- * Every wobble is an integer harmonic of one clock that loops over 2π,
- * so the loop closes seamlessly with no jump at the wrap.
+ * Every part's outline is computed on each frame from sine harmonics —
+ * no drawings, no frame count, so the ceiling is the display refresh
+ * rate. All the wobbles are integer harmonics of one clock that loops
+ * over 2*pi, so the loop closes with no jump at the wrap, and each part
+ * carries a phase offset so the pieces never move in lockstep.
  */
 
 const TAU = Math.PI * 2;
 
-/** How long one full swirl takes. Slower reads calmer, not choppier. */
+/** How long one full swirl takes. */
 const SWIRL_MS = 5200;
 
+interface FlameSpec {
+  cx?: number;
+  baseY?: number;
+  /** Half-width where it meets the ground. */
+  foot: number;
+  /** Half-width at the widest point, low down. */
+  bulge: number;
+  /** Half-width where it necks in before the tip. */
+  waist: number;
+  /** How high the tip reaches. Lower number, taller flame. */
+  tipY: number;
+}
+
 /**
- * The flame silhouette at a moment in the cycle.
- *
- * Built as two Bézier flanks meeting at a wandering tip, closed with a
- * rounded base. `spread` fattens or narrows the whole shape; `amp`
- * scales how far the outline is allowed to travel, so small tiers stay
- * readable instead of thrashing.
+ * A flame: a bulb that pinches into a leaning tip. Proportions come from
+ * the spec, so the same generator draws a squat kindling wisp and a tall
+ * blue column.
  */
-export function flameOutline(t: number, spread: number, amp: number): string {
+export function flameShape(t: number, o: FlameSpec, amp: number): string {
   'worklet';
-  const cx = 32;
-  const baseY = 50;
+  const cx = o.cx ?? 32;
+  const baseY = o.baseY ?? 50;
+  const span = baseY - o.tipY;
 
-  // A flame is a bulb that pinches into a leaning tip — not a teardrop.
-  // Three widths do the work: the foot, the widest point low down, and
-  // the waist where it necks in before the tip.
-  const foot = 8.4 * spread;
-  const bulgeL = (11.4 + Math.sin(t * 2 + 0.7) * 1.1 * amp) * spread;
-  const bulgeR = (11.4 + Math.sin(t * 2 + 2.9) * 1.1 * amp) * spread;
-  const bulgeY = 41.5 + Math.sin(t + 1.4) * 1.4 * amp;
+  const bulgeY = baseY - span * 0.3 + Math.sin(t + 1.4) * 1.3 * amp;
+  const waistY = baseY - span * 0.58 + Math.sin(t * 2 + 1.1) * 1.6 * amp;
 
-  const waistL = (5.6 + Math.sin(t * 3 + 2.1) * 1.5 * amp) * spread;
-  const waistR = (5.6 + Math.sin(t * 3 + 0.5) * 1.5 * amp) * spread;
-  const waistY = 32.5 + Math.sin(t * 2 + 1.1) * 1.8 * amp;
+  const bulgeL = o.bulge + Math.sin(t * 2 + 0.7) * o.bulge * 0.12 * amp;
+  const bulgeR = o.bulge + Math.sin(t * 2 + 2.9) * o.bulge * 0.12 * amp;
+  const waistL = o.waist + Math.sin(t * 3 + 2.1) * o.waist * 0.28 * amp;
+  const waistR = o.waist + Math.sin(t * 3 + 0.5) * o.waist * 0.28 * amp;
 
-  // The tip wanders and curls — the part the eye actually reads as fire.
-  const tipX = cx + Math.sin(t) * 3.4 * amp + Math.sin(t * 3 + 1.1) * 1.5 * amp;
-  const tipY = 21 - Math.sin(t * 2 + 0.5) * 2.2 * amp;
+  const tipX =
+    cx + Math.sin(t) * span * 0.11 * amp + Math.sin(t * 3 + 1.1) * span * 0.05 * amp;
+  const tipY = o.tipY - Math.sin(t * 2 + 0.5) * span * 0.08 * amp;
   const curl = Math.sin(t * 2 + 2.4) * 2.6 * amp;
 
   return (
-    `M${cx - foot} ${baseY}` +
-    `C${cx - bulgeL} ${bulgeY + 4} ${cx - bulgeL} ${bulgeY - 3} ${cx - waistL} ${waistY}` +
-    `C${cx - waistL + curl * 0.4} ${waistY - 5} ${tipX - 3.2} ${tipY + 6} ${tipX} ${tipY}` +
-    `C${tipX + 3.4} ${tipY + 6} ${cx + waistR - curl * 0.4} ${waistY - 5} ${cx + waistR} ${waistY}` +
-    `C${cx + bulgeR} ${bulgeY - 3} ${cx + bulgeR} ${bulgeY + 4} ${cx + foot} ${baseY}` +
-    `Q${cx} ${baseY + 3.2} ${cx - foot} ${baseY}Z`
+    `M${cx - o.foot} ${baseY}` +
+    `C${cx - bulgeL} ${bulgeY + 3.5} ${cx - bulgeL} ${bulgeY - 2.5} ${cx - waistL} ${waistY}` +
+    `C${cx - waistL + curl * 0.4} ${waistY - span * 0.16} ${tipX - o.foot * 0.38} ${tipY + span * 0.2} ${tipX} ${tipY}` +
+    `C${tipX + o.foot * 0.4} ${tipY + span * 0.2} ${cx + waistR - curl * 0.4} ${waistY - span * 0.16} ${cx + waistR} ${waistY}` +
+    `C${cx + bulgeR} ${bulgeY - 2.5} ${cx + bulgeR} ${bulgeY + 3.5} ${cx + o.foot} ${baseY}` +
+    `Q${cx} ${baseY + 2.8} ${cx - o.foot} ${baseY}Z`
   );
 }
 
-/** The hotter shape inside it — same maths, tighter and quicker. */
-export function coreOutline(t: number, amp: number): string {
+/** A coal: wide, squat, domed, with no tip at all. */
+export function domeShape(t: number, w: number, h: number, amp: number): string {
   'worklet';
   const cx = 32;
-  const baseY = 47.5;
-  const foot = 4.4;
-
-  const bulgeL = 6.4 + Math.sin(t * 2 + 1.3) * 0.8 * amp;
-  const bulgeR = 6.4 + Math.sin(t * 2 + 3.1) * 0.8 * amp;
-  const bulgeY = 42 + Math.sin(t + 0.9) * 0.9 * amp;
-
-  const waistL = 2.8 + Math.sin(t * 3 + 0.4) * 0.8 * amp;
-  const waistR = 2.8 + Math.sin(t * 3 + 2.6) * 0.8 * amp;
-  const waistY = 37 + Math.sin(t * 2 + 2.2) * 1 * amp;
-
-  const tipX = cx + Math.sin(t + 0.6) * 2.2 * amp;
-  const tipY = 30 - Math.sin(t * 2 + 1.7) * 1.6 * amp;
+  const baseY = 50;
+  const a = Math.sin(t * 2) * 0.7 * amp;
+  const b = Math.sin(t * 3 + 1.2) * 0.7 * amp;
 
   return (
-    `M${cx - foot} ${baseY}` +
-    `C${cx - bulgeL} ${bulgeY + 2.5} ${cx - bulgeL} ${bulgeY - 1.5} ${cx - waistL} ${waistY}` +
-    `C${cx - waistL} ${waistY - 2.5} ${tipX - 1.8} ${tipY + 3} ${tipX} ${tipY}` +
-    `C${tipX + 1.9} ${tipY + 3} ${cx + waistR} ${waistY - 2.5} ${cx + waistR} ${waistY}` +
-    `C${cx + bulgeR} ${bulgeY - 1.5} ${cx + bulgeR} ${bulgeY + 2.5} ${cx + foot} ${baseY}` +
-    `Q${cx} ${baseY + 2} ${cx - foot} ${baseY}Z`
+    `M${cx - w} ${baseY}` +
+    `C${cx - w - a} ${baseY - h * 0.75} ${cx - w * 0.55} ${baseY - h - b} ${cx} ${baseY - h}` +
+    `C${cx + w * 0.55} ${baseY - h + b} ${cx + w + a} ${baseY - h * 0.75} ${cx + w} ${baseY}` +
+    `Q${cx} ${baseY + 2.6} ${cx - w} ${baseY}Z`
   );
 }
 
-/** A doodled crown, for the tiers that have earned one. */
-/** Sits above the tip, which now reaches y=18.5 at full stretch. */
-const CROWN = 'M25 12l3 3.4 4-4.4 4 4.4 3-3.4v4.2H25z';
+/** A spark: a four-point star that breathes. */
+export function starShape(
+  t: number,
+  cx: number,
+  cy: number,
+  r: number,
+  amp: number
+): string {
+  'worklet';
+  const p = r * (1 + Math.sin(t * 3) * 0.2 * amp);
+  const q = p * 0.26;
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-
-interface Skin {
-  /** Size of the whole doodle relative to the box. */
-  scale: number;
-  /** How freely the outline is allowed to travel. */
-  amp: number;
-  bodyFill: string | null;
-  bodyStroke: string;
-  bodyWidth: number;
-  dashed?: boolean;
-  coreFill: string | null;
-  crown?: { fill: string; stroke: string };
-  rays?: string;
-  underline?: string;
-  flicks?: string;
-  sparks?: string[];
+  return (
+    `M${cx} ${cy - p}L${cx + q} ${cy - q}L${cx + p} ${cy}L${cx + q} ${cy + q}` +
+    `L${cx} ${cy + p}L${cx - q} ${cy + q}L${cx - p} ${cy}L${cx - q} ${cy - q}Z`
+  );
 }
 
-function skinFor(tier: FireTier): Skin {
+/** The doodled crown, and the pen rays around a year-old fire. */
+const CROWN = 'M25 12l3 3.4 4-4.4 4 4.4 3-3.4v4.2H25z';
+const RAYS = 'M13 20l3.4 3.4M51 20l-3.4 3.4M7 36h5M52 36h5M15 51l3.2-3.2M49 51l-3.2-3.2';
+
+type Part =
+  | { k: 'flame'; o: FlameSpec; fill?: string; stroke?: string; sw?: number; ph?: number }
+  | { k: 'dome'; w: number; h: number; fill?: string; stroke?: string; sw?: number; ph?: number }
+  | { k: 'star'; cx: number; cy: number; r: number; fill: string; stroke?: string; sw?: number; ph?: number };
+
+interface Form {
+  /** How freely the outlines travel. Zero holds the whole thing still. */
+  amp: number;
+  /** Drawn as a dashed pencil ghost. */
+  ghost?: boolean;
+  parts: Part[];
+  crown?: { fill: string; stroke: string };
+  rays?: string;
+}
+
+/**
+ * The ten forms. Parts draw in order, so anything meant to sit behind
+ * the main body is listed before it.
+ */
+function formFor(tier: FireTier): Form {
   switch (true) {
+    // A whole fire: four flames, embers, a crown and pen rays.
     case tier.from >= 365:
       return {
-        scale: 1.06,
         amp: 1.15,
-        bodyFill: '#F0B93A',
-        bodyStroke: '#8A6508',
-        bodyWidth: 2.4,
-        coreFill: '#FFF6DC',
-        crown: { fill: '#FFF6DC', stroke: '#8A6508' },
         rays: '#C24E38',
-        sparks: ['#E4C94B', '#F0B93A', '#C24E38'],
+        crown: { fill: '#FFF3C8', stroke: '#8A6508' },
+        parts: [
+          { k: 'flame', o: { cx: 19, foot: 4.4, bulge: 6, waist: 3, tipY: 26 }, fill: '#C08A2E', stroke: '#8A6508', sw: 2, ph: 2.2 },
+          { k: 'flame', o: { cx: 45, foot: 4.4, bulge: 6, waist: 3, tipY: 28 }, fill: '#C08A2E', stroke: '#8A6508', sw: 2, ph: 3.7 },
+          { k: 'flame', o: { foot: 9.2, bulge: 12.4, waist: 6, tipY: 17 }, fill: '#F0B93A', stroke: '#8A6508', sw: 2.4 },
+          { k: 'flame', o: { foot: 4.6, bulge: 6.2, waist: 3.1, tipY: 28 }, fill: '#FFF3C8', ph: 1.6 },
+          { k: 'star', cx: 47, cy: 44, r: 2.4, fill: '#F0B93A', ph: 0.6 },
+          { k: 'star', cx: 17, cy: 46, r: 2, fill: '#C24E38', ph: 2.1 },
+        ],
       };
+
+    // Crowned, with two flamelets orbiting above.
     case tier.from >= 300:
       return {
-        scale: 1.03,
         amp: 1.1,
-        bodyFill: '#9A88DA',
-        bodyStroke: '#5B4AA0',
-        bodyWidth: 2.3,
-        coreFill: '#EAE2FA',
-        crown: { fill: '#E4C94B', stroke: '#5B4AA0' },
-        sparks: ['#DCD5F2', '#B9A9E8'],
+        crown: { fill: '#E4C94B', stroke: '#3E3070' },
+        parts: [
+          { k: 'flame', o: { cx: 20, baseY: 40, foot: 2.6, bulge: 3.4, waist: 1.7, tipY: 26 }, fill: '#B9A9E8', stroke: '#3E3070', sw: 1.7, ph: 1.1 },
+          { k: 'flame', o: { cx: 44, baseY: 40, foot: 2.6, bulge: 3.4, waist: 1.7, tipY: 26 }, fill: '#B9A9E8', stroke: '#3E3070', sw: 1.7, ph: 2.6 },
+          { k: 'flame', o: { foot: 7.2, bulge: 9.4, waist: 4.4, tipY: 19 }, fill: '#9A88DA', stroke: '#3E3070', sw: 2.3 },
+          { k: 'flame', o: { foot: 3.6, bulge: 4.8, waist: 2.3, tipY: 29 }, fill: '#E5DEFA', ph: 1.7 },
+        ],
       };
+
+    // A spire: taller and thinner still, throwing sparks.
     case tier.from >= 200:
       return {
-        scale: 1.02,
         amp: 1.05,
-        bodyFill: '#FFFFFF',
-        bodyStroke: '#7E8CA0',
-        bodyWidth: 2.3,
-        coreFill: '#EDF2F7',
-        flicks: '#B9C3CE',
-        sparks: ['#B9C3CE', '#7E8CA0'],
+        parts: [
+          { k: 'flame', o: { foot: 5.4, bulge: 6.8, waist: 2.8, tipY: 9 }, fill: '#CBD5E0', stroke: '#5E6B7A', sw: 2.2 },
+          { k: 'flame', o: { foot: 2.8, bulge: 3.6, waist: 1.7, tipY: 19 }, fill: '#FFFFFF', ph: 1.2 },
+          { k: 'star', cx: 44, cy: 24, r: 2.2, fill: '#FFFFFF', ph: 0.8 },
+          { k: 'star', cx: 20, cy: 29, r: 1.7, fill: '#CBD5E0', ph: 2.4 },
+        ],
       };
+
+    // A tall narrow column — the shape changes, not only the hue.
     case tier.from >= 100:
       return {
-        scale: 1,
         amp: 1,
-        bodyFill: '#7FB5E3',
-        bodyStroke: '#2E6FA3',
-        bodyWidth: 2.3,
-        coreFill: '#FFFFFF',
-        sparks: ['#7FB5E3'],
+        parts: [
+          { k: 'flame', o: { foot: 6.4, bulge: 8, waist: 3.6, tipY: 13 }, fill: '#6FA6DB', stroke: '#1F4A75', sw: 2.3 },
+          { k: 'flame', o: { foot: 3.2, bulge: 4.2, waist: 2, tipY: 24 }, fill: '#CDE8FF', ph: 1.4 },
+        ],
       };
+
+    // Three tongues: the fire starts splitting.
     case tier.from >= 50:
       return {
-        scale: 1,
         amp: 1,
-        bodyFill: '#FF9E52',
-        bodyStroke: '#27362B',
-        bodyWidth: 2.3,
-        coreFill: '#F6E7A2',
-        flicks: '#C24E38',
-        sparks: ['#E4C94B', '#FF9E52'],
+        parts: [
+          { k: 'flame', o: { cx: 24, foot: 4, bulge: 5.6, waist: 2.8, tipY: 29 }, fill: '#C24E38', stroke: '#27362B', sw: 2, ph: 2.2 },
+          { k: 'flame', o: { cx: 40, foot: 4, bulge: 5.6, waist: 2.8, tipY: 31 }, fill: '#C24E38', stroke: '#27362B', sw: 2, ph: 3.7 },
+          { k: 'flame', o: { foot: 8.4, bulge: 11.4, waist: 5.6, tipY: 21 }, fill: '#FF8A4A', stroke: '#27362B', sw: 2.4 },
+          { k: 'flame', o: { foot: 4.2, bulge: 5.8, waist: 2.9, tipY: 31 }, fill: '#FFD87A', ph: 1.6 },
+        ],
       };
+
+    // A flame with a heart. The coal is gone.
     case tier.from >= 20:
       return {
-        scale: 0.95,
         amp: 0.9,
-        bodyFill: '#FFC66B',
-        bodyStroke: '#27362B',
-        bodyWidth: 2.3,
-        coreFill: '#F6E7A2',
-        underline: '#C24E38',
+        parts: [
+          { k: 'flame', o: { foot: 8, bulge: 10.4, waist: 5.4, tipY: 25 }, fill: '#FFB05C', stroke: '#27362B', sw: 2.3 },
+          { k: 'flame', o: { foot: 4, bulge: 5.4, waist: 2.7, tipY: 33 }, fill: '#FBE59B', ph: 1.9 },
+        ],
       };
+
+    // Coal with the first wisp of actual fire on top.
     case tier.from >= 10:
       return {
-        scale: 0.88,
         amp: 0.8,
-        bodyFill: '#F6E7A2',
-        bodyStroke: '#27362B',
-        bodyWidth: 2.2,
-        coreFill: null,
+        parts: [
+          { k: 'flame', o: { foot: 4.5, bulge: 6, waist: 3, tipY: 30 }, fill: '#F6E7A2', stroke: '#D9832B', sw: 1.9, ph: 0.4 },
+          { k: 'dome', w: 10.5, h: 7, fill: '#E8A33A', stroke: '#27362B', sw: 2.2 },
+          { k: 'dome', w: 6, h: 4.4, fill: '#FBE59B' },
+        ],
       };
+
+    // A glowing coal. Still no flame.
     case tier.from >= 5:
       return {
-        scale: 0.82,
         amp: 0.7,
-        bodyFill: null,
-        bodyStroke: '#27362B',
-        bodyWidth: 2.2,
-        coreFill: null,
+        parts: [
+          { k: 'dome', w: 11, h: 8.5, fill: '#E8A33A', stroke: '#AC761C', sw: 2.2 },
+          { k: 'dome', w: 6.5, h: 5, fill: '#FBE59B' },
+          { k: 'star', cx: 38, cy: 34, r: 2, fill: '#E4C94B', ph: 1.1 },
+        ],
       };
+
+    // A star, not a small flame.
     case tier.from >= 1:
       return {
-        scale: 0.72,
-        amp: 0.6,
-        bodyFill: null,
-        bodyStroke: '#5D6F5C',
-        bodyWidth: 2,
-        coreFill: null,
+        amp: 0.9,
+        parts: [
+          { k: 'star', cx: 32, cy: 40, r: 7, fill: '#FCEBC0', stroke: '#C9A227', sw: 2 },
+          { k: 'star', cx: 41, cy: 31, r: 2.4, fill: '#E4C94B', ph: 1.6 },
+          { k: 'star', cx: 24, cy: 33, r: 1.8, fill: '#E4C94B', ph: 2.9 },
+        ],
       };
+
+    // Nothing burning yet: a cold coal, sketched in pencil.
     default:
       return {
-        scale: 0.78,
         amp: 0,
-        bodyFill: null,
-        bodyStroke: '#A5AF9E',
-        bodyWidth: 1.8,
-        dashed: true,
-        coreFill: null,
+        ghost: true,
+        parts: [{ k: 'dome', w: 9, h: 6, stroke: '#A5AF9E', sw: 1.8 }],
       };
   }
 }
 
-/** A smooth, endless ping-pong between 0 and 1. */
-function useBreath(duration: number, delay: number, still: boolean) {
-  const value = useSharedValue(0);
-  useEffect(() => {
-    if (still) {
-      value.value = 0;
-      return;
-    }
-    value.value = withDelay(
-      delay,
-      withRepeat(withTiming(1, { duration, easing: Easing.inOut(Easing.sin) }), -1, true)
-    );
-  }, [value, duration, delay, still]);
-  return value;
+/** The outline of one part at a moment in the cycle. */
+function pathFor(part: Part, t: number, amp: number): string {
+  'worklet';
+  if (part.k === 'flame') return flameShape(t, part.o, amp);
+  if (part.k === 'dome') return domeShape(t, part.w, part.h, amp);
+  return starShape(t, part.cx, part.cy, part.r, amp);
 }
 
-/** One ember drifting up off the flame and fading out. */
-function Spark({
-  color,
-  x,
-  size,
-  delay,
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+/**
+ * One piece of the fire. Each carries its own phase offset so the parts
+ * never swirl in lockstep — that is what stops a multi-part tier from
+ * reading as one rigid object.
+ */
+function FormPart({
+  part,
+  clock,
+  amp,
+  ghost,
+  still,
 }: {
-  color: string;
-  x: number;
-  size: number;
-  delay: number;
+  part: Part;
+  clock: SharedValue<number>;
+  amp: number;
+  ghost: boolean;
+  still: boolean;
 }) {
-  const rise = useSharedValue(0);
+  const phase = part.ph ?? 0;
 
-  useEffect(() => {
-    rise.value = withDelay(
-      delay,
-      withRepeat(withTiming(1, { duration: 2600, easing: Easing.out(Easing.quad) }), -1, false)
-    );
-  }, [rise, delay]);
-
-  const style = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: -rise.value * 15 * (size / 64) },
-      { translateX: Math.sin(rise.value * Math.PI * 1.4) * 3 * (size / 64) },
-      { scale: 1 - rise.value * 0.35 },
-    ],
-    opacity: rise.value < 0.2 ? rise.value / 0.2 : 1 - (rise.value - 0.2) / 0.8,
+  const animatedProps = useAnimatedProps(() => ({
+    d: pathFor(part, clock.value + phase, amp),
   }));
 
-  const dot = Math.max(3, size * 0.055);
+  const visual = {
+    fill: ghost ? 'none' : (part.fill ?? 'none'),
+    stroke: part.stroke,
+    strokeWidth: part.sw,
+    strokeLinejoin: 'round' as const,
+    strokeDasharray: ghost ? '5 4' : undefined,
+    opacity: ghost ? 0.8 : 1,
+  };
 
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        {
-          position: 'absolute',
-          left: (x / 64) * size - dot / 2,
-          top: size * 0.42,
-          width: dot,
-          height: dot,
-        },
-        style,
-      ]}>
-      <Svg width={dot} height={dot} viewBox="0 0 8 8">
-        <Circle cx={4} cy={4} r={3.4} fill={color} />
-      </Svg>
-    </Animated.View>
-  );
+  if (still) return <Path d={pathFor(part, phase, amp)} {...visual} />;
+  return <AnimatedPath animatedProps={animatedProps} {...visual} />;
 }
 
 interface Props {
   tier: FireTier;
   /** Rendered size in px, square. */
   size?: number;
-  /** False draws the unlit pencil ghost, perfectly still. */
+  /** False draws the unlit cold coal, perfectly still. */
   lit?: boolean;
 }
 
@@ -323,25 +323,36 @@ export function DoodleFlame({ tier, size = 72, lit = true }: Props) {
   const reduced = useReducedMotion();
   const still = !lit || !!reduced;
 
-  const skin = lit ? skinFor(tier) : skinFor({ ...tier, from: -1 } as FireTier);
+  const form = lit ? formFor(tier) : formFor({ ...tier, from: -1 } as FireTier);
 
-  // One clock, running 0 to 2π forever. Every wobble is an integer
+  // One clock, running 0 to 2*pi forever. Every wobble is an integer
   // harmonic of it, so the loop closes without a seam.
-  const t = useSharedValue(0);
+  const clock = useSharedValue(0);
   useEffect(() => {
     if (still) {
-      t.value = 0;
+      clock.value = 0;
       return;
     }
-    t.value = withRepeat(
+    clock.value = withRepeat(
       withTiming(TAU, { duration: SWIRL_MS, easing: Easing.linear }),
       -1,
       false
     );
-  }, [t, still]);
+  }, [clock, still]);
 
-  // A slow lean on top, so the flame is not perfectly centred forever.
-  const sway = useBreath(3100, 0, still);
+  // A slow lean, so the whole fire is not pinned dead centre.
+  const sway = useSharedValue(0);
+  useEffect(() => {
+    if (still) {
+      sway.value = 0;
+      return;
+    }
+    sway.value = withRepeat(
+      withTiming(1, { duration: 3100, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true
+    );
+  }, [sway, still]);
 
   const swayStyle = useAnimatedStyle(() => ({
     transform: [
@@ -350,25 +361,16 @@ export function DoodleFlame({ tier, size = 72, lit = true }: Props) {
     ],
   }));
 
-  const bodyProps = useAnimatedProps(() => ({
-    d: flameOutline(t.value, 1, skin.amp),
-  }));
-
-  const coreProps = useAnimatedProps(() => ({
-    d: coreOutline(t.value * 1.6 + 2, skin.amp),
-  }));
-
-  const transform = `translate(32 34) scale(${skin.scale}) translate(-32 -34)`;
-
   return (
     <View style={[styles.wrap, { width: size, height: size }]}>
-      {skin.rays ? (
+      {form.rays ? (
         <Svg width={size} height={size} viewBox="0 0 64 64" style={StyleSheet.absoluteFill}>
           <Path
-            d="M13 20l3.4 3.4M51 20l-3.4 3.4M7 36h5M52 36h5M15 51l3.2-3.2M49 51l-3.2-3.2"
-            stroke={skin.rays}
+            d={RAYS}
+            stroke={form.rays}
             strokeWidth={2}
             strokeLinecap="round"
+            fill="none"
             opacity={0.85}
           />
         </Svg>
@@ -376,69 +378,30 @@ export function DoodleFlame({ tier, size = 72, lit = true }: Props) {
 
       <Animated.View style={[StyleSheet.absoluteFill, swayStyle]}>
         <Svg width={size} height={size} viewBox="0 0 64 64">
-          {still ? (
-            <Path
-              d={flameOutline(0, 1, skin.amp)}
-              transform={transform}
-              fill={skin.bodyFill ?? 'none'}
-              stroke={skin.bodyStroke}
-              strokeWidth={skin.bodyWidth}
-              strokeLinejoin="round"
-              strokeDasharray={skin.dashed ? '5 4' : undefined}
-              opacity={skin.dashed ? 0.8 : 1}
+          {form.parts.map((part, i) => (
+            <FormPart
+              key={i}
+              part={part}
+              clock={clock}
+              amp={form.amp}
+              ghost={!!form.ghost}
+              still={still}
             />
-          ) : (
-            <AnimatedPath
-              animatedProps={bodyProps}
-              transform={transform}
-              fill={skin.bodyFill ?? 'none'}
-              stroke={skin.bodyStroke}
-              strokeWidth={skin.bodyWidth}
-              strokeLinejoin="round"
-            />
-          )}
-
-          {skin.coreFill && !still ? (
-            <AnimatedPath animatedProps={coreProps} transform={transform} fill={skin.coreFill} />
-          ) : null}
+          ))}
         </Svg>
       </Animated.View>
 
-      <Svg width={size} height={size} viewBox="0 0 64 64" style={StyleSheet.absoluteFill}>
-        {skin.crown ? (
+      {form.crown ? (
+        <Svg width={size} height={size} viewBox="0 0 64 64" style={StyleSheet.absoluteFill}>
           <Path
             d={CROWN}
-            fill={skin.crown.fill}
-            stroke={skin.crown.stroke}
+            fill={form.crown.fill}
+            stroke={form.crown.stroke}
             strokeWidth={1.6}
             strokeLinejoin="round"
           />
-        ) : null}
-        {skin.underline ? (
-          <Path
-            d="M24 53c4.5 1.6 11.5 1.6 16 0"
-            stroke={skin.underline}
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            fill="none"
-          />
-        ) : null}
-        {skin.flicks ? (
-          <Path
-            d="M22 41c-2-.5-3.2-1.6-3.6-2.8M42 41c2-.5 3.2-1.6 3.6-2.8"
-            stroke={skin.flicks}
-            strokeWidth={1.8}
-            strokeLinecap="round"
-            fill="none"
-          />
-        ) : null}
-      </Svg>
-
-      {!still && skin.sparks
-        ? skin.sparks.map((color, i) => (
-            <Spark key={i} color={color} x={[22, 43, 33][i % 3]} size={size} delay={i * 850} />
-          ))
-        : null}
+        </Svg>
+      ) : null}
     </View>
   );
 }

@@ -13,7 +13,7 @@ jest.mock('@/lib/sfx', () => ({
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { AchievementSticker } from '@/components/AchievementSticker';
-import { DoodleFlame, coreOutline, flameOutline } from '@/components/DoodleFlame';
+import { DoodleFlame, domeShape, flameShape, starShape } from '@/components/DoodleFlame';
 import {
   ACHIEVEMENTS,
   FAMILY_ORDER,
@@ -103,15 +103,23 @@ describe('the doodle flame', () => {
   });
 
   /**
-   * The outline is generated per frame rather than picked from a set of
-   * drawings, which is what removes the frame-rate ceiling. These guard
-   * the generator: it must stay a closed path, stay inside the 64-unit
-   * box, and actually differ from moment to moment.
+   * The outlines are generated per frame rather than picked from a set
+   * of drawings, which is what removes the frame-rate ceiling. These
+   * guard the three generators: closed paths, inside the box, different
+   * at every moment, and seamless where the loop wraps.
    */
-  it('draws a closed path that stays inside the box', () => {
+  const FLAME = { foot: 8.4, bulge: 11.4, waist: 5.6, tipY: 21 };
+
+  it('draws closed paths that stay inside the box', () => {
     for (let i = 0; i < 24; i++) {
       const t = (i / 24) * Math.PI * 2;
-      for (const d of [flameOutline(t, 1, 1), coreOutline(t, 1)]) {
+      const shapes = [
+        flameShape(t, FLAME, 1),
+        flameShape(t, { foot: 5.4, bulge: 6.8, waist: 2.8, tipY: 9 }, 1),
+        domeShape(t, 11, 8.5, 1),
+        starShape(t, 32, 40, 7, 1),
+      ];
+      for (const d of shapes) {
         expect(d.startsWith('M')).toBe(true);
         expect(d.endsWith('Z')).toBe(true);
         const numbers = d.match(/-?\d+(\.\d+)?/g)!.map(Number);
@@ -123,15 +131,39 @@ describe('the doodle flame', () => {
 
   it('is a different shape at every moment of the swirl', () => {
     const shapes = new Set<string>();
-    for (let i = 0; i < 60; i++) shapes.add(flameOutline((i / 60) * Math.PI * 2, 1, 1));
+    for (let i = 0; i < 60; i++) shapes.add(flameShape((i / 60) * Math.PI * 2, FLAME, 1));
     expect(shapes.size).toBe(60);
   });
 
   it('closes its loop seamlessly, so the swirl never jumps', () => {
-    expect(flameOutline(0, 1, 1)).toBe(flameOutline(Math.PI * 2, 1, 1));
+    expect(flameShape(0, FLAME, 1)).toBe(flameShape(Math.PI * 2, FLAME, 1));
+    expect(domeShape(0, 11, 8.5, 1)).toBe(domeShape(Math.PI * 2, 11, 8.5, 1));
+    expect(starShape(0, 32, 40, 7, 1)).toBe(starShape(Math.PI * 2, 32, 40, 7, 1));
   });
 
   it('holds still when the streak is unlit', () => {
-    expect(flameOutline(1.2, 1, 0)).toBe(flameOutline(4.8, 1, 0));
+    expect(flameShape(1.2, FLAME, 0)).toBe(flameShape(4.8, FLAME, 0));
+  });
+
+  /**
+   * The whole point of the tier forms: a spark is a star, an ember is a
+   * coal, and the fire keeps gaining parts. If two tiers ever collapse
+   * onto the same silhouette again, this fails.
+   */
+  it('gives every tier its own form, not just its own colour', () => {
+    const trees = FIRE_TIERS.map((tier) => {
+      const t = mount(<DoodleFlame tier={tier} size={64} lit />);
+      const json = JSON.stringify(t.toJSON());
+      unmount(t);
+      // count the drawn parts, and how tall the tallest one reaches
+      const paths = json.match(/"d":"[^"]+"/g) ?? [];
+      return { from: tier.from, parts: paths.length };
+    });
+
+    // fire is built from more pieces the longer it has burned
+    expect(trees[0].parts).toBeLessThan(trees[trees.length - 1].parts);
+    // and no two neighbouring tiers are the same recipe
+    const distinct = new Set(trees.map((x) => x.parts + ':' + x.from));
+    expect(distinct.size).toBe(FIRE_TIERS.length);
   });
 });
