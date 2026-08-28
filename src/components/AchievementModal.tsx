@@ -17,6 +17,13 @@ interface Props {
   index?: number;
   /** True when showing a locked tile that was tapped. */
   locked?: boolean;
+  /**
+   * True only when this is the moment a sticker is *earned*. Re-reading
+   * one you already keep opens the same card, and a fanfare there both
+   * cheapens the real thing and collides with the peel sound the album
+   * plays on the way in.
+   */
+  celebrate?: boolean;
   onNext?: () => void;
   onClose: () => void;
 }
@@ -30,6 +37,7 @@ export function AchievementModal({
   unlocks,
   index = 0,
   locked,
+  celebrate = false,
   onNext,
   onClose,
 }: Props) {
@@ -38,10 +46,10 @@ export function AchievementModal({
   const hasMore = index < unlocks.length - 1;
 
   useEffect(() => {
-    if (visible && !locked) {
+    if (visible && !locked && celebrate) {
       playSfx('achievement');
     }
-  }, [visible, index, locked]);
+  }, [visible, index, locked, celebrate]);
 
   return (
     <Modal

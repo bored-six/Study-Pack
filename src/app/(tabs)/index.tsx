@@ -283,6 +283,7 @@ export default function HomeScreen() {
 
       <AchievementModal
         visible={revealing}
+        celebrate
         unlocks={pending}
         index={revealIndex}
         onNext={() => setRevealIndex((i) => i + 1)}

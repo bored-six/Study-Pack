@@ -355,6 +355,7 @@ function DebugFabInner() {
 
       <AchievementModal
         visible={showReveal}
+        celebrate
         unlocks={reveal}
         onClose={() => setShowReveal(false)}
       />
