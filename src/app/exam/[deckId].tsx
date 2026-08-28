@@ -464,7 +464,10 @@ export default function ExamSetupScreen() {
                 // an odd count leaves the last one room to breathe
                 wide={i === MODE_ORDER.length - 1 && MODE_ORDER.length % 2 === 1}
                 last={id === lastMode}
-                onPress={() => setPeek(id)}
+                onPress={() => {
+                  playSfx('cartridge_click');
+                  setPeek(id);
+                }}
               />
             ))}
           </View>

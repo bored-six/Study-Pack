@@ -27,7 +27,14 @@ const SOURCES = {
   brief_enumeration: require('../../assets/sfx/brief_enumeration.wav'),
   derp_boing: require('../../assets/sfx/derp_boing.wav'),
   derp_pop: require('../../assets/sfx/derp_pop.wav'),
-  victory_derp: require('../../assets/sfx/victory_derp.wav'),
+  achievement: require('../../assets/sfx/achievement.wav'),
+  tier_up: require('../../assets/sfx/tier_up.wav'),
+  sticker_peel: require('../../assets/sfx/sticker_peel.wav'),
+  streak_keep: require('../../assets/sfx/streak_keep.wav'),
+  cartridge_click: require('../../assets/sfx/cartridge_click.wav'),
+  album_open: require('../../assets/sfx/album_open.wav'),
+  day_tap: require('../../assets/sfx/day_tap.wav'),
+  tab_flip: require('../../assets/sfx/tab_flip.wav'),
 } as const;
 
 export type SfxName = keyof typeof SOURCES;

@@ -39,7 +39,7 @@ export function AchievementModal({
 
   useEffect(() => {
     if (visible && !locked) {
-      playSfx('victory_derp');
+      playSfx('achievement');
     }
   }, [visible, index, locked]);
 

@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,9 +13,14 @@ import { daysToNextTier, fireFor, FIRE_TIERS } from '@/lib/fire';
 import { masteryLabel } from '@/lib/mastery';
 import { useAchievementsStore } from '@/store/achievements';
 import { dayKey, useProgressStore } from '@/store/progress';
+import { playSfx } from '@/lib/sfx';
+import { readSetting, writeSetting } from '@/lib/db';
 import { subjectInkFor } from '@/theme/tokens';
 import { derpRadius, font, outline, shadow, tabClearance, useThemeStore, getColors } from '@/theme/tokens';
 import { useNotesStore } from '@/store/notes';
+
+/** The highest fire tier the student has already been played a chime for. */
+const TIER_SEEN_KEY = 'fire_tier_heard';
 
 /** Days shown on the chart: 12 weeks, so it always fills the width. */
 const CHART_WEEKS = 12;
@@ -65,16 +70,44 @@ export default function ProgressScreen() {
   const { unlocked, refresh: refreshAchievements } = useAchievementsStore();
   const { subjects: noteDecks, refresh: refreshNotes } = useNotesStore();
 
+  // Tab screens stay mounted, so the fire must be told when nobody is
+  // looking at it — otherwise it animates behind Decks and Planner too.
+  const [focused, setFocused] = useState(true);
+
   const [viewing, setViewing] = useState<Unlock | null>(null);
   const [pickedDay, setPickedDay] = useState<Day | null>(null);
 
   useFocusEffect(
     useCallback(() => {
+      setFocused(true);
       void refresh();
       void refreshAchievements();
       void refreshNotes();
+      return () => setFocused(false);
     }, [refresh, refreshAchievements, refreshNotes])
   );
+
+  /**
+   * The fire growing a stage is worth hearing, but only the first time.
+   * The highest tier already heard is remembered so re-opening Progress
+   * is silent.
+   */
+  useEffect(() => {
+    if (status !== 'ready') return;
+    let cancelled = false;
+    void (async () => {
+      const reached = fireFor(currentStreak).from;
+      const seen = Number((await readSetting(TIER_SEEN_KEY)) ?? -1);
+      if (cancelled) return;
+      if (reached > seen) {
+        await writeSetting(TIER_SEEN_KEY, String(reached));
+        if (reached > 0 && seen >= 0) playSfx('tier_up');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [status, currentStreak]);
 
   const iconFor = useMemo(() => {
     const map = new Map<string, string>();
@@ -187,7 +220,7 @@ export default function ProgressScreen() {
             {/* ---- the streak ---- */}
             <View style={styles.streakCard}>
               <View style={styles.flameWrap}>
-                <DoodleFlame tier={fire} size={72} lit={currentStreak > 0} />
+                <DoodleFlame tier={fire} size={72} lit={currentStreak > 0} active={focused} />
               </View>
               <View style={styles.streakText}>
                 <Text style={styles.streakDays}>
@@ -263,7 +296,10 @@ export default function ProgressScreen() {
                       {col.map((day) => (
                         <Pressable
                           key={day.key}
-                          onPress={() => setPickedDay(day)}
+                          onPress={() => {
+                            playSfx('day_tap');
+                            setPickedDay(day);
+                          }}
                           accessibilityLabel={`${day.key}, ${day.count} rounds`}
                           style={[
                             styles.cell,
@@ -325,7 +361,10 @@ export default function ProgressScreen() {
             </View>
 
             <Pressable
-              onPress={() => router.push('/album')}
+              onPress={() => {
+                playSfx('album_open');
+                router.push('/album');
+              }}
               accessibilityLabel="Open the album"
               style={({ pressed }) => [styles.albumStrip, pressed && { opacity: 0.85 }]}>
               {recentStickers(unlocked).map((entry) => (

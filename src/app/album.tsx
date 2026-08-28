@@ -14,6 +14,7 @@ import {
   type AchievementDef,
   type Unlock,
 } from '@/lib/achievements';
+import { playSfx } from '@/lib/sfx';
 import { useAchievementsStore } from '@/store/achievements';
 import { derpRadius, font, outline, shadow, useThemeStore, getColors } from '@/theme/tokens';
 
@@ -70,7 +71,14 @@ export default function AlbumScreen() {
     return (
       <Pressable
         key={def.id}
-        onPress={() => (unlock ? setViewing(unlock) : setLockedTapped(true))}
+        onPress={() => {
+          if (unlock) {
+            playSfx('sticker_peel');
+            setViewing(unlock);
+          } else {
+            setLockedTapped(true);
+          }
+        }}
         accessibilityLabel={unlock ? def.title : 'Locked sticker'}
         style={({ pressed }) => [styles.slot, pressed && { opacity: 0.75 }]}>
         <AchievementSticker

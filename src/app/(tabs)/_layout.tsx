@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, StyleSheet } from 'react-native';
 
 import { Icon } from '@/components/Icon';
+import { playSfx } from '@/lib/sfx';
 import { font, getColors, useThemeStore, outline, shadow } from '@/theme/tokens';
 import { BouncyPressable } from '@/components/BouncyPressable';
 
@@ -48,6 +49,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           });
 
           if (!isFocused && !event.defaultPrevented) {
+            playSfx('tab_flip');
             navigation.navigate(route.name, route.params);
           }
         };
