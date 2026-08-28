@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 
 import { Icon, type IconName } from '@/components/Icon';
 import type { ModeSpec } from '@/lib/mode';
-import { font, getColors, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, onWash, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 /**
  * The mode's badge, wherever it has to appear.
@@ -234,7 +234,8 @@ const getStyles = (colors: any) =>
     detail: {
       fontFamily: font.bodySemibold,
       fontSize: 10.5,
-      color: colors.textDim,
+      // the crest is painted with the mode's wash, so this leaves the theme
+      color: onWash.dim,
     },
     detailBanner: {
       fontSize: 12,

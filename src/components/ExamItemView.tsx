@@ -28,7 +28,7 @@ import type {
   TypedItem,
 } from '@/lib/exam';
 import { checkAnswer, checkEnumeration } from '@/lib/grade';
-import { candy, font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { candy, font, getColors, onWash, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   item: ExamItem;
@@ -634,13 +634,18 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
                 style={({ pressed }) => [
                   styles.matchChip,
                   activeTerm === i && styles.matchActive,
-                  paired && !checked && { backgroundColor: tone.wash, borderColor: tone.ink },
+                  paired && !checked && {
+                    backgroundColor: tone.wash,
+                    borderColor: tone.ink,
+                  },
                   good && styles.optionGood,
                   bad && styles.optionBad,
                   pressed && !checked && styles.pressed,
                 ]}>
                 <View style={styles.matchTextWrap}>
-                  <Text style={styles.matchText} numberOfLines={2}>
+                  <Text
+                    style={[styles.matchText, paired && !checked && styles.matchTextOnWash]}
+                    numberOfLines={2}>
                     {term}
                   </Text>
                   {bad ? <PenStrike color={colors.coral} /> : null}
@@ -676,7 +681,9 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
                   activeTerm != null && !takenMeanings.has(j) && !checked && styles.matchInviting,
                   pressed && styles.pressed,
                 ]}>
-                <Text style={styles.matchText} numberOfLines={3}>
+                <Text
+                  style={[styles.matchText, tone && !checked && styles.matchTextOnWash]}
+                  numberOfLines={3}>
                   {meaning}
                 </Text>
               </Pressable>
@@ -1193,6 +1200,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 16.5,
     color: colors.text,
+  },
+  /** A paired chip is painted with the pair's wash, so its text leaves the theme. */
+  matchTextOnWash: {
+    color: onWash.ink,
   },
   matchNum: {
     fontFamily: font.bodyHeavy,

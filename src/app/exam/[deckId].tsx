@@ -29,7 +29,7 @@ import { FORMAT_HOWTO, FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib
 import { estimateLabel, MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
 import { playSfx } from '@/lib/sfx';
 import { useExamStore } from '@/store/exam';
-import { derpRadius, font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { derpRadius, font, getColors, onWash, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 /** A drill sent here by the results note asks for this many of one format. */
 const DRILL_COUNT = 12;
@@ -113,11 +113,15 @@ function FormatChip({
           </Animated.View>
         </View>
         <Text
-          style={[styles.chipName, on && styles.chipNameOn, off && styles.chipTextOff]}
+          style={[
+            styles.chipName,
+            on && styles.chipNameOn,
+            off && styles.chipTextOff,
+          ]}
           numberOfLines={2}>
           {FORMAT_LABEL[format]}
         </Text>
-        <Text style={[styles.chipRoom, off && styles.chipTextOff]}>
+        <Text style={[styles.chipRoom, on && styles.chipRoomOn, off && styles.chipTextOff]}>
           {off ? 'not in these notes' : `${max} ready`}
         </Text>
       </Pressable>
@@ -818,7 +822,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.textDim,
   },
   chipNameOn: {
-    color: colors.text,
+    color: onWash.ink,
+  },
+  chipRoomOn: {
+    color: onWash.faint,
   },
   chipRoom: {
     fontFamily: font.bodySemibold,
@@ -974,7 +981,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontFamily: font.bodySemibold,
     fontSize: 9.5,
     lineHeight: 12,
-    color: colors.textDim,
+    color: onWash.dim,
     textAlign: 'center',
   },
   cartTagWide: { textAlign: 'left', fontSize: 11, lineHeight: 14 },
@@ -1031,7 +1038,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontFamily: font.bodySemibold,
     fontSize: 12.5,
     lineHeight: 17,
-    color: colors.textDim,
+    color: onWash.dim,
     textAlign: 'center',
   },
   peekDials: {

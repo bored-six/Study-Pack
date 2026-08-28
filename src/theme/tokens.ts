@@ -109,6 +109,26 @@ export const getColors = (isDark: boolean) => isDark ? darkColors : lightColors;
 export const colors = lightColors; // Fallback for static files
 
 
+/**
+ * Text sitting on a wash.
+ *
+ * The washes — candy, subjectPalette, a mode's own colour, a format's
+ * badge — are fixed pastels in both themes, because a subject's colour is
+ * its identity and not a surface that follows the page. That means text on
+ * top of one can never take its colour from the theme: in dark mode
+ * `colors.text` is near-white, and a ticked type chip came out white on
+ * mint. Use these instead of `colors.text` / `textDim` / `textFaint`
+ * anywhere a wash is the background.
+ */
+export const onWash = {
+  /** Titles and anything that has to be read at a glance. */
+  ink: '#1A211C',
+  /** Supporting lines — taglines, captions. */
+  dim: '#4A5348',
+  /** Counts and asides. Still clears 4.5:1 on every wash in use. */
+  faint: '#5F6A5C',
+} as const;
+
 /** Candy washes rotated across deck cards for sticker-sheet variety. */
 export const candy = [
   { wash: '#DDF3DC', ink: '#2C8A4A' }, // mint
