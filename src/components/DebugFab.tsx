@@ -73,6 +73,10 @@ function DebugFabInner() {
   const pan = useMemo(
     () =>
       PanResponder.create({
+        // Claim the touch immediately. Only asking for it on movement
+        // means a plain tap is never granted, so the release handler --
+        // and with it the whole button -- never fires.
+        onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4,
         onPanResponderGrant: () => {
           dragged.current = false;
@@ -83,16 +87,10 @@ function DebugFabInner() {
           const y = Math.min(Math.max(insets.top, posRef.current.y + g.dy), screen.height - 90);
           setPos({ x, y });
         },
-        onPanResponderRelease: (_e, g) => {
-          setPos((p) => ({
-            x: Math.min(Math.max(0, p.x + 0), screen.width - 54),
-            y: p.y,
-          }));
-          // a tap, not a drag
-          if (!dragged.current && Math.abs(g.dx) < 5 && Math.abs(g.dy) < 5) {
-            setOpen((o) => !o);
-          }
+        onPanResponderRelease: () => {
+          if (!dragged.current) setOpen((o) => !o);
         },
+        onPanResponderTerminationRequest: () => false,
       }),
     [insets.top, screen.height, screen.width]
   );

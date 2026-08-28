@@ -27,6 +27,7 @@ const SOURCES = {
   brief_enumeration: require('../../assets/sfx/brief_enumeration.wav'),
   derp_boing: require('../../assets/sfx/derp_boing.wav'),
   derp_pop: require('../../assets/sfx/derp_pop.wav'),
+  victory_derp: require('../../assets/sfx/victory_derp.wav'),
 } as const;
 
 export type SfxName = keyof typeof SOURCES;
