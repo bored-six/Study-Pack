@@ -188,6 +188,12 @@ export function SubjectSheet({ visible, subject, onClose, onSave, onDelete }: Pr
                     <Pressable
                       key={glyph}
                       onPress={() => setIcon(active ? null : glyph)}
+                      accessibilityRole="button"
+                      // The cell is a picture and nothing else, so without a
+                      // label there are 43 buttons here that all read as
+                      // "button" — and no way to tell which one is chosen.
+                      accessibilityLabel={glyph}
+                      accessibilityState={{ selected: active }}
                       style={[styles.iconCell, active && styles.iconCellActive]}>
                       <Icon
                         name={glyph}

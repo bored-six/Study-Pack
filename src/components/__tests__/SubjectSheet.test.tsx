@@ -2,7 +2,6 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { Text, TextInput } from 'react-native';
 
 import { SubjectSheet } from '../SubjectSheet';
-import { Icon } from '../Icon';
 import { ChunkyButton } from '../ChunkyButton';
 import type { Deck } from '@/lib/types';
 
@@ -35,11 +34,25 @@ function open(deck: Deck = subject) {
   });
 
   /** The glyph names currently offered in the grid (the preview aside). */
+  /**
+   * The glyphs on the shelf that is showing.
+   *
+   * This used to take every Icon on screen and drop index 0 for the header
+   * preview, which quietly counted the trash icon in the Delete row as a
+   * shelf glyph and made School read as 15. Going by the cells themselves
+   * counts the grid and nothing else.
+   */
   const gridIcons = () =>
     tree.root
-      .findAllByType(Icon)
-      .map((node) => node.props.name as string)
-      .slice(1); // index 0 is the header preview
+      .findAll(
+        (node) =>
+          node.props?.accessibilityRole === 'button' &&
+          'selected' in (node.props?.accessibilityState ?? {}),
+        // Pressable passes its props down through several layers, so without
+        // this every cell is counted once per layer.
+        { deep: false }
+      )
+      .map((node) => node.props.accessibilityLabel as string);
 
   const press = (node: ReactTestInstance) => act(() => node.props.onPress());
 
