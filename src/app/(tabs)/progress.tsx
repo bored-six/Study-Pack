@@ -119,6 +119,14 @@ export default function ProgressScreen() {
     return cols;
   }, [days]);
 
+  /** One contribution is one finished round — a quiz or an exam sitting. */
+  const chartTotal = useMemo(() => days.reduce((sum, d) => sum + d.count, 0), [days]);
+  const activeDays = useMemo(() => days.filter((d) => d.count > 0).length, [days]);
+  const busiest = useMemo(
+    () => days.reduce((best, d) => (d.count > best ? d.count : best), 0),
+    [days]
+  );
+
   const monthMarks = useMemo(() => {
     const marks: { label: string; column: number }[] = [];
     let last = '';
@@ -205,6 +213,14 @@ export default function ProgressScreen() {
             </View>
 
             <View style={styles.chartCard}>
+              <Text style={styles.chartTotal}>
+                {chartTotal} {chartTotal === 1 ? 'round' : 'rounds'} in 12 weeks
+              </Text>
+              <Text style={styles.chartSub}>
+                {activeDays} {activeDays === 1 ? 'day' : 'days'} studied
+                {busiest > 0 ? ` · busiest ${busiest} in a day` : ''}
+              </Text>
+
               {pickedDay ? (
                 <Pressable style={styles.dayPop} onPress={() => setPickedDay(null)}>
                   <Text style={styles.dayPopDate}>
@@ -252,7 +268,9 @@ export default function ProgressScreen() {
                           style={[
                             styles.cell,
                             day.level > 0 && { backgroundColor: heatColor(day.level, colors) },
+                            day.level >= 3 && styles.cellHot,
                             day.isToday && styles.cellToday,
+                            pickedDay?.key === day.key && styles.cellPicked,
                           ]}>
                           {pinnedDays.has(day.key) ? <View style={styles.pin} /> : null}
                         </Pressable>
@@ -549,6 +567,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     ...shadow.card,
     transform: [{ rotate: '-0.3deg' }],
   },
+  chartTotal: {
+    fontFamily: font.hero,
+    fontSize: 20,
+    lineHeight: 23,
+    color: colors.text,
+  },
+  chartSub: {
+    fontFamily: font.bodySemibold,
+    fontSize: 10.5,
+    color: colors.textFaint,
+    marginBottom: 8,
+  },
   monthRow: {
     height: 13,
     marginLeft: 16,
@@ -597,6 +627,14 @@ const getStyles = (colors: any) => StyleSheet.create({
   cellToday: {
     borderWidth: 2,
     borderColor: colors.coral,
+  },
+  // Busy days lift off the page slightly, so weight reads before hue.
+  cellHot: {
+    boxShadow: '0 0 4px rgba(79, 178, 106, 0.55)',
+  },
+  cellPicked: {
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
   pin: {
     width: 7,
