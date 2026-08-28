@@ -66,7 +66,29 @@ export interface ModeSpec {
   hud: HudKind;
   /** Heading on the card at the end — a survival run is not a report card. */
   reportTitle: string;
+  /** How the sitting closes, before the card arrives. */
+  outro: OutroKind;
 }
+
+/**
+ * The last beat of a sitting.
+ *
+ * Every mode used to end the same way — the page tears upward and the
+ * report card slides in — which made clearing a mastery pile feel exactly
+ * like running out of lives. The ending is the most emotional half-second
+ * in the app and it was the one part that did not know which game it was.
+ */
+export type OutroKind =
+  /** The page tears off the pad. */
+  | 'tear'
+  /** The last card lifts off, and the pile is gone. */
+  | 'pile'
+  /** The fuse reaches the end. */
+  | 'burnout'
+  /** The paper is sealed and stamped. */
+  | 'seal'
+  /** The last heart breaks. */
+  | 'lastheart';
 
 /** The stage's stationery — what the paper under the question looks like. */
 export type PaperStock = 'ruled' | 'grid' | 'ticket' | 'foolscap' | 'card';
@@ -94,6 +116,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     countsHint: 'How many pages you sit, once each.',
     hud: 'pages',
     reportTitle: 'REPORT CARD',
+    outro: 'tear',
     autoBuild: false,
   },
   mastery: {
@@ -115,6 +138,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     countsHint: 'How many go in the pile. Each one comes back until it sticks.',
     hud: 'pile',
     reportTitle: 'THE PILE',
+    outro: 'pile',
     autoBuild: false,
   },
   rapid: {
@@ -136,6 +160,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     countsHint: 'How many tickets. Each one has its own countdown.',
     hud: 'fuse',
     reportTitle: 'TIME SHEET',
+    outro: 'burnout',
     autoBuild: false,
   },
   simulation: {
@@ -157,6 +182,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     countsHint: 'How long the paper is. You can go back and change answers.',
     hud: 'paper',
     reportTitle: 'MARKED PAPER',
+    outro: 'seal',
     autoBuild: false,
   },
   survival: {
@@ -178,6 +204,7 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     countsHint: 'Survival deals its own questions — nothing to choose.',
     hud: 'lives',
     reportTitle: 'HOW FAR YOU GOT',
+    outro: 'lastheart',
     autoBuild: true,
   },
 };

@@ -34,6 +34,7 @@ import { ExamItemView } from '@/components/ExamItemView';
 import { ExamSheet } from '@/components/ExamSheet';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
 import { ModeCrest } from '@/components/ModeCrest';
+import { ModeOutro } from '@/components/ModeOutro';
 import { ModeHud, clockText } from '@/components/ModeHud';
 import { DayTint, EmberDrift, type DeskMood } from '@/components/deskdress';
 import { Icon } from '@/components/Icon';
@@ -205,27 +206,54 @@ export default function ExamRunScreen() {
     setItemDeadline(Date.now() + questionSeconds(item.format) * 1000);
   }, [spec.clock, item, visits, waitingOnBriefing]);
 
-  const flyOff = useSharedValue(0);
+  /**
+   * The last five seconds of a sprint, out loud.
+   *
+   * Only under a per-question clock, only in the final five, and once per
+   * second — a tick every frame is a smoke alarm, and a tick through a
+   * whole question is exhausting. Keyed on the deadline as well as the
+   * count, so two questions in a row can both tick at five.
+   */
+  const tickedAt = useRef<string | null>(null);
+  useEffect(() => {
+    if (spec.clock !== 'per_question' || itemDeadline == null) return;
+    const left = Math.ceil((itemDeadline - now) / 1000);
+    if (left > 5 || left <= 0) return;
+    const beat = `${itemDeadline}:${left}`;
+    if (tickedAt.current === beat) return;
+    tickedAt.current = beat;
+    playSfx('tick');
+  }, [now, itemDeadline, spec.clock]);
 
-  const finished = useCallback(
-    (next: 'next' | 'finished') => {
-      tapThud();
-      if (next === 'finished') {
-        // The last page tears off before the report card arrives.
-        flyOff.value = withTiming(1, { duration: 300, easing: Easing.in(Easing.quad) });
-        setTimeout(() => router.replace('/exam/results'), 320);
-      }
-    },
-    [flyOff]
-  );
+  const finished = useCallback((_next: 'next' | 'finished') => {
+    // The ending itself is driven off `status`, so a sitting that ends any
+    // other way — a submitted paper, a whole-paper clock running out — gets
+    // the same send-off as one that ends on a last answer.
+    tapThud();
+  }, []);
 
-  const flyStyle = useAnimatedStyle(() => ({
-    opacity: 1 - flyOff.value,
-    transform: [
-      { translateY: flyOff.value * -700 },
-      { rotate: `${flyOff.value * -6}deg` },
-    ],
-  }));
+  /**
+   * Leaves for the report card, once and only once.
+   *
+   * This used to be a bare effect on `status === 'finished'`, which fired
+   * the instant the store flipped and navigated out from under the page
+   * tear — so the ending animation had been dead in practice. The outro now
+   * says when it is safe to go, and this only guarantees it happens.
+   */
+  const leaving = status === 'finished';
+  const navigated = useRef(false);
+  const goResults = useCallback(() => {
+    if (navigated.current) return;
+    navigated.current = true;
+    router.replace('/exam/results');
+  }, []);
+
+  // A backstop, in case the animation never reports back.
+  useEffect(() => {
+    if (!leaving) return;
+    const timer = setTimeout(goResults, 1400);
+    return () => clearTimeout(timer);
+  }, [leaving, goResults]);
 
   const handleDone = useCallback(
     (correct: boolean) => {
@@ -278,13 +306,6 @@ export default function ExamRunScreen() {
     void store.answer(false, true).then(finished);
   }, [now, itemDeadline, spec.clock, store, finished]);
 
-  // The sitting ended while this screen was still up. Its own navigation is
-  // already in flight; this is the backstop for the case where writing the
-  // attempt down fails, which used to leave the student on a spinner.
-  useEffect(() => {
-    if (status === 'finished') router.replace('/exam/results');
-  }, [status]);
-
   // One attempt per mount, tracked so a failed resume doesn't loop. Only a
   // cold store is worth recovering: a finished paper is not a lost one.
   const [recovery, setRecovery] = useState<'idle' | 'trying' | 'failed'>('idle');
@@ -316,6 +337,9 @@ export default function ExamRunScreen() {
     return (
       <View style={[styles.screen, styles.center]}>
         <ActivityIndicator color={colors.accentDeep} />
+        {/* A finished sitting leaves through its mode's own ending, which
+            covers this spinner long before the report card arrives. */}
+        {leaving ? <ModeOutro spec={spec} onCovered={goResults} /> : null}
       </View>
     );
   }
@@ -524,8 +548,7 @@ export default function ExamRunScreen() {
           <Animated.View
             key={`${item.id}:${visits}`}
             entering={FadeInDown.springify().damping(16)}
-            exiting={SlideOutUp.duration(220)}
-            style={flyStyle}>
+            exiting={SlideOutUp.duration(220)}>
             {scored ? <ComboMeter combo={combo} idle={idle} /> : null}
             <ExamSheet
               format={item.format}
