@@ -22,10 +22,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
-import { DerpArrow, DerpCheck, DerpMinus, DerpPlus, DerpScribbleLine } from '@/components/DerpIcons';
-import { Icon, type IconName } from '@/components/Icon';
+import { DerpCheck, DerpMinus, DerpPlus } from '@/components/DerpIcons';
+import { Icon } from '@/components/Icon';
+import { ModeCrest, dialsOf } from '@/components/ModeCrest';
 import { FORMAT_HOWTO, FORMAT_LABEL, FORMAT_ORDER, type ExamFormat } from '@/lib/exam';
-import { MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
+import { estimateLabel, MODE_ORDER, MODES, type ExamMode, type ModeSpec } from '@/lib/mode';
 import { playSfx } from '@/lib/sfx';
 import { useExamStore } from '@/store/exam';
 import { derpRadius, font, getColors, outline, radius, shadow, useThemeStore } from '@/theme/tokens';
@@ -43,12 +44,15 @@ function FormatChip({
   on,
   onPress,
   index,
+  spec,
 }: {
   format: ExamFormat;
   max: number;
   on: boolean;
   onPress: () => void;
   index: number;
+  /** A ticked chip wears the mode's colour, not a fixed green. */
+  spec: ModeSpec;
 }) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
@@ -98,7 +102,7 @@ function FormatChip({
         accessibilityState={{ checked: on, disabled: off }}
         style={({ pressed }) => [
           styles.chip,
-          on && styles.chipOn,
+          on && { backgroundColor: spec.wash, borderColor: spec.edge },
           off && styles.chipOff,
           pressed && styles.pressed,
         ]}>
@@ -126,12 +130,15 @@ function StepBtn({
   count,
   max,
   onPress,
+  label,
   children,
 }: {
   delta: number;
   count: number;
   max: number;
   onPress: (delta: number) => void;
+  /** Hand-drawn glyphs carry no text, so the button says what it does. */
+  label: string;
   children: React.ReactNode;
 }) {
   const isDark = useThemeStore((s) => s.isDark);
@@ -167,6 +174,9 @@ function StepBtn({
         onPress={handlePress}
         disabled={disabled}
         hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ disabled }}
         style={({ pressed }) => [
           styles.stepBtn,
           disabled && styles.stepBtnOff,
@@ -185,12 +195,14 @@ function AmountRow({
   max,
   onChange,
   index,
+  spec,
 }: {
   format: ExamFormat;
   count: number;
   max: number;
   onChange: (next: number) => void;
   index: number;
+  spec: ModeSpec;
 }) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
@@ -236,12 +248,22 @@ function AmountRow({
         <Pressable
           onPress={handleMax}
           hitSlop={6}
-          style={({ pressed }) => [styles.maxBtn, pressed && styles.pressed]}>
-          <Text style={styles.maxText}>Max {max}</Text>
+          accessibilityLabel={`All ${max} ${FORMAT_LABEL[format]}`}
+          style={({ pressed }) => [
+            styles.maxBtn,
+            { backgroundColor: spec.wash },
+            pressed && styles.pressed,
+          ]}>
+          <Text style={[styles.maxText, { color: spec.ink }]}>Max {max}</Text>
         </Pressable>
       </View>
 
-      <StepBtn delta={-STEP} count={count} max={max} onPress={handleStep}>
+      <StepBtn
+        delta={-STEP}
+        count={count}
+        max={max}
+        onPress={handleStep}
+        label={`Fewer ${FORMAT_LABEL[format]}`}>
         <DerpMinus width={42} height={42} />
       </StepBtn>
 
@@ -260,41 +282,16 @@ function AmountRow({
         />
       </Animated.View>
 
-      <StepBtn delta={STEP} count={count} max={max} onPress={handleStep}>
+      <StepBtn
+        delta={STEP}
+        count={count}
+        max={max}
+        onPress={handleStep}
+        label={`More ${FORMAT_LABEL[format]}`}>
         <DerpPlus width={42} height={42} />
       </StepBtn>
     </View>
   );
-}
-
-/** One way of sitting the exam, as a sticker card. */
-/** The three dials a mode sets, as the picker shows them. */
-function dialsOf(spec: ModeSpec) {
-  return [
-    {
-      on: spec.clock !== 'none',
-      icon: (spec.clock === 'none' ? 'clockClassic' : 'clock') as IconName,
-      label: spec.clock === 'none' ? 'No clock' : spec.clock === 'whole' ? 'Whole paper' : 'Per question',
-      caption: 'CLOCK',
-    },
-    {
-      on: spec.feedback === 'instant',
-      icon: 'check' as IconName,
-      label: spec.feedback === 'instant' ? 'Straight away' : 'At the end',
-      caption: 'MARKS',
-    },
-    {
-      on: spec.repetition !== 'once',
-      icon: (spec.repetition === 'once' ? 'play' : 'spark') as IconName,
-      label:
-        spec.repetition === 'once'
-          ? 'One pass'
-          : spec.repetition === 'until_retired'
-            ? 'Until retired'
-            : 'Three lives',
-      caption: 'REPEATS',
-    },
-  ];
 }
 
 /**
@@ -460,10 +457,12 @@ export default function ExamSetupScreen() {
 
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.contentWrapper}>
         <View style={styles.navRow}>
           <Pressable
             onPress={() => router.back()}
             hitSlop={10}
+            accessibilityLabel="Back"
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
             <Text style={styles.backArrow}>←</Text>
           </Pressable>
@@ -500,6 +499,7 @@ export default function ExamSetupScreen() {
             </Text>
           </View>
         </ScrollView>
+        </View>
 
         {/* The detail sits over the shelf rather than replacing it, so
             backing out costs one tap and the other four stay in sight. */}
@@ -551,39 +551,47 @@ export default function ExamSetupScreen() {
     );
   }
 
+  const spec = MODES[mode];
   const picked = total();
-  // Roughly half a minute per question — enough to set expectations.
-  const minutes = Math.round(picked * 0.5);
+  // Per mode: a sprint of 20 is not a sitting of 20, and mastery asks each
+  // card more than once. Survival returns null — it ends when you do.
+  const howLong = estimateLabel(mode, counts);
   const longExam = picked > 40;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+      <View style={styles.contentWrapper}>
       <View style={styles.navRow}>
         <Pressable
           onPress={() => setStep('mode')}
           hitSlop={10}
+          accessibilityLabel="Pick a different mode"
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
-          <DerpArrow width={24} height={24} />
+          <Text style={styles.backArrow}>←</Text>
         </Pressable>
         <View style={styles.headText}>
-          <View style={{ position: 'relative', alignSelf: 'flex-start' }}>
-            <Text style={[styles.title, { transform: [{ rotate: '-1.5deg' }] }]}>Build your exam!</Text>
-            <View style={styles.scribbleLine}>
-              <DerpScribbleLine width="120%" height="15" />
-            </View>
-          </View>
-          <Text style={[styles.sub, { transform: [{ rotate: '1deg' }], marginTop: 6 }]} numberOfLines={1}>
-            {MODES[mode].name} · {deck?.name}
+          <Text style={styles.title} numberOfLines={1}>
+            Build your {spec.unit === 'question' ? 'paper' : spec.units}
+          </Text>
+          <Text style={styles.sub} numberOfLines={1}>
+            {deck?.name}
           </Text>
         </View>
       </View>
 
-      <View style={styles.contentWrapper}>
+      <ModeCrest
+        spec={spec}
+        size="banner"
+        showDials
+        detail={spec.tagline}
+        style={styles.crestBanner}
+      />
+
         <ScrollView
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>WHICH TYPES?</Text>
+        <Text style={[styles.kicker, { color: spec.ink }]}>WHICH TYPES?</Text>
         <View style={styles.grid}>
           {FORMAT_ORDER.map((format, i) => (
             <FormatChip
@@ -592,6 +600,7 @@ export default function ExamSetupScreen() {
               format={format}
               max={available[format]}
               on={picks.includes(format)}
+              spec={spec}
               onPress={() => toggleFormat(format)}
             />
           ))}
@@ -599,7 +608,8 @@ export default function ExamSetupScreen() {
 
         {picks.length > 0 ? (
           <>
-            <Text style={styles.kicker}>HOW MANY OF EACH?</Text>
+            <Text style={[styles.kicker, { color: spec.ink }]}>HOW MANY OF EACH?</Text>
+            <Text style={styles.kickerHint}>{spec.countsHint}</Text>
             {picks.map((format, i) => (
               <AmountRow
                 key={format}
@@ -607,6 +617,7 @@ export default function ExamSetupScreen() {
                 format={format}
                 count={counts[format]}
                 max={available[format]}
+                spec={spec}
                 onChange={(next) => setCount(format, next)}
               />
             ))}
@@ -614,6 +625,7 @@ export default function ExamSetupScreen() {
               <Pressable
                 onPress={evenSplit}
                 hitSlop={8}
+                accessibilityLabel="Even them out"
                 style={({ pressed }) => [styles.switcher, pressed && styles.pressed]}>
                 <Text style={styles.switcherText}>Even them out</Text>
               </Pressable>
@@ -633,13 +645,29 @@ export default function ExamSetupScreen() {
         <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
           <Text style={styles.total}>
             {picked} question{picked === 1 ? '' : 's'}
-            {minutes > 0 ? ` · about ${minutes} min` : ''}
+            {howLong ? ` · ${howLong}` : ''}
           </Text>
+          {spec.repetition === 'until_retired' && picked > 0 ? (
+            <Text style={styles.modeNote}>
+              Each card comes back until you've had it right twice — the pile decides when
+              you're done, not the count.
+            </Text>
+          ) : null}
+          {spec.clock === 'per_question' && picked > 0 ? (
+            <Text style={styles.modeNote}>
+              Every question has its own countdown. Running out marks it wrong.
+            </Text>
+          ) : null}
+          {spec.feedback === 'deferred' && picked > 0 ? (
+            <Text style={styles.modeNote}>
+              Nothing is marked until you submit. You can flag questions and come back.
+            </Text>
+          ) : null}
           {longExam ? (
-            <Text style={styles.longNote}>That’s a big sitting — you can always do less.</Text>
+            <Text style={styles.longNote}>That's a big sitting — you can always do less.</Text>
           ) : null}
           <ChunkyButton
-            label={picked === 0 ? 'Pick a type' : 'Start exam'}
+            label={picked === 0 ? 'Pick a type' : spec.verb}
             icon="play"
             size="lg"
             disabled={picked === 0}
@@ -720,6 +748,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.accentDeep,
     marginTop: 2,
     marginLeft: 2,
+  },
+  kickerHint: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
+    lineHeight: 15.5,
+    color: colors.textDim,
+    marginLeft: 2,
+    marginTop: -4,
+    marginBottom: 2,
+  },
+  crestBanner: {
+    marginBottom: 12,
   },
 
   // --- type chips -------------------------------------------------------
@@ -875,7 +915,6 @@ const getStyles = (colors: any) => StyleSheet.create({
 
   // --- modes ------------------------------------------------------------
   shelf: {
-    paddingHorizontal: 16,
     paddingBottom: 28,
   },
   cartGrid: {
@@ -1118,6 +1157,14 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.gold,
     textAlign: 'center',
     marginTop: -4,
+  },
+  modeNote: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
+    lineHeight: 15.5,
+    color: colors.textFaint,
+    textAlign: 'center',
+    marginTop: -2,
   },
   errorCard: {
     backgroundColor: colors.surface,

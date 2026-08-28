@@ -214,7 +214,8 @@ describe('the exam setup screen', () => {
     press(first, 'True or False');
     press(first, 'Multiple choice');
     type(first, 'How many True or False', '20');
-    press(first, 'Start exam');
+    // The start button wears the mode's own verb now, not one label for all five.
+    press(first, 'Light the fuse');
 
     act(() => useExamStore.getState().reset());
     const again = await open();
