@@ -2,6 +2,8 @@ import type { ExamItem } from '../exam';
 import type { AnswerRecord } from '../mastery';
 import {
   advanceQueue,
+  estimateLabel,
+  estimateSeconds,
   fullRequests,
   MODE_ORDER,
   MODES,
@@ -166,5 +168,78 @@ describe('survival', () => {
 
   it('asks for nothing from an empty deck rather than throwing', () => {
     expect(fullRequests([])).toEqual([]);
+  });
+});
+
+
+describe('every mode has an identity, not just rules', () => {
+  it.each(MODE_ORDER)('%s says what it is called and what it prints on', (id) => {
+    const spec = MODES[id];
+    for (const field of ['edge', 'paper', 'unit', 'units', 'verb', 'stamp', 'countsHint', 'hud'] as const) {
+      expect(typeof spec[field]).toBe('string');
+      expect(spec[field].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('gives each mode its own start button, so no two read the same', () => {
+    const verbs = MODE_ORDER.map((id) => MODES[id].verb);
+    expect(new Set(verbs).size).toBe(verbs.length);
+  });
+
+  it('gives each mode its own progress readout', () => {
+    const huds = MODE_ORDER.map((id) => MODES[id].hud);
+    expect(new Set(huds).size).toBe(huds.length);
+  });
+
+  it('pairs the readout with the rule it is reporting on', () => {
+    // A readout that disagrees with the rule is worse than none at all.
+    expect(MODES.mastery.hud).toBe('pile');
+    expect(MODES.mastery.repetition).toBe('until_retired');
+    expect(MODES.survival.hud).toBe('lives');
+    expect(MODES.survival.repetition).toBe('until_out');
+    expect(MODES.rapid.hud).toBe('fuse');
+    expect(MODES.rapid.clock).toBe('per_question');
+    expect(MODES.simulation.hud).toBe('paper');
+    expect(MODES.simulation.clock).toBe('whole');
+  });
+});
+
+describe('how long a paper will take', () => {
+  const TEN_CHOICE = { multiple_choice: 10 } as const;
+
+  it('has nothing to estimate for an empty paper', () => {
+    expect(estimateSeconds('relaxed', {})).toBe(0);
+    expect(estimateLabel('relaxed', {})).toBeNull();
+  });
+
+  it('refuses to promise an end for survival', () => {
+    expect(estimateSeconds('survival', TEN_CHOICE)).toBeNull();
+    expect(estimateLabel('survival', TEN_CHOICE)).toBeNull();
+  });
+
+  it('holds a sprint to what its own clock allows', () => {
+    // Ten multiple choice at fifteen seconds each is two and a half minutes,
+    // not the five the flat half-a-minute-each estimate used to claim.
+    expect(estimateSeconds('rapid', TEN_CHOICE)).toBe(questionSeconds('multiple_choice') * 10);
+    expect(estimateSeconds('rapid', TEN_CHOICE)!).toBeLessThan(
+      estimateSeconds('relaxed', TEN_CHOICE)!
+    );
+  });
+
+  it('gives a sealed paper the same allowance the clock will', () => {
+    expect(estimateSeconds('simulation', TEN_CHOICE)).toBe(
+      questionSeconds('multiple_choice') * 10 * 2
+    );
+  });
+
+  it('expects mastery to take longer than one pass, because it is more than one pass', () => {
+    expect(estimateSeconds('mastery', TEN_CHOICE)!).toBeGreaterThan(
+      estimateSeconds('relaxed', TEN_CHOICE)!
+    );
+  });
+
+  it('reads a short paper in seconds and a long one in minutes', () => {
+    expect(estimateLabel('rapid', { true_false: 4 })).toMatch(/sec$/);
+    expect(estimateLabel('relaxed', TEN_CHOICE)).toBe('about 5 min');
   });
 });

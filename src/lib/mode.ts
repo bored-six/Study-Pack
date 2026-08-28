@@ -41,7 +41,36 @@ export interface ModeSpec {
   repetition: Repetition;
   /** The mode picks its own questions, so the format form is skipped. */
   autoBuild: boolean;
+
+  // --- identity ---------------------------------------------------------
+  // Everything below is how the mode looks and talks. It lives beside the
+  // rules rather than in the screens because three screens render it and
+  // they were drifting: the build screen said "Start exam" for a mode whose
+  // paper never ends, and the run screen called a survival draw a "page".
+
+  /** A deeper ink for borders and rules — `ink` is for text and glyphs. */
+  edge: string;
+  /** The stationery the stage is printed on. */
+  paper: PaperStock;
+  /** What one item is, in this mode's language. Singular. */
+  unit: string;
+  /** Plural of `unit`, because "pages" and "lives" don't share a rule. */
+  units: string;
+  /** The word on the button that begins the sitting. */
+  verb: string;
+  /** Stamped on the stage corner, so a screenshot says which game it was. */
+  stamp: string;
+  /** What "how many of each" buys you here. */
+  countsHint: string;
+  /** Which progress readout the run screen puts in the header. */
+  hud: HudKind;
 }
+
+/** The stage's stationery — what the paper under the question looks like. */
+export type PaperStock = 'ruled' | 'grid' | 'ticket' | 'foolscap' | 'card';
+
+/** The shape of the run screen's progress readout. */
+export type HudKind = 'pages' | 'pile' | 'fuse' | 'paper' | 'lives';
 
 export const MODES: Record<ExamMode, ModeSpec> = {
   relaxed: {
@@ -54,6 +83,14 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     clock: 'none',
     feedback: 'instant',
     repetition: 'once',
+    edge: '#38A75F',
+    paper: 'ruled',
+    unit: 'page',
+    units: 'pages',
+    verb: 'Start',
+    stamp: 'NO CLOCK',
+    countsHint: 'How many pages you sit, once each.',
+    hud: 'pages',
     autoBuild: false,
   },
   mastery: {
@@ -66,6 +103,14 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     clock: 'none',
     feedback: 'instant',
     repetition: 'until_retired',
+    edge: '#4E7B2C',
+    paper: 'card',
+    unit: 'card',
+    units: 'cards',
+    verb: 'Build the pile',
+    stamp: 'UNTIL IT STICKS',
+    countsHint: 'How many go in the pile. Each one comes back until it sticks.',
+    hud: 'pile',
     autoBuild: false,
   },
   rapid: {
@@ -78,6 +123,14 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     clock: 'per_question',
     feedback: 'instant',
     repetition: 'once',
+    edge: '#A0731A',
+    paper: 'ticket',
+    unit: 'ticket',
+    units: 'tickets',
+    verb: 'Light the fuse',
+    stamp: 'ON THE CLOCK',
+    countsHint: 'How many tickets. Each one has its own countdown.',
+    hud: 'fuse',
     autoBuild: false,
   },
   simulation: {
@@ -90,6 +143,14 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     clock: 'whole',
     feedback: 'deferred',
     repetition: 'once',
+    edge: '#2E6FA3',
+    paper: 'foolscap',
+    unit: 'question',
+    units: 'questions',
+    verb: 'Sit the paper',
+    stamp: 'SEALED',
+    countsHint: 'How long the paper is. You can go back and change answers.',
+    hud: 'paper',
     autoBuild: false,
   },
   survival: {
@@ -102,6 +163,14 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     clock: 'none',
     feedback: 'instant',
     repetition: 'until_out',
+    edge: '#A94050',
+    paper: 'grid',
+    unit: 'round',
+    units: 'rounds',
+    verb: 'Take the first hit',
+    stamp: 'THREE LIVES',
+    countsHint: 'Survival deals its own questions — nothing to choose.',
+    hud: 'lives',
     autoBuild: true,
   },
 };
@@ -143,6 +212,67 @@ export const PAPER_GENEROSITY = 2;
 export function paperSeconds(items: readonly ExamItem[]): number {
   const total = items.reduce((sum, item) => sum + RAPID_SECONDS[item.format], 0);
   return Math.max(60, total * PAPER_GENEROSITY);
+}
+
+// --- how long a sitting takes -------------------------------------------
+
+/**
+ * An unhurried answer, in seconds. The old build screen assumed this for
+ * every mode and told a Beat-the-clock student "about 10 min" for a paper
+ * the clock caps at two and a half — the estimate has to know the mode.
+ */
+export const UNHURRIED_SECONDS = 30;
+
+/**
+ * A perfect mastery run sees each card exactly RETIRE_AT times; a real one
+ * misses some. Measured against runs of the queue rather than guessed.
+ */
+export const MASTERY_PASSES = 2.4;
+
+/**
+ * Roughly how long a paper of these counts takes in this mode.
+ *
+ * Null means "there is no answer": survival deals until you run out of
+ * lives, and a number there would be a promise the mode cannot keep.
+ */
+export function estimateSeconds(
+  mode: ExamMode,
+  counts: Readonly<Partial<Record<ExamFormat, number>>>
+): number | null {
+  const formats = Object.keys(counts) as ExamFormat[];
+  const questions = formats.reduce((sum, format) => sum + (counts[format] ?? 0), 0);
+  if (questions === 0) return MODES[mode].repetition === 'until_out' ? null : 0;
+
+  // What the per-question clock would allow, format by format.
+  const clocked = formats.reduce(
+    (sum, format) => sum + RAPID_SECONDS[format] * (counts[format] ?? 0),
+    0
+  );
+
+  switch (MODES[mode].id) {
+    case 'rapid':
+      return clocked;
+    case 'simulation':
+      return Math.max(60, clocked * PAPER_GENEROSITY);
+    case 'mastery':
+      return Math.round(questions * UNHURRIED_SECONDS * MASTERY_PASSES);
+    case 'survival':
+      return null;
+    default:
+      return questions * UNHURRIED_SECONDS;
+  }
+}
+
+/** "about 4 min", "about 40 sec", or null when the mode has no end. */
+export function estimateLabel(
+  mode: ExamMode,
+  counts: Readonly<Partial<Record<ExamFormat, number>>>
+): string | null {
+  const seconds = estimateSeconds(mode, counts);
+  if (seconds == null) return null;
+  if (seconds === 0) return null;
+  if (seconds < 90) return `about ${Math.max(10, Math.round(seconds / 10) * 10)} sec`;
+  return `about ${Math.round(seconds / 60)} min`;
 }
 
 // --- mastery queue ------------------------------------------------------
