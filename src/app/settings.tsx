@@ -48,7 +48,11 @@ function DerpToggle({ value, onChange, label }: { value: boolean; onChange: (on:
   
   return (
     <Pressable
+      accessibilityRole="switch"
       accessibilityLabel={label}
+      // Without this the switch announces its name and never its state:
+      // "Sound effects", with no way to hear whether it is on or off.
+      accessibilityState={{ checked: value }}
       onPress={() => onChange(!value)}
       style={[
         styles.derpToggle,

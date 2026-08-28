@@ -1,5 +1,5 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
-import { Switch, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import SettingsScreen from '../settings';
 
@@ -84,10 +84,26 @@ function pressLabelled(tree: ReactTestRenderer, label: string): void {
   });
 }
 
+/**
+ * One switch, found the way a screen reader finds it.
+ *
+ * These used to be React Native's own Switch and are now a hand-drawn
+ * Pressable, so looking for the type found nothing at all. Going by role
+ * and label instead means the test keeps working through the next restyle
+ * — and only passes while the switch is still announcing itself.
+ */
 function switchFor(tree: ReactTestRenderer, label: string) {
-  return tree.root.findAll(
-    (node) => node.type === Switch && node.props.accessibilityLabel === label
+  const node = tree.root.findAll(
+    (n) =>
+      n.props?.accessibilityRole === 'switch' && n.props?.accessibilityLabel === label
   )[0];
+  if (!node) throw new Error(`no switch labelled "${label}"`);
+  return node;
+}
+
+/** What the switch says it is: on, or off. */
+function switchState(tree: ReactTestRenderer, label: string): boolean {
+  return switchFor(tree, label).props.accessibilityState.checked === true;
 }
 
 function has(tree: ReactTestRenderer, label: string): boolean {
@@ -115,19 +131,19 @@ describe('the settings screen', () => {
     mockSettings.set('sfx_muted', '1');
     const tree = await render();
 
-    expect(switchFor(tree, 'Sound effects').props.value).toBe(false);
-    expect(switchFor(tree, 'Vibration').props.value).toBe(true);
-    expect(switchFor(tree, 'Format how-tos').props.value).toBe(true);
+    expect(switchState(tree, 'Sound effects')).toBe(false);
+    expect(switchState(tree, 'Vibration')).toBe(true);
+    expect(switchState(tree, 'Format how-tos')).toBe(true);
   });
 
   it('persists a flipped switch', async () => {
     const tree = await render();
 
     await act(async () => {
-      switchFor(tree, 'Vibration').props.onValueChange(false);
+      switchFor(tree, 'Vibration').props.onPress();
     });
 
-    expect(switchFor(tree, 'Vibration').props.value).toBe(false);
+    expect(switchState(tree, 'Vibration')).toBe(false);
     expect(mockSettings.get('haptics_muted')).toBe('1');
   });
 
