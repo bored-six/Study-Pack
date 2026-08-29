@@ -438,3 +438,43 @@ describe('buildExam reuse decay', () => {
     expect(Math.max(...uses.values())).toBeLessThanOrEqual(2);
   });
 });
+
+describe('the word a false statement is built from', () => {
+  /**
+   * True/false never shows the option set, but it is made out of it: the
+   * false version of a sentence is the real one with a decoy swapped in. A
+   * decoy that would have stood out in a list stands out here too.
+   */
+  const CLOZE = (): Question => ({
+    id: 'q:rna',
+    prompt: 'Ribosomes assemble proteins from amino acids delivered by transfer ______.',
+    correctAnswer: 'RNA',
+    answers: ['RNA', 'Human', 'Chlorophyll', 'ATP'],
+    kind: 'cloze',
+    sourceLine: 'Ribosomes assemble proteins from amino acids delivered by transfer RNA.',
+  });
+
+  it('prefers a decoy the same size as the answer', () => {
+    // "transfer Human" is not a claim anyone has to think about; "transfer
+    // ATP" is. Both are wrong; only one is a question.
+    const seen = new Set<string>();
+    for (let n = 0; n < 40; n++) {
+      const items = buildExam([CLOZE()], [{ format: 'true_false', count: 1 }], `seed-${n}`);
+      const statement = (items[0] as { statement?: string })?.statement;
+      if (!statement || statement.includes('RNA.')) continue;
+      const swapped = /transfer (\w+)\./.exec(statement)?.[1];
+      if (swapped) seen.add(swapped);
+    }
+    expect(seen.size).toBeGreaterThan(0);
+    expect([...seen]).toEqual(['ATP']);
+  });
+
+  it('still builds the format when nothing is the right size', () => {
+    const awkward: Question = {
+      ...CLOZE(),
+      answers: ['RNA', 'Chlorophyll', 'Photosynthesis', 'Mitochondria'],
+    };
+    const items = buildExam([awkward], [{ format: 'true_false', count: 1 }], 'seed');
+    expect(items).toHaveLength(1);
+  });
+});

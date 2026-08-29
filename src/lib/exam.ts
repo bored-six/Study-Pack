@@ -247,10 +247,28 @@ function fillBlank(prompt: string, word: string): string[] {
   return tokens;
 }
 
+/**
+ * The wrong word a false statement is built from.
+ *
+ * True/false and modified true/false do not show the option set, but they
+ * are made out of it: the false version of a sentence is the real one with a
+ * decoy swapped in. So a decoy that would have given the answer away in a
+ * list gives it away here too, just louder — "delivered by transfer RNA"
+ * became "delivered by transfer Human", which is not a claim anyone has to
+ * think about.
+ *
+ * Same test the option set has to pass, applied one decoy at a time, and
+ * still falling back rather than losing the format when a deck has nothing
+ * better to offer.
+ */
 function pickDecoy(question: Question, rand: () => number): string | null {
   const decoys = question.answers.filter((a) => a !== question.correctAnswer);
   if (decoys.length === 0) return null;
-  return decoys[Math.floor(rand() * decoys.length)];
+  const level = decoys.filter((decoy) =>
+    optionsAreLevel(question.correctAnswer, [question.correctAnswer, decoy])
+  );
+  const usable = level.length > 0 ? level : decoys;
+  return usable[Math.floor(rand() * usable.length)];
 }
 
 function buildTrueFalse(question: Question, rand: () => number): TrueFalseItem | null {
