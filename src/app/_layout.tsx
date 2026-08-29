@@ -18,7 +18,6 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { IntroOverlay } from '@/components/IntroOverlay';
-import { DebugFab } from '@/components/DebugFab';
 import { initDb } from '@/lib/db';
 import { initPrefs } from '@/lib/prefs';
 import { font, getColors, useThemeStore } from '@/theme/tokens';
@@ -105,7 +104,6 @@ export default function RootLayout() {
         }}
       />
       {playIntro && !introDone ? <IntroOverlay onDone={() => setIntroDone(true)} /> : null}
-      <DebugFab />
     </>
   );
 }
