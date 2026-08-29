@@ -55,7 +55,8 @@ const RECIPES: { icon: IconName; name: string; sample: string }[] = [
     sample: 'Chlorophyll: the green pigment that absorbs light',
   },
   {
-    icon: 'note',
+    // Not 'note' — that glyph is a musical note.
+    icon: 'pencil',
     name: 'A plain fact',
     sample: 'Mitochondria produce 36 ATP per glucose molecule.',
   },

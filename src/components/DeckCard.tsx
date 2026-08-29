@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { Icon, type IconName } from '@/components/Icon';
 import { DIFFICULTY_LABEL, type Deck } from '@/lib/types';
-import { candy, derpRadius, font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { candy, derpRadius, font, getColors, onWash, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   deck: Deck;
@@ -76,8 +76,8 @@ export function DeckCard({ deck, tilt, downloading, onDownload, onRemove, onStar
           <Icon
             name={deckIcon(deck.name)}
             size={26}
-            color={colors.ink}
-            fill={colors.surface}
+            color={onWash.ink}
+            fill="#FFFFFF"
             strokeWidth={1.9}
           />
         </View>

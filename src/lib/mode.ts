@@ -179,7 +179,8 @@ export const MODES: Record<ExamMode, ModeSpec> = {
     id: 'simulation',
     name: 'Exam simulation',
     tagline: 'One timer for the whole paper. No answers until you submit.',
-    icon: 'note',
+    // 'note' is a musical note — a sealed exam paper was wearing a quaver.
+    icon: 'book',
     wash: '#DBEEFB',
     ink: '#2E6FA3',
     clock: 'whole',

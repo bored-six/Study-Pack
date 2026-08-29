@@ -2,7 +2,7 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 
 import { Icon, type IconName } from '@/components/Icon';
 import { FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
-import { font, getColors, useThemeStore , lightColors } from '@/theme/tokens';
+import { font, getColors, lightColors, onWash, useThemeStore } from '@/theme/tokens';
 
 /**
  * One visual identity per exam format — same icon and colour on the
@@ -47,8 +47,10 @@ export function FormatBadge({ format, size = 'sm', style }: Props) {
       <Icon
         name={meta.icon}
         size={large ? 26 : 15}
-        color={colors.ink}
-        fill={colors.surface}
+        // The badge is a fixed pastel, so the glyph on it keeps fixed ink
+        // and a paper fill — the theme's surface turned it into a dark blob.
+        color={onWash.ink}
+        fill="#FFFFFF"
         strokeWidth={large ? 1.9 : 2.2}
       />
       <Text style={[styles.label, large && styles.labelLg, { color: meta.ink }]}>

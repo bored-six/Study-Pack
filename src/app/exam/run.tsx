@@ -47,7 +47,7 @@ import { emptyDraft, hasAnswer } from '@/lib/draft';
 import { FORMAT_HOWTO, FORMAT_LABEL, type ExamFormat } from '@/lib/exam';
 import { MODES, questionSeconds } from '@/lib/mode';
 import { useExamStore } from '@/store/exam';
-import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { font, getColors, onWash, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 export default function ExamRunScreen() {
   const isDark = useThemeStore((s) => s.isDark);
@@ -523,8 +523,8 @@ export default function ExamRunScreen() {
             <Icon
               name={FORMAT_META[item.format].icon}
               size={16}
-              color={colors.ink}
-              fill={colors.surface}
+              color={onWash.ink}
+              fill="#FFFFFF"
               strokeWidth={2.2}
             />
           </View>

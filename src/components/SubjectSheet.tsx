@@ -16,7 +16,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { Tape } from '@/components/notebook';
 import { Icon, type IconName } from '@/components/Icon';
 import type { Deck } from '@/lib/types';
-import { font, getColors, outlineOn, radius, subjectPalette, useThemeStore } from '@/theme/tokens';
+import { font, getColors, onWash, outlineOn, radius, subjectPalette, useThemeStore } from '@/theme/tokens';
 
 interface Props {
   visible: boolean;
@@ -127,7 +127,7 @@ export function SubjectSheet({ visible, subject, onClose, onSave, onDelete }: Pr
 
             <View style={styles.header}>
               <View style={[styles.preview, { backgroundColor: previewWash }]}>
-                <Icon name={previewIcon} size={26} color={colors.ink} fill={colors.surface} strokeWidth={1.9} />
+                <Icon name={previewIcon} size={26} color={onWash.ink} fill="#FFFFFF" strokeWidth={1.9} />
               </View>
               {/* The title doubles as the rename field — tap it and type. */}
               <TextInput
