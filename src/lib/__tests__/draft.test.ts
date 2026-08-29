@@ -102,8 +102,8 @@ describe('empty drafts', () => {
 
 describe('grading', () => {
   it('scores multiple choice on the exact option', () => {
-    expect(gradeDraft(CHOICE, { kind: 'choice', picked: 'Chlorophyll' })).toBe(true);
-    expect(gradeDraft(CHOICE, { kind: 'choice', picked: 'Osmosis' })).toBe(false);
+    expect(gradeDraft(CHOICE, { kind: 'choice', picked: 'Chlorophyll', checked: false })).toBe(true);
+    expect(gradeDraft(CHOICE, { kind: 'choice', picked: 'Osmosis', checked: false })).toBe(false);
   });
 
   it('scores true/false on the call', () => {
@@ -166,7 +166,7 @@ describe('grading', () => {
 
 describe('what counts as answered', () => {
   it('counts a pick, however wrong', () => {
-    expect(hasAnswer(CHOICE, { kind: 'choice', picked: 'Osmosis' })).toBe(true);
+    expect(hasAnswer(CHOICE, { kind: 'choice', picked: 'Osmosis', checked: false })).toBe(true);
     expect(hasAnswer(TF, { kind: 'tf', picked: false })).toBe(true);
   });
 
@@ -205,7 +205,7 @@ describe('the marked paper', () => {
   });
 
   it('reads back what the student actually put', () => {
-    expect(draftText(CHOICE, { kind: 'choice', picked: 'Osmosis' })).toBe('Osmosis');
+    expect(draftText(CHOICE, { kind: 'choice', picked: 'Osmosis', checked: false })).toBe('Osmosis');
     expect(draftText(TF, { kind: 'tf', picked: false })).toBe('False');
     expect(draftText(TYPED, { kind: 'typed', text: ' chlorophyl ', checked: true })).toBe(
       'chlorophyl'

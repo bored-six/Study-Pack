@@ -174,7 +174,15 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
   const styles = getStyles(colors);
 
   const picked = draft.picked;
-  const revealed = reveal && picked != null;
+  /**
+   * A tick is not an answer until it is confirmed.
+   *
+   * Touching an option used to mark the paper immediately, so a thumb that
+   * brushed the wrong line scored it, and there was no moment to change your
+   * mind — the one thing multiple choice is supposed to give you. Every other
+   * format already asks for a Check; this one now does too.
+   */
+  const revealed = reveal && draft.checked && picked != null;
   const correct = picked === item.correctAnswer;
 
   return (
@@ -199,7 +207,7 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
               accessibilityLabel={option}
               onPress={() => {
                 tapSelect();
-                setDraft({ kind: 'choice', picked: option });
+                setDraft({ ...draft, picked: option });
               }}
               style={({ pressed }) => [
                 styles.answerLine,
@@ -249,7 +257,12 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
       {revealed ? (
         <Verdict correct={correct} onNext={() => onDone(correct)} />
       ) : reveal ? (
-        <Text style={styles.hint}>Tick your answer</Text>
+        <ChunkyButton
+          label="Check"
+          size="lg"
+          disabled={picked == null}
+          onPress={() => setDraft({ ...draft, checked: true })}
+        />
       ) : (
         <Recorded answered={picked != null} />
       )}

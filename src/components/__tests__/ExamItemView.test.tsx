@@ -108,17 +108,30 @@ const CHOICE: ChoiceItem = {
 };
 
 describe('multiple choice', () => {
-  it('reports a correct pick after Next', () => {
+  it('reports a correct pick after Check, then Next', () => {
     const { press, onDone } = drive(CHOICE);
     press('Chlorophyll');
-    expect(onDone).not.toHaveBeenCalled(); // reveal first, then Next
+    // Ticking is not answering: nothing is marked until Check.
+    expect(onDone).not.toHaveBeenCalled();
+    press('Check');
+    expect(onDone).not.toHaveBeenCalled();
     press('Next');
     expect(onDone).toHaveBeenCalledWith(true);
+  });
+
+  it('lets a pick be changed before it is checked', () => {
+    // The whole point of a confirm step: a brushed line is not an answer.
+    const { press, texts } = drive(CHOICE);
+    press('Osmosis');
+    press('Chlorophyll');
+    press('Check');
+    expect(texts().join(' ')).toContain('Correct');
   });
 
   it('reports a wrong pick', () => {
     const { press, onDone } = drive(CHOICE);
     press('Osmosis');
+    press('Check');
     press('Next');
     expect(onDone).toHaveBeenCalledWith(false);
   });
@@ -126,6 +139,7 @@ describe('multiple choice', () => {
   it('locks the options once answered', () => {
     const { press, texts } = drive(CHOICE);
     press('Chlorophyll');
+    press('Check');
     expect(texts()).toContain('Correct');
     // A second pick must not change anything.
     expect(() => press('Osmosis')).toThrow();
@@ -438,14 +452,14 @@ describe('withheld answers (exam simulation)', () => {
     expect(said).not.toContain('Correct');
     expect(said).not.toContain('Not quite');
     expect(onDone).not.toHaveBeenCalled();
-    expect(answer()).toEqual({ kind: 'choice', picked: 'Chlorophyll' });
+    expect(answer()).toEqual({ kind: 'choice', picked: 'Chlorophyll', checked: false });
   });
 
   it('lets a pick be changed, because the paper is not submitted yet', () => {
     const { press, answer } = driveDeferred(CHOICE);
     press('Chlorophyll');
     press('Osmosis');
-    expect(answer()).toEqual({ kind: 'choice', picked: 'Osmosis' });
+    expect(answer()).toEqual({ kind: 'choice', picked: 'Osmosis', checked: false });
   });
 
   it('offers no Check button to press', () => {

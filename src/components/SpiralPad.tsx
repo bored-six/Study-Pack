@@ -354,6 +354,9 @@ const getStyles = (colors: any) =>
       alignItems: 'center',
       paddingTop: 8,
       gap: 4,
+      // The deskmate sits in the top left corner; the title stops short of it
+      // rather than running underneath.
+      paddingHorizontal: 84,
     },
     title: {
       fontFamily: font.hero,

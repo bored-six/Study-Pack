@@ -166,7 +166,12 @@ function FormatRow({
             // Once it is on the paper, the useful number is the ceiling.
             <Pressable
               onPress={() => {
-                playSfx('derp_boing');
+                // Tapping Max when the count is already the max changes
+                // nothing, so it should not make a noise either. That is what
+                // made it spammable: the sound fired on every tap whether or
+                // not anything moved.
+                if (count === max) return;
+                playSfx('derp_pop');
                 onChange(max);
               }}
               hitSlop={8}

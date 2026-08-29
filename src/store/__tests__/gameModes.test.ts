@@ -114,7 +114,7 @@ function terminatingAnswer(mode: ExamMode): boolean {
 function filledDraft(item: ExamItem, correct: boolean): DraftValue {
   if (item.format !== 'multiple_choice') return emptyDraft(item);
   const wrong = item.options.find((option) => option !== item.correctAnswer);
-  return { kind: 'choice', picked: correct ? item.correctAnswer : (wrong ?? null) };
+  return { kind: 'choice', picked: correct ? item.correctAnswer : (wrong ?? null), checked: true };
 }
 
 async function open() {

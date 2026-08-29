@@ -230,7 +230,7 @@ describe('exam simulation', () => {
 
     const items = useExamStore.getState().items;
     const first = items[0];
-    const answer: DraftValue = { kind: 'choice', picked: first.format === 'multiple_choice' ? first.options[0] : null };
+    const answer: DraftValue = { kind: 'choice', picked: first.format === 'multiple_choice' ? first.options[0] : null, checked: true };
 
     useExamStore.getState().setDraft(first.id, answer);
     useExamStore.getState().goTo(3);
@@ -287,7 +287,7 @@ describe('exam simulation', () => {
       if (item.format !== 'multiple_choice') return;
       const picked =
         i === 1 ? item.options.find((o) => o !== item.correctAnswer)! : item.correctAnswer;
-      useExamStore.getState().setDraft(item.id, { kind: 'choice', picked });
+      useExamStore.getState().setDraft(item.id, { kind: 'choice', picked, checked: true });
     });
 
     await useExamStore.getState().submitPaper();

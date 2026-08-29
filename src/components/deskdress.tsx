@@ -305,12 +305,21 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     color: colors.textFaint,
   },
+  /**
+   * Top left, not bottom right.
+   *
+   * The bottom right of a pad is where the Check and Next buttons live, so
+   * the deskmate sat on top of the one control every question needs. Up here
+   * it has the whole margin to itself — the title is centred, the stamp is
+   * on the other side, and the stars come up along the bottom.
+   */
   propCorner: {
     position: 'absolute',
-    right: 0,
-    bottom: -6,
+    left: 2,
+    top: 26,
     width: 92,
     height: 58,
+    zIndex: 2,
   },
   ruler: {
     width: 54,

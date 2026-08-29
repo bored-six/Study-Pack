@@ -11,7 +11,7 @@ import type { ExamItem } from './exam';
 import { checkAnswer, checkEnumeration } from './grade';
 
 export type DraftValue =
-  | { kind: 'choice'; picked: string | null }
+  | { kind: 'choice'; picked: string | null; checked: boolean }
   | { kind: 'tf'; picked: boolean | null }
   | {
       kind: 'mtf';
@@ -33,7 +33,7 @@ export type DraftValue =
 export function emptyDraft(item: ExamItem): DraftValue {
   switch (item.format) {
     case 'multiple_choice':
-      return { kind: 'choice', picked: null };
+      return { kind: 'choice', picked: null, checked: false };
     case 'true_false':
       return { kind: 'tf', picked: null };
     case 'modified_true_false':
