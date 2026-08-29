@@ -543,6 +543,51 @@ function numericDistractors(value: string, seed: string): string[] {
 const namedTerm = (term: string) => /^[A-Z]/.test(term.trim());
 
 /**
+ * Terms the notes capitalise in the middle of a sentence.
+ *
+ * A defined term is capitalised because it opens its line; a proper noun is
+ * capitalised wherever it stands. Only the second kind has to keep its
+ * capital when an option set is levelled, which is why this is read from the
+ * notes rather than guessed from the word.
+ */
+function properNouns(text: string): Set<string> {
+  const proper = new Set<string>();
+  for (const sentence of text.split(/(?<=[.!?:])\s+|\n/)) {
+    const tokens = sentence.trim().split(/\s+/).filter(Boolean);
+    for (let i = 1; i < tokens.length; i++) {
+      const bare = cleanTerm(tokens[i]);
+      if (!bare || !/^[A-Z]/.test(bare)) continue;
+      proper.add(bare.toLowerCase());
+    }
+  }
+  return proper;
+}
+
+/**
+ * One option written the way the rest of its set is written.
+ *
+ * The pool holds terms lifted from definitions, which are capitalised
+ * because they opened their line, and words lifted from mid-sentence, which
+ * are not. Put them in one list and the odd one out is the answer: "lower
+ * the ______ price" offered Negative externalities, Elasticity, Merit goods
+ * and "equilibrium", and you can pick that without reading the sentence.
+ *
+ * The answer itself is never re-cased. Other code finds it inside its own
+ * source line by exact match to build true/false statements, and a changed
+ * capital there fails silently.
+ */
+function conformCase(answer: string, option: string, proper: ReadonlySet<string>): string {
+  if (proper.has(option.trim().toLowerCase())) return option;
+  const answerIsNamed = namedTerm(answer);
+  if (namedTerm(option) === answerIsNamed) return option;
+  // Anything with a capital of its own further in ("pH", "mRNA") is left be.
+  if (/.[A-Z]/.test(option)) return option;
+  return answerIsNamed
+    ? option.charAt(0).toUpperCase() + option.slice(1)
+    : option.charAt(0).toLowerCase() + option.slice(1);
+}
+
+/**
  * Terms that are the opening of a longer term the notes also use.
  *
  * The capitalised-word scan reads "Kinetic energy is..." and keeps
@@ -566,11 +611,17 @@ function fragmentsOf(pool: string[]): Set<string> {
   return fragments;
 }
 
-function termDistractors(answer: string, pool: string[], seed: string): string[] {
+function termDistractors(
+  answer: string,
+  pool: string[],
+  seed: string,
+  fragments: ReadonlySet<string>,
+  /** How often each term has already been a decoy in this set of notes. */
+  spent: ReadonlyMap<string, number> = new Map()
+): string[] {
   const answerLower = answer.toLowerCase();
   const answerWords = wordCount(answer);
   const answerIsNamed = namedTerm(answer);
-  const fragments = fragmentsOf(pool);
 
   const usable = pool.filter((term) => {
     const lower = term.toLowerCase();
@@ -603,7 +654,33 @@ function termDistractors(answer: string, pool: string[], seed: string): string[]
    * otherwise drop.
    */
   const sameShape = base.filter((term) => namedTerm(term) === answerIsNamed);
-  const shuffled = seededShuffle(sameShape.length >= 3 ? sameShape : base, seed);
+  const shaped = sameShape.length >= 3 ? sameShape : base;
+
+  /**
+   * And roughly the same size.
+   *
+   * An initialism among long words is its own answer: "Which term is short
+   * for adenosine triphosphate?" offered ATP beside Anaphase, Chlorophyll
+   * and Calvin Cycle, and the shape of the word settles it. Word count is
+   * already preferred above; this is the same idea for the letters.
+   */
+  const floor = answer.length / 1.5;
+  const ceiling = answer.length * 1.5;
+  const sameSize = shaped.filter((t) => t.length >= floor && t.length <= ceiling);
+  const eligible = sameSize.length >= 3 ? sameSize : shaped;
+
+  /**
+   * Least-used first, then seeded shuffle.
+   *
+   * Preferring the answer's shape and size narrows the candidates, and a
+   * narrow field asked over and over hands the same three wrong answers to
+   * every question in the deck. A decoy you have eliminated on sight five
+   * times is not a decoy. Ties are still shuffled, so the order stays
+   * unpredictable within a usage tier.
+   */
+  const shuffled = seededShuffle(eligible, seed).sort(
+    (a, b) => (spent.get(a) ?? 0) - (spent.get(b) ?? 0)
+  );
 
   // Reject options that overlap each other ("Allosteric" beside "Allosteric
   // regulation" gives the answer away).
@@ -639,9 +716,10 @@ export function suggestDistractors(
 ): string[] {
   const clean = answer.trim();
   if (!clean) return [];
+  const terms = [...pool];
   return isNumeric(clean)
     ? numericDistractors(clean, seed)
-    : termDistractors(clean, [...pool], seed);
+    : termDistractors(clean, terms, seed, fragmentsOf(terms));
 }
 
 // --- enumeration --------------------------------------------------------
@@ -1004,6 +1082,10 @@ export function parseNotes(input: string): ParseResult {
   }
 
   const pool = [...termPool];
+  const proper = properNouns(text);
+  const fragments = fragmentsOf(pool);
+  /** Decoy usage across this parse, so no term carries every question. */
+  const spent = new Map<string, number>();
   const questions: ParsedQuestion[] = [];
   const seenPrompts = new Set<string>();
   /**
@@ -1060,7 +1142,7 @@ export function parseNotes(input: string): ParseResult {
     const usablePool = pool.filter((term) => fitsAsOption(term, draft.prompt, draft.answer));
     const distractors = isNumeric(draft.answer)
       ? numericDistractors(draft.answer, seed)
-      : termDistractors(draft.answer, usablePool, seed);
+      : termDistractors(draft.answer, usablePool, seed, fragments, spent);
 
     // A multiple-choice question needs three believable wrong answers or it
     // isn't a question — drop it rather than pad with nonsense.
@@ -1071,10 +1153,12 @@ export function parseNotes(input: string): ParseResult {
 
     seenPrompts.add(key);
     seenAnswers.add(answerKey);
+    distractors.forEach((term) => spent.set(term, (spent.get(term) ?? 0) + 1));
+    const levelled = distractors.map((term) => conformCase(draft.answer, term, proper));
     questions.push({
       prompt: draft.prompt,
       correctAnswer: draft.answer,
-      answers: seededShuffle([draft.answer, ...distractors], seed),
+      answers: seededShuffle([draft.answer, ...levelled], seed),
       kind: draft.kind,
       sourceLine: draft.source,
     });

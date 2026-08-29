@@ -12,6 +12,7 @@
 
 import type { AnswerRecord } from './mastery';
 import { rankByNeed } from './pick';
+import { optionsAreLevel } from './questionQuality';
 import { looksLikeIllustration, readsAsStatement } from './quizzable';
 import type { Question } from './types';
 
@@ -181,7 +182,10 @@ export function isQuizzable(question: Question): boolean {
 export function supportedFormats(question: Question): ExamFormat[] {
   if (!isQuizzable(question)) return [];
 
-  const formats: ExamFormat[] = ['multiple_choice'];
+  // Multiple choice needs four options a student cannot sort by looking.
+  const formats: ExamFormat[] = optionsAreLevel(question.correctAnswer, question.answers)
+    ? ['multiple_choice']
+    : [];
 
   if (question.kind === 'enumeration') {
     return ['enumeration'];

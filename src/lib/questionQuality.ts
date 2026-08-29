@@ -169,3 +169,40 @@ export function fitsAsOption(option: string, prompt: string, answer: string): bo
   // Every word of it is already on the page: it reads as part of the question.
   return !words.every((word) => inPrompt.has(word));
 }
+
+/**
+ * How far an option's length may sit from its neighbours' before the shape
+ * of the word answers the question on its own.
+ */
+const SIZE_BAND = 1.6;
+
+/**
+ * Whether an option set can be shown side by side without the answer
+ * standing out.
+ *
+ * Four options are only a question if choosing between them needs the
+ * material. "Which term is short for adenosine triphosphate?" offering ATP
+ * beside Anaphase, Chlorophyll and Calvin Cycle is not a question — the
+ * three-letter one is the initialism whatever the stem says, and a student
+ * who has never opened the notes gets it.
+ *
+ * The picker already prefers decoys of the answer's own shape and size, so
+ * this only catches what the notes could not supply: an initialism in a set
+ * of notes holding no other initialisms. There is no honest way to build
+ * that set, and inventing a plausible-looking decoy would be inventing
+ * material. The question is still worth asking — it just has to be asked as
+ * one the student types rather than picks.
+ *
+ * The same reasoning already governs modified true/false, which refuses a
+ * multi-word answer because the long chip would give itself away.
+ */
+export function optionsAreLevel(answer: string, options: readonly string[]): boolean {
+  const decoys = options.filter((option) => option !== answer).map((option) => option.trim().length);
+  if (decoys.length === 0) return true;
+
+  const shortest = Math.min(...decoys);
+  const longest = Math.max(...decoys);
+  const size = answer.trim().length;
+
+  return size <= longest * SIZE_BAND && size * SIZE_BAND >= shortest;
+}

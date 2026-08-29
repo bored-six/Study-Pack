@@ -10,6 +10,7 @@ import { parseNotes } from '../noteParser';
 import {
   contentWords,
   danglesOutward,
+  optionsAreLevel,
   fitsAsOption,
   givesItselfAway,
   isAskable,
@@ -207,6 +208,69 @@ describe('notes it has never seen', () => {
       // wrong; real list items sit within a word or two of each other.
       const lengths = q.answers.map((a) => a.split(/\s+/).length);
       expect(Math.max(...lengths) - Math.min(...lengths)).toBeLessThanOrEqual(3);
+    }
+  });
+});
+
+describe('an option set you cannot sort by looking', () => {
+  it('rejects an initialism standing among long words', () => {
+    // The three-letter one is the initialism whatever the stem says.
+    expect(optionsAreLevel('ATP', ['ATP', 'Anaphase', 'Chlorophyll', 'Calvin Cycle'])).toBe(false);
+    expect(optionsAreLevel('TCP', ['Established', 'Networking', 'TCP', 'Acknowledge'])).toBe(false);
+  });
+
+  it('accepts a set of initialisms', () => {
+    expect(optionsAreLevel('ATP', ['ATP', 'RNA', 'DNA', 'ADP'])).toBe(true);
+  });
+
+  it('accepts ordinary terms of ordinary lengths', () => {
+    expect(
+      optionsAreLevel('Equilibrium', ['Inflation', 'Deflation', 'Equilibrium', 'Monopsony'])
+    ).toBe(true);
+  });
+
+  it('rejects an answer far longer than everything beside it', () => {
+    expect(optionsAreLevel('Photophosphorylation', ['Ion', 'Gas', 'Acid', 'Photophosphorylation'])).toBe(
+      false
+    );
+  });
+
+  it('says nothing about a set with no decoys yet', () => {
+    expect(optionsAreLevel('Energy', ['Energy'])).toBe(true);
+  });
+});
+
+describe('options written the same way as each other', () => {
+  /**
+   * A cloze answer is lifted from mid-sentence and is lowercase; a defined
+   * term opened its line and is capitalised. Put them in one list and the
+   * odd one out is the answer, without reading the question.
+   */
+  const NOTES = [
+    'Elasticity measures how far demand responds to a change in price.',
+    'Monopsony describes a market with a single buyer.',
+    'Merit goods are goods the state judges people underconsume.',
+    'Subsidies shift the supply curve rightward and lower the equilibrium price.',
+    'Progressive taxation takes a larger proportion of income from higher earners.',
+  ].join('\n');
+
+  it('never leaves the answer as the only one of its case', () => {
+    for (const q of parseNotes(NOTES).questions) {
+      if (q.kind === 'enumeration') continue;
+      const decoys = q.answers.filter((a) => a !== q.correctAnswer);
+      if (decoys.length === 0) continue;
+      const capitalised = (t: string) => /^[A-Z]/.test(t);
+      const oddOneOut = decoys.every((d) => capitalised(d) !== capitalised(q.correctAnswer));
+      expect(oddOneOut).toBe(false);
+    }
+  });
+
+  it('leaves the answer itself untouched, because other code searches for it', () => {
+    // buildModifiedTrueFalse finds the answer inside its own source line by
+    // exact match; a changed capital there fails silently.
+    for (const q of parseNotes(NOTES).questions) {
+      if (!q.sourceLine) continue;
+      expect(q.sourceLine).toContain(q.correctAnswer);
     }
   });
 });
