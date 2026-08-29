@@ -13,7 +13,6 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Icon } from '@/components/Icon';
-import { DeskProp, type DeskMood } from '@/components/deskdress';
 import type { ExamFormat } from '@/lib/exam';
 import type { PaperStock } from '@/lib/mode';
 import { font, getColors, shadow, useThemeStore } from '@/theme/tokens';
@@ -61,10 +60,6 @@ interface Props {
   smudges?: number;
   /** Star stickers earned this run — first-try-correct pages. */
   stars?: number;
-  /** True after ~8s without input; the desk gets impatient. */
-  idle?: boolean;
-  /** The deskmate's mood — leaning in, wincing, or watching. */
-  mood?: DeskMood;
   /** What this mode's paper is. Ruled unless the mode says otherwise. */
   stock?: PaperStock;
   /** The mode's rubber stamp, printed in the corner. */
@@ -81,8 +76,6 @@ export function SpiralPad({
   children,
   smudges = 0,
   stars = 0,
-  idle = false,
-  mood = 'watch',
   stock = 'ruled',
   stamp,
   stampInk,
@@ -142,7 +135,6 @@ export function SpiralPad({
         </View>
       ) : null}
 
-      <DeskProp format={format} idle={idle} mood={mood} />
     </View>
   );
 }

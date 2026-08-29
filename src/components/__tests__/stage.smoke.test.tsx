@@ -16,7 +16,6 @@ import { ExamSheet } from '@/components/ExamSheet';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
 import {
   DayTint,
-  DeskProp,
   EmberDrift,
   PageCount,
   PencilProgress,
@@ -52,17 +51,6 @@ function unmount(tree: ReactTestRenderer): void {
 jest.useFakeTimers();
 
 describe('the stage mounts in every state', () => {
-
-  it('the deskmate holds every mood on every prop', () => {
-    for (const format of FORMATS) {
-      for (const mood of ['watch', 'happy', 'wince', 'sleep'] as const) {
-        const tree = mount(<DeskProp format={format} idle={mood === 'sleep'} mood={mood} />);
-        expect(tree.toJSON()).toBeTruthy();
-        unmount(tree);
-      }
-    }
-  });
-
   it('desk dressing renders through a whole paper', () => {
     for (const progress of [0, 0.4, 1]) {
       const tree = mount(<PencilProgress progress={progress} combo={progress * 20} />);

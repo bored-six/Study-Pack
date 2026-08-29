@@ -35,7 +35,7 @@ import { SpiralPad } from '@/components/SpiralPad';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
 import { ModeOutro } from '@/components/ModeOutro';
 import { ModeHud, clockText } from '@/components/ModeHud';
-import { DayTint, EmberDrift, type DeskMood } from '@/components/deskdress';
+import { DayTint, EmberDrift } from '@/components/deskdress';
 import { Icon } from '@/components/Icon';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
@@ -451,10 +451,6 @@ export default function ExamRunScreen() {
   const isFlagged = flagged.includes(item.id);
   const lastItem = index + 1 >= items.length;
 
-  // The deskmate reads the room: a fresh miss gets a wince, a hot combo a
-  // lean-in, otherwise it just watches (sleep is handled by idle).
-  const mood: DeskMood =
-    Date.now() - lastWrongAt < 2200 ? 'wince' : combo >= 5 ? 'happy' : 'watch';
 
   // The bell: one small ring before the final page of a straight sitting.
   const showBell = lastItem && spec.repetition === 'once' && items.length > 3;
@@ -595,9 +591,7 @@ export default function ExamRunScreen() {
               stamp={spec.stamp}
               stampInk={spec.ink}
               smudges={wrongByItem[item.id] ?? 0}
-              stars={stars}
-              idle={idle}
-              mood={mood}>
+              stars={stars}>
               <ExamItemView
                 item={item}
                 value={spec.feedback === 'deferred' ? (drafts[item.id] ?? emptyDraft(item)) : undefined}

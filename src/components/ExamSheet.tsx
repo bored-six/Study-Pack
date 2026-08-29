@@ -14,7 +14,6 @@ import Animated, {
 
 import { Icon } from '@/components/Icon';
 
-import { DeskProp, type DeskMood } from '@/components/deskdress';
 import { Squiggle } from '@/components/notebook';
 import type { ExamFormat } from '@/lib/exam';
 import type { PaperStock } from '@/lib/mode';
@@ -31,10 +30,6 @@ interface Props {
   smudges?: number;
   /** Star stickers earned this run — first-try-correct pages. */
   stars?: number;
-  /** True after ~8s without input; the desk gets impatient. */
-  idle?: boolean;
-  /** The deskmate's mood — leaning in, wincing, or watching. */
-  mood?: DeskMood;
   /**
    * The stationery this mode prints on. One blank white page for all five
    * modes meant a screenshot of a sprint and a screenshot of a sealed paper
@@ -61,8 +56,6 @@ export function ExamSheet({
   children,
   smudges = 0,
   stars = 0,
-  idle = false,
-  mood = 'watch',
   stock = 'ruled',
   stamp,
   stampInk,
@@ -112,7 +105,6 @@ export function ExamSheet({
         </View>
       ) : null}
 
-      <DeskProp format={format} idle={idle} mood={mood} />
     </View>
   );
 }
