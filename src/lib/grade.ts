@@ -86,6 +86,15 @@ export interface EnumerationCheck {
   results: { expected: string; matched: string | null; nearMiss: boolean }[];
   correct: boolean;
   matchedCount: number;
+  /**
+   * Typed entries that answered nothing.
+   *
+   * Without this they were simply never looked at, so writing down every
+   * term in the notes and leaving the marker to find the right ones scored
+   * full marks on every list question. Knowing a list means knowing where it
+   * stops, so padding costs you the item.
+   */
+  extras: string[];
 }
 
 /**
@@ -125,6 +134,17 @@ export function checkEnumeration(
     return { expected: item, matched: null, nearMiss: false };
   });
 
+  // Whatever no expected item claimed. Blanks are not padding — the form
+  // hands out one empty box per item and most people leave some of them.
+  const extras = remaining
+    .filter((e) => !e.used && e.value.trim().length > 0)
+    .map((e) => e.value.trim());
+
   const matchedCount = results.filter((r) => r.matched != null).length;
-  return { results, correct: matchedCount === expected.length, matchedCount };
+  return {
+    results,
+    correct: matchedCount === expected.length && extras.length === 0,
+    matchedCount,
+    extras,
+  };
 }

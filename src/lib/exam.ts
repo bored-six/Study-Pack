@@ -486,10 +486,18 @@ export function spreadCounts(
  */
 const REUSE_DECAY = 0.35;
 
+/**
+ * The seed is required, not defaulted.
+ *
+ * It used to fall back to the constant "exam", which meant any caller that
+ * forgot it got the same paper every sitting and nothing said so. The app's
+ * own call site passes the deck, the mode and the clock; making the argument
+ * mandatory is what stops the next call site from quietly not doing that.
+ */
 export function buildExam(
   questions: Question[],
   requests: ExamRequest[],
-  seedText = 'exam',
+  seedText: string,
   history: readonly AnswerRecord[] = []
 ): ExamItem[] {
   const rand = seed(seedText + questions.length);

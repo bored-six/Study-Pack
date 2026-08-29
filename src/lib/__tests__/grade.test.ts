@@ -89,6 +89,59 @@ describe('checkEnumeration', () => {
   });
 });
 
+describe('padding a list', () => {
+  const ITEMS = ['Prophase', 'Metaphase', 'Anaphase', 'Telophase'];
+
+  it('does not score full marks for listing everything in the notes', () => {
+    // The shotgun answer: name every phase you can think of and let the
+    // marker pick out the four that count. Every expected item is found, so
+    // this used to come back correct.
+    const result = checkEnumeration(
+      ['prophase', 'metaphase', 'anaphase', 'telophase', 'mitosis', 'cytokinesis', 'interphase'],
+      ITEMS
+    );
+    expect(result.matchedCount).toBe(4);
+    expect(result.extras).toEqual(['mitosis', 'cytokinesis', 'interphase']);
+    expect(result.correct).toBe(false);
+  });
+
+  it('still passes a clean answer', () => {
+    const result = checkEnumeration(['prophase', 'metaphase', 'anaphase', 'telophase'], ITEMS);
+    expect(result.extras).toEqual([]);
+    expect(result.correct).toBe(true);
+  });
+
+  it('does not count the blank boxes the form hands out', () => {
+    // One empty input per item is the starting state of every list question.
+    const result = checkEnumeration(['prophase', '', '  ', ''], ITEMS);
+    expect(result.extras).toEqual([]);
+    expect(result.matchedCount).toBe(1);
+  });
+
+  it('counts a repeated answer as padding rather than as an attempt', () => {
+    const result = checkEnumeration(['prophase', 'prophase', 'prophase', 'prophase'], ITEMS);
+    expect(result.matchedCount).toBe(1);
+    expect(result.extras).toHaveLength(3);
+  });
+
+  it('does not treat a wrong answer in its own slot as padding', () => {
+    // Writing the wrong thing in box 2 is a wrong answer, not an extra one.
+    const result = checkEnumeration(['prophase', 'telophase', 'anaphase', 'metaphase'], ITEMS, true);
+    expect(result.extras).toEqual([]);
+    expect(result.correct).toBe(false);
+  });
+
+  it('counts entries past the end of an ordered list', () => {
+    const result = checkEnumeration(
+      ['prophase', 'metaphase', 'anaphase', 'telophase', 'cytokinesis'],
+      ITEMS,
+      true
+    );
+    expect(result.extras).toEqual(['cytokinesis']);
+    expect(result.correct).toBe(false);
+  });
+});
+
 describe('the same answer, written differently', () => {
   it('accepts singular against plural, and agreement with it', () => {
     // The note said "Hearts pump blood"; the student wrote what they knew.

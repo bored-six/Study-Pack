@@ -240,6 +240,52 @@ describe('answer options', () => {
   });
 });
 
+describe('one answer, once', () => {
+  it('does not ask two questions with the same right answer', () => {
+    // Two different sentences, both landing on Germany. In a ten-question
+    // quiz the second is free once you have seen the first.
+    const { questions } = parseNotes(
+      [
+        'The Treaty of Versailles was signed by Germany in 1919.',
+        'The Weimar Republic governed Germany after the war.',
+        'Reparations were the payments demanded from Germany.',
+        'Hyperinflation destroyed the value of the mark in 1923.',
+        'The Reichstag was the parliament of the German state.',
+      ].join('\n')
+    );
+
+    const answers = questions.map((q) => q.correctAnswer.toLowerCase());
+    expect(new Set(answers).size).toBe(answers.length);
+  });
+
+  it('says why the repeat was dropped', () => {
+    const { stats } = parseNotes(
+      [
+        'The Treaty of Versailles was signed by Germany in 1919.',
+        'The Weimar Republic governed Germany after the war.',
+        'Reparations were the payments demanded from Germany.',
+        'Hyperinflation destroyed the value of the mark in 1923.',
+        'The Reichstag was the parliament of the German state.',
+      ].join('\n')
+    );
+    expect(stats.skipped.some((skip) => skip.reason === 'duplicate')).toBe(true);
+  });
+
+  it('leaves a set with no repeats alone', () => {
+    // The same notes with the second Germany sentence taken out: nothing
+    // here shares an answer, so nothing should be dropped for sharing one.
+    const { questions, stats } = parseNotes(
+      [
+        'The Treaty of Versailles was signed by Germany in 1919.',
+        'Hyperinflation destroyed the value of the mark in 1923.',
+        'The Reichstag was the parliament of the German state.',
+      ].join('\n')
+    );
+    expect(questions.length).toBe(3);
+    expect(stats.skipped.some((skip) => skip.reason === 'duplicate')).toBe(false);
+  });
+});
+
 describe('limits', () => {
   it('flags and truncates oversized input', () => {
     const line = 'Mitochondria produce 36 ATP per glucose molecule.\n';

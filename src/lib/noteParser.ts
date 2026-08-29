@@ -44,7 +44,8 @@ export type SkipReason =
   | 'too_long'
   | 'no_fact'
   | 'no_options'
-  | 'illustration';
+  | 'illustration'
+  | 'duplicate';
 
 /** Plain-language reasons, shown to the student beside the skipped line. */
 export const SKIP_LABEL: Record<SkipReason, string> = {
@@ -54,6 +55,7 @@ export const SKIP_LABEL: Record<SkipReason, string> = {
   no_fact: 'no clear fact to test',
   no_options: "couldn't build enough answer options",
   illustration: 'an example, not a fact to test',
+  duplicate: 'the same answer as an earlier question',
 };
 
 export interface SkippedLine {
@@ -940,6 +942,16 @@ export function parseNotes(input: string): ParseResult {
   const pool = [...termPool];
   const questions: ParsedQuestion[] = [];
   const seenPrompts = new Set<string>();
+  /**
+   * Right answers already spoken for.
+   *
+   * Two prompts can be worded differently and still come down to the same
+   * word — a note that mentions Germany twice yielded two questions whose
+   * answer was "Germany". In a ten-question quiz that reads as padding, and
+   * the second one is free once you have seen the first. Enumeration is
+   * exempt: its answer is a list, not a word.
+   */
+  const seenAnswers = new Set<string>();
 
   for (const draft of drafts) {
     if (questions.length >= LIMITS.maxQuestions) break;
@@ -955,6 +967,12 @@ export function parseNotes(input: string): ParseResult {
      */
     if (!isAskable({ prompt: draft.prompt, answer: draft.answer })) {
       skipped.push({ text: draft.source, reason: 'no_fact' });
+      continue;
+    }
+
+    const answerKey = draft.answer.trim().toLowerCase();
+    if (draft.kind !== 'enumeration' && seenAnswers.has(answerKey)) {
+      skipped.push({ text: draft.source, reason: 'duplicate' });
       continue;
     }
 
@@ -988,6 +1006,7 @@ export function parseNotes(input: string): ParseResult {
     }
 
     seenPrompts.add(key);
+    seenAnswers.add(answerKey);
     questions.push({
       prompt: draft.prompt,
       correctAnswer: draft.answer,

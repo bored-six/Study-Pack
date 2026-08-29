@@ -123,19 +123,53 @@ export function checkStatic(): Report {
   // --- work that never reached a screen -----------------------------------
 
   const files = sourceFiles(join(ROOT, 'src'));
-  const libModules = files
-    .filter((f) => f.includes(`${join('src', 'lib')}`) && !f.includes('__tests__'))
-    .map((f) => f.replace(/.*src[\\/]lib[\\/]/, '').replace(/\.tsx?$/, ''));
+  const inLib = (f: string) => f.includes(`${join('src', 'lib')}`);
+  const isTest = (f: string) => f.includes('__tests__');
 
-  const consumers = files.filter(
-    (f) => !f.includes('__tests__') && !f.includes(`${join('src', 'lib')}`)
-  );
-  const consumerText = consumers.map((f) => readFileSync(f, 'utf8')).join('\n');
+  const libFiles = files.filter((f) => inLib(f) && !isTest(f));
+  const nameOf = (f: string) => f.replace(/.*src[\\/]lib[\\/]/, '').replace(/\.tsx?$/, '');
+  const libModules = libFiles.map(nameOf);
+  const fileFor = new Map(libFiles.map((f) => [nameOf(f), f]));
 
-  const orphans = libModules.filter((module) => {
-    const patterns = [`@/lib/${module}`, `../lib/${module}`, `./lib/${module}`, `lib/${module}'`];
-    return !patterns.some((p) => consumerText.includes(p));
-  });
+  /**
+   * Which lib modules a file imports.
+   *
+   * A screen reaches a module as `@/lib/x` or `../lib/x`; a lib module
+   * reaches its neighbour as `./x`. Reading only the first kind was what made
+   * this check call questionQuality, quizzable and repair dead code — all
+   * three are imported, just by other lib modules rather than by a screen.
+   * The closing quote is part of the pattern so `lib/exam` does not match
+   * `lib/examDraft`.
+   */
+  const importsIn = (text: string, fromLib: boolean) =>
+    libModules.filter((module) => {
+      const paths = fromLib
+        ? [`./${module}`, `@/lib/${module}`]
+        : [`@/lib/${module}`, `../lib/${module}`];
+      return paths.some((path) => text.includes(`${path}'`) || text.includes(`${path}"`));
+    });
+
+  const read = (f: string) => readFileSync(f, 'utf8');
+
+  // Walk out from the screens, then follow lib → lib, so a module counts as
+  // reachable only if a real chain of imports leads to it from the app.
+  const reached = new Set<string>();
+  const queue: string[] = [];
+  const enqueue = (module: string) => {
+    if (reached.has(module)) return;
+    reached.add(module);
+    queue.push(module);
+  };
+
+  for (const file of files.filter((f) => !inLib(f) && !isTest(f))) {
+    importsIn(read(file), false).forEach(enqueue);
+  }
+  while (queue.length > 0) {
+    const file = fileFor.get(queue.shift()!);
+    if (file) importsIn(read(file), true).forEach(enqueue);
+  }
+
+  const orphans = libModules.filter((module) => !reached.has(module));
 
   report.metric(
     'lib modules reachable from a screen',

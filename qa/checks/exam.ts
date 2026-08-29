@@ -9,6 +9,9 @@
  * what it offered, and is the retake the same exam?
  */
 
+import { readFileSync } from 'fs';
+import { join, resolve } from 'path';
+
 import {
   availability,
   buildExam,
@@ -21,6 +24,8 @@ import type { Question } from '../../src/lib/types';
 import { REALISTIC } from '../corpora';
 import { Report } from '../report';
 import { percent, toQuestion, unique } from '../util';
+
+const ROOT = resolve(__dirname, '..', '..');
 
 const FORMATS: ExamFormat[] = [
   'multiple_choice',
@@ -235,13 +240,7 @@ export function checkExam(): Report {
     // --- two sittings ------------------------------------------------------
 
     const requests: ExamRequest[] = offered.map((format) => ({ format, count: available[format] }));
-    const first = buildExam(deck.questions, requests);
-    const second = buildExam(deck.questions, requests);
-    if (JSON.stringify(first) === JSON.stringify(second) && first.length > 1) {
-      identicalRetakes.push(
-        `[${deck.name}] ${first.length} items, byte-identical on the second build`
-      );
-    }
+    const first = buildExam(deck.questions, requests, 'sitting-0');
 
     // Seeding is supported — so check that it actually changes the exam.
     const variants = unique(
@@ -252,6 +251,22 @@ export function checkExam(): Report {
     if (variants <= 1 && first.length > 1) {
       deadVariety.push(`[${deck.name}] ${SITTINGS} different seeds produced ${variants} distinct exam`);
     }
+  }
+
+  /**
+   * Whether a retake is a new paper is decided at the call site, not here.
+   *
+   * buildExam is deterministic in its seed by design — that is what lets a
+   * survival round rebuild itself. So the thing worth checking is that the
+   * store mixes something per-sitting into the seed rather than the deck and
+   * the mode alone, which no amount of building exams in this file can show.
+   */
+  const storeSource = readFileSync(join(ROOT, 'src', 'store', 'exam.ts'), 'utf8');
+  const seedLine = /const seedText = `([^`]*)`/.exec(storeSource)?.[1];
+  if (!seedLine) {
+    identicalRetakes.push('src/store/exam.ts no longer builds a seedText the audit can read');
+  } else if (!/Date\.now\(\)|attempt|Math\.random|sitting|nonce/.test(seedLine)) {
+    identicalRetakes.push(`the seed is \`${seedLine}\` — nothing in it changes between sittings`);
   }
 
   report.metric(
@@ -340,9 +355,9 @@ export function checkExam(): Report {
     identicalRetakes.length > 0,
     'medium',
     'Every sitting of a deck produces the identical exam',
-    'The default seedText is the constant "exam", combined only with the question count, so two sittings of the same deck give the same items in the same order with the same true/false answers. A retake then tests recall of the last exam rather than of the notes. Pass a per-sitting seed — a timestamp or attempt id — at the call site.',
+    'buildExam is deterministic in its seed, so the whole question of whether a retake is a new paper comes down to what the call site passes. A seed built only from the deck and the mode gives the same items in the same order with the same true/false answers every sitting, and the retake tests recall of the last exam rather than of the notes.',
     identicalRetakes,
-    'src/lib/exam.ts → buildExam'
+    'src/store/exam.ts → startExam'
   );
 
   report.flagIf(

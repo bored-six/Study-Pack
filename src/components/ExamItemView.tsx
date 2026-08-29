@@ -843,7 +843,11 @@ function Enumeration({ item, draft, setDraft, reveal, onDone }: Field<Enumeratio
       {checked ? (
         <Verdict
           correct={result.correct}
-          detail={`You got ${result.matchedCount} of ${item.items.length}`}
+          detail={
+            result.extras.length > 0
+              ? `You got ${result.matchedCount} of ${item.items.length}, and ${result.extras.length} that weren't on the list`
+              : `You got ${result.matchedCount} of ${item.items.length}`
+          }
           onNext={() => onDone(result.correct)}
         />
       ) : reveal ? (
