@@ -31,7 +31,7 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { ComboMeter, comboColor } from '@/components/ComboMeter';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
-import { ExamSheet } from '@/components/ExamSheet';
+import { SpiralPad } from '@/components/SpiralPad';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
 import { ModeOutro } from '@/components/ModeOutro';
 import { ModeHud, clockText } from '@/components/ModeHud';
@@ -204,6 +204,25 @@ export default function ExamRunScreen() {
     }
     setItemDeadline(Date.now() + questionSeconds(item.format) * 1000);
   }, [spec.clock, item, visits, waitingOnBriefing]);
+
+  /**
+   * Turning to the next page.
+   *
+   * The stage is a pad now, so moving on is a physical thing and wants a
+   * sound. Not the tear — a tear per question is charming twice and
+   * exhausting by the fiftieth, and it is already the sound the sitting
+   * ends on, so spending it here would spend the ending too. A page turn
+   * is quieter and is what actually happens.
+   *
+   * Skipped on the very first page: the cartridge has just been loaded,
+   * and stacking a page turn on top of that reads as a stutter.
+   */
+  const turnedAt = useRef(0);
+  useEffect(() => {
+    if (visits === 0 || visits === turnedAt.current) return;
+    turnedAt.current = visits;
+    playSfx('tab_flip');
+  }, [visits]);
 
   /**
    * The last five seconds of a sprint, out loud.
@@ -560,7 +579,7 @@ export default function ExamRunScreen() {
             entering={FadeInDown.springify().damping(16)}
             exiting={SlideOutUp.duration(220)}>
             {scored ? <ComboMeter combo={combo} idle={idle} /> : null}
-            <ExamSheet
+            <SpiralPad
               format={item.format}
               title={FORMAT_LABEL[item.format]}
               accent={FORMAT_META[item.format].ink}
@@ -578,7 +597,7 @@ export default function ExamRunScreen() {
                 reveal={scored}
                 onDone={handleDone}
               />
-            </ExamSheet>
+            </SpiralPad>
           </Animated.View>
         </ScrollView>
 

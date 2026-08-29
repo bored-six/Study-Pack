@@ -194,26 +194,42 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
               style={styles.dealSlot}>
             <Pressable
               disabled={revealed}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: picked === option, disabled: revealed }}
+              accessibilityLabel={option}
               onPress={() => {
                 tapSelect();
                 setDraft({ kind: 'choice', picked: option });
               }}
               style={({ pressed }) => [
-                styles.playCard,
-                { transform: [{ rotate: i % 2 === 0 ? '-1.2deg' : '1.2deg' }] },
-                !reveal && picked === option && styles.playCardPicked,
-                showGood && styles.playCardGood,
-                showBad && styles.playCardBad,
-                dud && styles.playCardDud,
-                pressed && !revealed && styles.playCardLift,
+                styles.answerLine,
+                dud && styles.linePale,
+                pressed && !revealed && styles.linePressed,
               ]}>
-              <Text style={[styles.cardRank, showGood && styles.rankGood, showBad && styles.rankBad]}>
-                {rank}
-              </Text>
-              <View style={styles.cardTextWrap}>
+              {/* Ticked in pencil, the way you would on the page itself. */}
+              <View
+                style={[
+                  styles.tickBox,
+                  !reveal && picked === option && styles.tickBoxOn,
+                  showGood && styles.tickBoxGood,
+                  showBad && styles.tickBoxBad,
+                ]}>
+                {picked === option || showGood ? (
+                  <Icon
+                    name="check"
+                    size={12}
+                    color={showBad ? colors.coral : colors.surface}
+                    strokeWidth={3.2}
+                  />
+                ) : (
+                  <Text style={styles.tickRank}>{rank}</Text>
+                )}
+              </View>
+
+              <View style={styles.lineTextWrap}>
                 <Text
                   style={[
-                    styles.cardText,
+                    styles.lineText,
                     showGood && styles.optionTextGood,
                     showBad && styles.optionTextBad,
                   ]}>
@@ -223,12 +239,8 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
                   <PenStrike color={showBad ? colors.coral : colors.textFaint} />
                 ) : null}
               </View>
-              <Text style={[styles.cardRank, styles.cardRankFlip]}>{rank}</Text>
-              {showGood ? (
-                <View style={styles.cardMark}>
-                  <Icon name="check" size={16} color={colors.leaf} strokeWidth={3} />
-                </View>
-              ) : null}
+
+              {showGood ? <Icon name="check" size={16} color={colors.leaf} strokeWidth={3} /> : null}
             </Pressable>
             </Animated.View>
           );
@@ -237,7 +249,7 @@ function Choice({ item, draft, setDraft, reveal, onDone }: Field<ChoiceItem, 'ch
       {revealed ? (
         <Verdict correct={correct} onNext={() => onDone(correct)} />
       ) : reveal ? (
-        <Text style={styles.hint}>Play a card</Text>
+        <Text style={styles.hint}>Tick your answer</Text>
       ) : (
         <Recorded answered={picked != null} />
       )}
@@ -906,8 +918,70 @@ const getStyles = (colors: any) => StyleSheet.create({
     gap: 10,
   },
   dealSlot: {
-    width: '47.5%',
-    flexGrow: 1,
+    width: '100%',
+  },
+
+  /**
+   * One answer, written on a ruled line.
+   *
+   * These were playing cards — two abreast, rotated, each with a rank in
+   * two corners. On a pad they are lines: a pencil box at the margin and
+   * the answer beside it, so choosing looks like ticking a page rather
+   * than picking a card off a table.
+   */
+  answerLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    // Two ruled lines to an answer, so the page's rhythm and the answers'
+    // agree instead of drifting apart down the page.
+    height: 44,
+    paddingRight: 4,
+  },
+  linePale: {
+    opacity: 0.42,
+  },
+  linePressed: {
+    opacity: 0.65,
+  },
+  tickBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: colors.textFaint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Not `flex: 0` — that hands it a zero basis and the row squashes it
+    // to a sliver next to a flexible label.
+    flexShrink: 0,
+  },
+  tickBoxOn: {
+    backgroundColor: colors.accentDeep,
+    borderColor: colors.accentDeep,
+  },
+  tickBoxGood: {
+    backgroundColor: colors.leaf,
+    borderColor: colors.leaf,
+  },
+  tickBoxBad: {
+    borderColor: colors.coral,
+  },
+  tickRank: {
+    fontFamily: font.hero,
+    fontSize: 13,
+    lineHeight: 16,
+    color: colors.textFaint,
+  },
+  lineTextWrap: {
+    flex: 1,
+    position: 'relative',
+  },
+  lineText: {
+    fontFamily: font.heading,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.text,
   },
   playCard: {
     minHeight: 92,
