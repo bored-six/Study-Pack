@@ -464,6 +464,18 @@ function clozeCandidates(sentence: string, frequency: Map<string, number>): Cand
       continue;
     }
 
+    /**
+     * A lowercase word straight after the opening subject is the sentence's
+     * verb far more often than it is the thing worth testing, and length
+     * alone was enough to blank it: "Conduction ______ heat through direct
+     * contact between particles" asked for "transfers" and then offered
+     * three nouns beside it. Stopword subjects are exempt, so "The nucleus
+     * stores..." can still blank "nucleus".
+     */
+    const subject = tokens[0] ? cleanTerm(tokens[0]) : '';
+    const namedSubject = subject && titleish(subject) && !STOPWORDS.has(subject.toLowerCase());
+    if (i === 1 && namedSubject && !isNumeric(bare) && !titleish(bare)) continue;
+
     const seen = frequency.get(lower) ?? 0;
     if (seen >= 2) score += 4;
     // Long words are domain terms far more often than filler ("cytoplasm",
@@ -517,9 +529,49 @@ function numericDistractors(value: string, seed: string): string[] {
 }
 
 /** Picks wrong answers from other terms in the same notes, matched by shape. */
+/**
+ * Whether a term reads as a named thing rather than a plain word.
+ *
+ * The pool is a mixture: terms lifted from definitions ("Energy", "Matter"),
+ * items lifted from lists ("solid", "gas"), and words lifted from cloze
+ * sentences ("transfers"). They do not look alike, and a set of options that
+ * does not look alike answers itself — "Which term means: the ability to do
+ * work?" offered "transfers", "gas", "Kinetic" and "Energy", where the only
+ * capitalised, noun-shaped option is the right one. You do not need to know
+ * any physics to win that.
+ */
+const namedTerm = (term: string) => /^[A-Z]/.test(term.trim());
+
+/**
+ * Terms that are the opening of a longer term the notes also use.
+ *
+ * The capitalised-word scan reads "Kinetic energy is..." and keeps
+ * "Kinetic", because the second word is lowercase. On its own that is not a
+ * thing the notes ever define, and beside "Kinetic energy" it is a tell.
+ */
+function fragmentsOf(pool: string[]): Set<string> {
+  const fragments = new Set<string>();
+  for (const short of pool) {
+    const head = short.trim().toLowerCase();
+    if (!head) continue;
+    for (const long of pool) {
+      const whole = long.trim().toLowerCase();
+      if (whole === head) continue;
+      if (whole.startsWith(head) && /^[\s-]/.test(whole.slice(head.length))) {
+        fragments.add(short);
+        break;
+      }
+    }
+  }
+  return fragments;
+}
+
 function termDistractors(answer: string, pool: string[], seed: string): string[] {
   const answerLower = answer.toLowerCase();
   const answerWords = wordCount(answer);
+  const answerIsNamed = namedTerm(answer);
+  const fragments = fragmentsOf(pool);
+
   const usable = pool.filter((term) => {
     const lower = term.toLowerCase();
     if (lower === answerLower) return false;
@@ -527,6 +579,7 @@ function termDistractors(answer: string, pool: string[], seed: string): string[]
     // A bare number is never a believable stand-in for a term.
     if (isNumeric(term)) return false;
     if (words(lower).some((w) => STRUCTURAL.has(w.replace(/[^a-z]/g, '')))) return false;
+    if (fragments.has(term)) return false;
     return true;
   });
 
@@ -539,7 +592,18 @@ function termDistractors(answer: string, pool: string[], seed: string): string[]
   });
 
   const near = ranked.filter((t) => Math.abs(wordCount(t) - answerWords) <= 1);
-  const shuffled = seededShuffle(near.length >= 3 ? near : ranked, seed);
+  const base = near.length >= 3 ? near : ranked;
+
+  /**
+   * Same kind of thing as the answer, where the notes can afford it.
+   *
+   * Preferred rather than required: sparse notes may hold three sensible
+   * decoys of the other shape and nothing else, and a question with an
+   * imperfect option set still teaches more than the question we would
+   * otherwise drop.
+   */
+  const sameShape = base.filter((term) => namedTerm(term) === answerIsNamed);
+  const shuffled = seededShuffle(sameShape.length >= 3 ? sameShape : base, seed);
 
   // Reject options that overlap each other ("Allosteric" beside "Allosteric
   // regulation" gives the answer away).
