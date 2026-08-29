@@ -286,6 +286,44 @@ describe('one answer, once', () => {
   });
 });
 
+describe('a list item is a list item, however the list was written', () => {
+  const ITEMS = ['Hearts pump blood', 'lungs absorb oxygen', 'brains control body functions'];
+
+  it('drops the conjunction from a bulleted list', () => {
+    const { questions } = parseNotes(
+      'Human Body Basics:\n- Hearts pump blood\n- lungs absorb oxygen\n- and brains control body functions'
+    );
+    expect(questions[0].answers).toEqual(ITEMS);
+  });
+
+  it('drops it from a numbered list too', () => {
+    const { questions } = parseNotes(
+      'Human Body Basics:\n1. Hearts pump blood\n2. lungs absorb oxygen\n3. and brains control body functions'
+    );
+    expect(questions[0].answers).toEqual(ITEMS);
+  });
+
+  it('drops it from an inline series, as it always did', () => {
+    const { questions } = parseNotes(
+      'Human Body Basics: Hearts pump blood, lungs absorb oxygen, and brains control body functions.'
+    );
+    expect(questions[0].answers).toEqual(ITEMS);
+  });
+
+  it('handles "or" the same way', () => {
+    const { questions } = parseNotes('Rock types:\n- igneous\n- sedimentary\n- or metamorphic');
+    expect(questions[0].answers).toEqual(['igneous', 'sedimentary', 'metamorphic']);
+  });
+
+  it('does not eat a word that merely starts with those letters', () => {
+    const { questions } = parseNotes(
+      'Circulatory parts:\n- arteries carry blood\n- organs filter waste\n- andirons are not organs'
+    );
+    expect(questions[0].answers).toContain('andirons are not organs');
+    expect(questions[0].answers).toContain('organs filter waste');
+  });
+});
+
 describe('limits', () => {
   it('flags and truncates oversized input', () => {
     const line = 'Mitochondria produce 36 ATP per glucose molecule.\n';

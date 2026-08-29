@@ -1,5 +1,5 @@
 import { availability, supportedFormats } from '../exam';
-import { inferRepair } from '../repair';
+import { inferRepair, repairListAnswers } from '../repair';
 import type { Question } from '../types';
 
 /** A row as it sits in the database before repair: everything says trivia. */
@@ -126,5 +126,26 @@ describe('repairing a deck saved before the fix', () => {
       expect(question.sourceLine).not.toContain('______');
       expect(question.sourceLine).toContain(question.correctAnswer);
     }
+  });
+});
+
+describe('lists already saved to the database', () => {
+  it('strips a conjunction the old splitter left behind', () => {
+    expect(
+      repairListAnswers(['Hearts pump blood', 'lungs absorb oxygen', 'and brains control body functions'])
+    ).toEqual(['Hearts pump blood', 'lungs absorb oxygen', 'brains control body functions']);
+  });
+
+  it('leaves a clean list alone, so the migration writes nothing', () => {
+    expect(repairListAnswers(['igneous', 'sedimentary', 'metamorphic'])).toBeNull();
+  });
+
+  it('refuses to shorten a list, because the count is part of the question', () => {
+    // "List the 3" must still have three items afterwards.
+    expect(repairListAnswers(['solid', 'and', 'gas'])).toBeNull();
+  });
+
+  it('does not touch a word that merely begins with the conjunction', () => {
+    expect(repairListAnswers(['andirons', 'organs', 'orbits'])).toBeNull();
   });
 });

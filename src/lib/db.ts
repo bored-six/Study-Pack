@@ -1,6 +1,6 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
-import { inferRepair } from './repair';
+import { inferRepair, repairListAnswers } from './repair';
 
 import type {
   Attempt,
@@ -156,6 +156,45 @@ export async function initDb(): Promise<void> {
   // unrelated migration could never be repaired. The query below finds
   // nothing once everything is labelled, so running it every launch is free.
   await repairNoteQuestions(db);
+  await repairStoredLists(db);
+}
+
+/**
+ * Strips leading conjunctions from list answers saved by the old splitter.
+ *
+ * Ungated for the same reason as repairNoteQuestions: this is data, not
+ * schema, and a version gate cannot reach a database that was bumped past it
+ * by an unrelated migration. Once the lists are clean the update matches
+ * nothing, so running it every launch costs one query.
+ */
+async function repairStoredLists(db: SQLiteDatabase): Promise<void> {
+  const rows = await db.getAllAsync<{ id: string; answers_json: string }>(
+    `SELECT id, answers_json FROM questions WHERE kind = 'enumeration'`
+  );
+  if (rows.length === 0) return;
+
+  await db.withTransactionAsync(async () => {
+    for (const row of rows) {
+      let stored: unknown;
+      try {
+        stored = JSON.parse(row.answers_json);
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(stored) || !stored.every((item) => typeof item === 'string')) continue;
+
+      const cleaned = repairListAnswers(stored as string[]);
+      if (!cleaned) continue;
+
+      // The first item is also the stored correct answer, so both move.
+      await db.runAsync(
+        'UPDATE questions SET answers_json = ?, correct_answer = ? WHERE id = ?',
+        JSON.stringify(cleaned),
+        cleaned[0],
+        row.id
+      );
+    }
+  });
 }
 
 /**

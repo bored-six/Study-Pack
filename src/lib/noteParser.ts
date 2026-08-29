@@ -776,6 +776,37 @@ function plausibleItem(text: string): boolean {
 }
 
 /**
+ * One item of a list, however the list was written.
+ *
+ * "A, B, and C" leaves "and C" behind when it splits on the comma, so the
+ * inline splitter learned to drop a leading conjunction. The block splitter
+ * never did, and a list is just as likely to have the word typed on its last
+ * line:
+ *
+ *     Human Body Basics:
+ *     - Hearts pump blood
+ *     - lungs absorb oxygen
+ *     - and brains control body functions
+ *
+ * That asked the student to write "and brains control body functions",
+ * conjunction and all, and marked them wrong without it. The rule was right;
+ * it was only in one of the two places a list item is made. Now it is in
+ * neither and in one.
+ */
+export function listItem(text: string): string {
+  return text
+    .trim()
+    .replace(/^(?:and|or)\s+/i, '')
+    .replace(/[.;,]+$/, '')
+    .trim();
+}
+
+/** A stray bracket in an item is proof the split landed mid-aside. */
+function usableItem(text: string): boolean {
+  return plausibleItem(text) && !/[()]/.test(text);
+}
+
+/**
  * "Stages of mitosis:" followed by marked short lines. The colon line must
  * have nothing substantial after it, or it's a definition instead.
  */
@@ -794,8 +825,10 @@ function findListBlocks(lines: Line[]): { drafts: EnumDraft[]; consumed: Set<num
     const items: string[] = [];
     let numbered = false;
     let j = i + 1;
-    while (j < lines.length && lines[j].marked && plausibleItem(lines[j].text)) {
-      items.push(lines[j].text.replace(/[.;,]$/, ''));
+    while (j < lines.length && lines[j].marked) {
+      const item = listItem(lines[j].text);
+      if (!usableItem(item)) break;
+      items.push(item);
       numbered = numbered || lines[j].numbered;
       j++;
     }
@@ -855,16 +888,12 @@ function findInlineSeries(line: string): EnumDraft | null {
 
   const items = listable
     .split(/\s*,\s*|\s+and\s+|\s+or\s+/i)
-    .map((s) => s.trim())
-    // "A, B, and C" splits on the comma first and leaves "and C" behind.
-    .map((s) => s.replace(/^(?:and|or)\s+/i, '').trim())
+    .map(listItem)
     .filter(Boolean);
 
   const min = named ? CATEGORY_MIN : ENUM_LIMITS.min;
   if (items.length < min || items.length > ENUM_LIMITS.max) return null;
-  if (!items.every(plausibleItem)) return null;
-  // A stray bracket in an item is proof the split landed mid-aside.
-  if (items.some((item) => /[()]/.test(item))) return null;
+  if (!items.every(usableItem)) return null;
 
   // When the title states a count, it must agree — otherwise we split wrong.
   if (stated != null && stated !== items.length) return null;

@@ -8,6 +8,7 @@
  * prompt opens with "List the". Anything else is left alone.
  */
 
+import { listItem } from './noteParser';
 import type { QuestionKind } from './types';
 
 export interface RepairInput {
@@ -58,4 +59,22 @@ export function inferRepair(question: RepairInput): Repair | null {
 
   // Not a shape this parser produces — leave it as trivia.
   return null;
+}
+
+/**
+ * Cleans a stored list whose items were saved before the block splitter
+ * dropped leading conjunctions.
+ *
+ * Questions are parsed once, when the note is added, so fixing the parser
+ * does nothing for a deck already on the phone: it kept asking for "and
+ * brains control body functions" and marking the student wrong for writing
+ * what the list actually is. The rule is imported rather than restated, so
+ * a stored list and a fresh one can never disagree about what an item is.
+ *
+ * Returns null when nothing needed changing, so the caller can skip the write.
+ */
+export function repairListAnswers(answers: readonly string[]): string[] | null {
+  const cleaned = answers.map(listItem).filter(Boolean);
+  if (cleaned.length !== answers.length) return null;
+  return cleaned.some((item, i) => item !== answers[i]) ? cleaned : null;
 }
