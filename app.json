@@ -6,11 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "studypack",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.boredsix.flipp",
       "adaptiveIcon": {
         "backgroundColor": "#FAF3E1",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

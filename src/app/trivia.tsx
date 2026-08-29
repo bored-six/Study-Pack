@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
+  Linking,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -86,6 +87,18 @@ export default function TriviaScreen() {
       <Text style={styles.sub}>
         Practice decks from Open Trivia DB
         {savedHere > 0 ? ` · ${savedHere} saved on this level` : ''}
+      </Text>
+
+      {/*
+        Open Trivia DB is CC BY-SA 4.0, which asks for the source *and* the
+        licence to be named. Saying where the questions came from was only
+        half of that, and the licence applies however the app is handed out.
+      */}
+      <Text
+        style={styles.credit}
+        accessibilityRole="link"
+        onPress={() => void Linking.openURL('https://opentdb.com/api_config.php').catch(() => {})}>
+        Questions © Open Trivia DB, used under CC BY-SA 4.0
       </Text>
 
       <OfflineBanner message="Offline — saved decks still play" style={styles.cacheNote} />
@@ -261,6 +274,13 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 12.5,
     color: colors.textFaint,
     marginTop: 2,
+  },
+  credit: {
+    fontFamily: font.body,
+    fontSize: 11.5,
+    color: colors.textFaint,
+    marginTop: 4,
+    textDecorationLine: 'underline',
   },
   cacheNote: {
     marginTop: 10,
