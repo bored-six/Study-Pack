@@ -5,8 +5,7 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/exam/(.*)", "destination": "/exam/[deckId]" },
-    { "source": "/quiz/(.*)", "destination": "/quiz/[deckId]" }
+    { "source": "/exam/(.*)", "destination": "/exam/[deckId]" }
   ],
   "headers": [
     {

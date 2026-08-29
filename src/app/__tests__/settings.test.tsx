@@ -6,7 +6,6 @@ import SettingsScreen from '../settings';
 const mockSettings = new Map<string, string>();
 const mockErase = jest.fn(async () => undefined);
 const mockClearHistory = jest.fn(async () => undefined);
-const mockClearTrivia = jest.fn(async () => undefined);
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
 jest.mock('react-native-safe-area-context', () => ({
@@ -28,7 +27,6 @@ jest.mock('@/lib/db', () => ({
   // Called through, not passed directly: the factory runs while the mock
   // consts are still hoisted-but-unassigned.
   clearPracticeHistory: () => mockClearHistory(),
-  clearTriviaDownloads: () => mockClearTrivia(),
   eraseEverything: () => mockErase(),
 }));
 jest.mock('@/lib/sfx', () => ({ setSfxEnabled: jest.fn() }));

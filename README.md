@@ -24,7 +24,7 @@ should survive a dropped connection. Downloading a deck is the feature, not a ca
                                 │              transactional writes
                   ┌─────────────┼──────────────┐
                   ▼             ▼              ▼
-           store/decks.ts  store/quiz.ts  store/progress.ts     (zustand)
+           store/progress.ts     (zustand)
                   │             │              │
                   ▼             ▼              ▼
              app/(tabs)/   app/quiz/      app/(tabs)/
