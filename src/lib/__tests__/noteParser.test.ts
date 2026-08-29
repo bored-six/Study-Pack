@@ -338,10 +338,24 @@ describe('notes that used to break it', () => {
 
   it('reads a paste that lost its line breaks as separate facts', () => {
     const prompts = promptsOf(
-      'Water Cycle: Evaporation happens first.Solar System: The Sun is a star at the centre of it.Seasons: Caused by the tilt of the axis of Earth.'
+      'Water Cycle: Evaporation happens first.Photosynthesis: Plants convert sunlight into stored chemical energy.Seasons: Caused by the tilt of the axis of Earth.'
     );
     expect(prompts).toHaveLength(3);
-    for (const prompt of prompts) expect(prompt).not.toContain('Solar System:');
+    // Three facts, three questions — not one question holding all three.
+    for (const prompt of prompts) expect(prompt).not.toContain('Photosynthesis:');
+  });
+
+  it('drops a run-on sentence that leans on the term it is asking for', () => {
+    // "…at the centre of it" only means anything beside the words "Solar
+    // System", so on its own it is not a question, and the "it" is the
+    // answer. Its neighbours still come through.
+    const prompts = promptsOf(
+      'Water Cycle: Evaporation happens first.Solar System: The Sun is a star at the centre of it.Seasons: Caused by the tilt of the axis of Earth.'
+    );
+    expect(prompts).toHaveLength(2);
+    expect(prompts.join(' ')).not.toContain('centre of it');
+    // And it is not salvaged by blanking a word out of its own term.
+    expect(prompts.join(' ')).not.toContain('Solar');
   });
 
   it('keeps an abbreviation whole rather than splitting inside it', () => {

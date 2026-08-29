@@ -11,6 +11,7 @@
  * topically related instead of obviously filler.
  */
 
+import { danglesOutward, fitsAsOption, isAskable, tightenMeaning } from './questionQuality';
 import { CLAIM_VERB, ILLUSTRATION_PREFIX } from './quizzable';
 
 export const LIMITS = {
@@ -407,7 +408,8 @@ function matchDefinition(line: string): Definition | null {
 }
 
 function definitionPrompt(def: Definition): string {
-  let meaning = def.meaning.replace(/\s*[.;]+$/, '');
+  // The asides a note carries to help its reader are noise in a question.
+  let meaning = tightenMeaning(def.meaning).replace(/\s*[.;]+$/, '');
   // Cleaning can eat a closing quote — put it back rather than leave it open.
   if ((meaning.match(/"/g)?.length ?? 0) % 2 === 1) meaning += '"';
   return def.acronym
@@ -847,7 +849,10 @@ export function parseNotes(input: string): ParseResult {
     if (
       definition &&
       wordCount(definition.term) <= LIMITS.maxAnswerWords &&
-      wordCount(definition.meaning) <= LIMITS.maxSentenceWords
+      wordCount(definition.meaning) <= LIMITS.maxSentenceWords &&
+      // "The Sun is a star at the centre of it" defines nothing on its own,
+      // and the "it" it leans on is the answer being asked for.
+      !danglesOutward(definition.meaning)
     ) {
       drafts.push({
         prompt: definitionPrompt(definition),
@@ -857,6 +862,20 @@ export function parseNotes(input: string): ParseResult {
       });
       termPool.add(definition.term);
       linesUsed++;
+      continue;
+    }
+
+    /**
+     * A definition we turned down is a line we turned down.
+     *
+     * It used to fall through to the cloze builder, which does not know a
+     * "Term: meaning" line from prose and happily blanked a word out of the
+     * term itself — "Solar ______: The Sun is a star at the centre of it."
+     * If the line is shaped like a definition and the definition was not
+     * good enough to ask, there is nothing else here worth asking either.
+     */
+    if (definition) {
+      skipped.push({ text: line, reason: 'no_fact' });
       continue;
     }
 
@@ -928,6 +947,17 @@ export function parseNotes(input: string): ParseResult {
     const key = draft.prompt.toLowerCase();
     if (seenPrompts.has(key)) continue;
 
+    /**
+     * Every question, from every format, through one gate. It used to be
+     * that each builder pushed straight onto the pile, so a rule about
+     * what makes a question answerable had to be remembered in each of
+     * them — and a question that stated its own answer reached the deck.
+     */
+    if (!isAskable({ prompt: draft.prompt, answer: draft.answer })) {
+      skipped.push({ text: draft.source, reason: 'no_fact' });
+      continue;
+    }
+
     // Enumeration needs no decoys — the items are the answer.
     if (draft.kind === 'enumeration' && draft.items) {
       seenPrompts.add(key);
@@ -943,9 +973,12 @@ export function parseNotes(input: string): ParseResult {
     }
 
     const seed = draft.prompt + draft.answer;
+    // The picker never sees the prompt, so it cannot know that one of its
+    // candidates is already printed in the question. Filter the pool first.
+    const usablePool = pool.filter((term) => fitsAsOption(term, draft.prompt, draft.answer));
     const distractors = isNumeric(draft.answer)
       ? numericDistractors(draft.answer, seed)
-      : termDistractors(draft.answer, pool, seed);
+      : termDistractors(draft.answer, usablePool, seed);
 
     // A multiple-choice question needs three believable wrong answers or it
     // isn't a question — drop it rather than pad with nonsense.
