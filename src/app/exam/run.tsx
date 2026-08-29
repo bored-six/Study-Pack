@@ -569,9 +569,17 @@ export default function ExamRunScreen() {
             <Animated.View
               key={`bell:${index}`}
               entering={ZoomIn.springify().damping(11)}
-              style={styles.bell}>
-              <Icon name="bell" size={15} color={colors.ink} fill={colors.goldWash} strokeWidth={2.1} />
-              <Text style={styles.bellText}>last one!</Text>
+              style={styles.bellSlot}>
+              {/*
+                The tilt lives on the inner view. Reanimated drives a layout
+                animation and `transform` through the same property, so a view
+                carrying both loses the tilt the moment the animation runs —
+                silently, and with a warning every render.
+              */}
+              <View style={styles.bell}>
+                <Icon name="bell" size={15} color={colors.ink} fill={colors.goldWash} strokeWidth={2.1} />
+                <Text style={styles.bellText}>last one!</Text>
+              </View>
             </Animated.View>
           ) : null}
           <Animated.View
@@ -634,10 +642,12 @@ export default function ExamRunScreen() {
           <Animated.View
             entering={SlideInRight.springify().damping(16)}
             exiting={FadeOut.duration(250)}
-            style={styles.passingNote}
+            style={styles.passingNoteSlot}
             pointerEvents="none">
-            <View style={styles.noteFold} />
-            <Text style={styles.noteText}>{note}</Text>
+            <View style={styles.passingNote}>
+              <View style={styles.noteFold} />
+              <Text style={styles.noteText}>{note}</Text>
+            </View>
           </Animated.View>
         ) : null}
         <Animated.View
@@ -746,18 +756,21 @@ export default function ExamRunScreen() {
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
+  /** Placement only: the animated wrapper must not carry the tilt. */
+  bellSlot: {
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
   bell: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'center',
     backgroundColor: colors.goldWash,
     borderWidth: 1.5,
     borderColor: colors.edge,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 5,
-    marginBottom: 8,
     transform: [{ rotate: '-2deg' }],
   },
   bellText: {
@@ -765,11 +778,14 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 15,
     color: colors.gold,
   },
-  passingNote: {
+  /** Placement only: the animated wrapper must not carry the tilt. */
+  passingNoteSlot: {
     position: 'absolute',
     right: 10,
     top: '38%',
     zIndex: 45,
+  },
+  passingNote: {
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.edge,

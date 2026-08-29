@@ -231,9 +231,18 @@ function TwinkleStar({ index, newest }: { index: number; newest: boolean }) {
     ],
   }));
 
+  /*
+   * The landing animation goes on a wrapper, never on the view that also
+   * carries the shimmer's transform. Reanimated drives both from the same
+   * property, so the layout animation silently overwrites the transform and
+   * warns about it once per render — with a star per first-try-correct
+   * answer, that filled the console.
+   */
   return (
-    <Animated.View entering={newest ? ZoomIn.springify().damping(9) : undefined} style={style}>
-      <Icon name="star" size={24} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+    <Animated.View entering={newest ? ZoomIn.springify().damping(9) : undefined}>
+      <Animated.View style={style}>
+        <Icon name="star" size={24} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+      </Animated.View>
     </Animated.View>
   );
 }

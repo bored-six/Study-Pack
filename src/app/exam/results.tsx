@@ -287,17 +287,24 @@ export default function ExamResultsScreen() {
               <Text style={styles.score}>{hero.big}</Text>
               <Text style={styles.pct}>{hero.small}</Text>
             </View>
-            <Animated.View
-              entering={ZoomIn.springify().damping(9).delay(250)}
-              style={[
-                styles.gradeStamp,
-                { borderColor: perfect ? colors.gold : tone.color },
-                perfect && styles.gradeStampGold,
-              ]}>
-              {perfect ? <Shimmer /> : null}
-              <Text style={[styles.gradeText, { color: perfect ? colors.gold : tone.color }]}>
-                {grade}
-              </Text>
+            <Animated.View entering={ZoomIn.springify().damping(9).delay(250)}>
+              {/*
+                The tilt lives on the inner view. Reanimated drives a layout
+                animation and `transform` through the same property, so a view
+                carrying both loses the tilt the moment the animation runs —
+                silently, and with a warning every render.
+              */}
+              <View
+                style={[
+                  styles.gradeStamp,
+                  { borderColor: perfect ? colors.gold : tone.color },
+                  perfect && styles.gradeStampGold,
+                ]}>
+                {perfect ? <Shimmer /> : null}
+                <Text style={[styles.gradeText, { color: perfect ? colors.gold : tone.color }]}>
+                  {grade}
+                </Text>
+              </View>
             </Animated.View>
           </View>
 
@@ -319,14 +326,17 @@ export default function ExamResultsScreen() {
                     perfect
                       ? ZoomIn.springify().damping(8).delay(500 + i * 90)
                       : undefined
-                  }
-                  style={{
-                    transform: [
-                      { rotate: `${perfect ? (i - Math.min(stars, 7) / 2) * 10 : (i % 3) * 7 - 7}deg` },
-                      { translateY: perfect ? -Math.abs(i - (Math.min(stars, 7) - 1) / 2) * -2 : 0 },
-                    ],
-                  }}>
-                  <Icon name="star" size={perfect ? 19 : 16} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+                  }>
+                  {/* The tilt sits inside, so the entrance cannot overwrite it. */}
+                  <View
+                    style={{
+                      transform: [
+                        { rotate: `${perfect ? (i - Math.min(stars, 7) / 2) * 10 : (i % 3) * 7 - 7}deg` },
+                        { translateY: perfect ? -Math.abs(i - (Math.min(stars, 7) - 1) / 2) * -2 : 0 },
+                      ],
+                    }}>
+                    <Icon name="star" size={perfect ? 19 : 16} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+                  </View>
                 </Animated.View>
               ))}
               <Text style={styles.starText}>

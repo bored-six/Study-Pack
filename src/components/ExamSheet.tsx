@@ -239,10 +239,10 @@ function TwinkleStar({ index, newest }: { index: number; newest: boolean }) {
   }));
 
   return (
-    <Animated.View
-      entering={newest ? ZoomIn.springify().damping(9) : undefined}
-      style={style}>
-      <Icon name="star" size={24} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+    <Animated.View entering={newest ? ZoomIn.springify().damping(9) : undefined}>
+      <Animated.View style={style}>
+        <Icon name="star" size={24} color={colors.ink} fill={colors.gold} strokeWidth={1.7} />
+      </Animated.View>
     </Animated.View>
   );
 }

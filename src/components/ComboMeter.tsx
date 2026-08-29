@@ -205,9 +205,12 @@ export function ComboMeter({ combo, idle = false }: Props) {
         pointerEvents="none"
         entering={ZoomIn.springify().damping(10)}
         exiting={FadeOut}
-        style={styles.backOn}>
-        <Icon name="check" size={13} color={colors.leaf} strokeWidth={3} />
-        <Text style={styles.backOnText}>back on it</Text>
+        style={styles.backOnSlot}>
+        {/* The tilt cannot share a view with the entrance. */}
+        <View style={styles.backOn}>
+          <Icon name="check" size={13} color={colors.leaf} strokeWidth={3} />
+          <Text style={styles.backOnText}>back on it</Text>
+        </View>
       </Animated.View>
     ) : null;
   }
@@ -217,13 +220,16 @@ export function ComboMeter({ combo, idle = false }: Props) {
   return (
     <>
       {flare != null ? (
-        <Animated.View pointerEvents="none" style={[styles.flare, flareStyle]} exiting={FadeOut}>
-          <Animated.View style={[styles.flareGlow, { backgroundColor: tier.wash }, glowDiscStyle]} />
-          {[0.5, 1.4, 2.4, 3.4, 4.3, 5.3].map((angle) => (
-            <Fleck key={angle} angle={angle} color={tier.color} nonce={burst} />
-          ))}
-          <Icon name={tier.icon} size={44} color={colors.ink} fill={tier.color} strokeWidth={1.7} />
-          <Text style={[styles.flareText, { color: tier.color }]}>×{flare}</Text>
+        <Animated.View pointerEvents="none" style={styles.flare} exiting={FadeOut}>
+          {/* The burst's own transform lives inside the exiting wrapper. */}
+          <Animated.View style={[styles.flareRow, flareStyle]}>
+            <Animated.View style={[styles.flareGlow, { backgroundColor: tier.wash }, glowDiscStyle]} />
+            {[0.5, 1.4, 2.4, 3.4, 4.3, 5.3].map((angle) => (
+              <Fleck key={angle} angle={angle} color={tier.color} nonce={burst} />
+            ))}
+            <Icon name={tier.icon} size={44} color={colors.ink} fill={tier.color} strokeWidth={1.7} />
+            <Text style={[styles.flareText, { color: tier.color }]}>×{flare}</Text>
+          </Animated.View>
         </Animated.View>
       ) : null}
 
@@ -280,11 +286,14 @@ const getStyles = (colors: any) => StyleSheet.create({
     letterSpacing: 1,
     marginTop: -2,
   },
-  backOn: {
+  /** Placement only: the animated wrapper must not carry the tilt. */
+  backOnSlot: {
     position: 'absolute',
     top: -12,
     right: 6,
     zIndex: 30,
+  },
+  backOn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -306,6 +315,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     top: '30%',
     alignSelf: 'center',
     zIndex: 40,
+  },
+  /** The row the burst scales and lifts; the wrapper above only positions it. */
+  flareRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 6,
