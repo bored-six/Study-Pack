@@ -91,6 +91,18 @@ function SettingRow({ icon, label, sub, right }: { icon?: IconName; label: strin
   );
 }
 
+/** One plain promise, ticked. Fixed ink: the card's wash never changes with the theme. */
+function PrivacyLine({ text }: { text: string }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const styles = getStyles(getColors(isDark));
+  return (
+    <View style={styles.privacyLine}>
+      <Icon name="check" size={15} color="#1A211C" strokeWidth={3} />
+      <Text style={styles.privacyText}>{text}</Text>
+    </View>
+  );
+}
+
 function DangerRow({ icon, label, sub, onPress }: { icon: IconName; label: string; sub: string; onPress: () => void }) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
@@ -299,6 +311,29 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* PRIVACY */}
+        <View style={styles.stickyWrapper}>
+          <View style={[styles.stickyCard, { backgroundColor: '#DBEEFB', transform: [{ rotate: '-0.6deg' }] }]}>
+            <View style={styles.cardHeader}>
+              <Icon name="smartphone" size={28} color="#1A211C" />
+              <Text style={styles.cardTitle}>Your Privacy</Text>
+            </View>
+
+            {/*
+              Flipp is handed out as a download from a link rather than through
+              a store, so nobody has vetted it on the student's behalf. Saying
+              plainly what it does is the only assurance they get, and every
+              line here is true of the code as written.
+            */}
+            <PrivacyLine text="Your notes, answers and streak stay on this phone." />
+            <PrivacyLine text="Nothing you write is uploaded. There is no server to upload it to." />
+            <PrivacyLine text="No account, no sign-in, no ads, no tracking of any kind." />
+            <PrivacyLine text="Reminders are set by the phone itself, not sent from anywhere." />
+            <PrivacyLine text="Trivia questions are the one thing fetched from the internet, from Open Trivia DB. Nothing about you goes with the request." />
+            <PrivacyLine text="Delete everything whenever you like, below. It is gone from the phone, and there is no copy elsewhere." />
+          </View>
+        </View>
+
         {/* DANGER ZONE */}
         <View style={styles.stickyWrapper}>
           <View style={[styles.stickyCard, { backgroundColor: '#FBD5CC', transform: [{ rotate: '-1deg' }] }]}>
@@ -452,6 +487,19 @@ const getStyles = (colors: any) => StyleSheet.create({
   settingLabel: {
     fontFamily: font.bodyHeavy,
     fontSize: 16,
+    color: lightColors.ink,
+  },
+  privacyLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    marginBottom: 11,
+  },
+  privacyText: {
+    flex: 1,
+    fontFamily: font.bodySemibold,
+    fontSize: 13.5,
+    lineHeight: 19,
     color: lightColors.ink,
   },
   settingSub: {

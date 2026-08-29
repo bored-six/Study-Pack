@@ -182,3 +182,34 @@ describe('the settings screen', () => {
     expect(mockErase).not.toHaveBeenCalled();
   });
 });
+
+describe('the privacy card', () => {
+  /**
+   * Flipp is handed out as a download from a link, so nobody has vetted it on
+   * the student's behalf. These lines are the only assurance they get, and
+   * each one has to stay true of the code — if a server, an account or an
+   * analytics SDK ever arrives, this test should fail and force the wording
+   * to change with it.
+   */
+  /** Everything the screen renders, as one string. */
+  const spoken = async () => {
+    const tree = await render();
+    return tree.root
+      .findAll((node) => node.type === Text)
+      .map((node) => textOf(node.props.children))
+      .join(' ');
+  };
+
+  it('promises the things that are actually true', async () => {
+    const said = await spoken();
+    expect(said).toContain('stay on this phone');
+    expect(said).toContain('Nothing you write is uploaded');
+    expect(said).toContain('no ads, no tracking');
+    expect(said).toContain('Open Trivia DB');
+  });
+
+  it('sits above the way to delete everything, not instead of it', async () => {
+    const said = await spoken();
+    expect(said).toContain('Delete everything');
+  });
+});
