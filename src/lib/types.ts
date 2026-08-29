@@ -8,16 +8,22 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   hard: 'Hard',
 };
 
-/** Where a deck came from: the trivia API, or the student's own notes. */
+/**
+ * Where a deck came from.
+ *
+ * Only 'notes' is ever created now. 'trivia' stays in the union because
+ * databases from before the trivia half was removed still carry rows marked
+ * that way, and the launch repair that deletes them has to be able to name
+ * them. Nothing writes it.
+ */
 export type DeckSource = 'trivia' | 'notes';
 
 /**
- * A trivia deck is one Open Trivia DB category at one difficulty.
- * A notes deck is generated on-device from pasted notes and is therefore
+ * A deck is a subject, generated on-device from pasted notes, and therefore
  * downloaded from the moment it exists.
  */
 export interface Deck {
-  id: string; // trivia: `${categoryId}:${difficulty}` · notes: `note:${timestamp}`
+  id: string; // `note:${timestamp}`
   categoryId: number;
   name: string;
   difficulty: Difficulty;
@@ -31,7 +37,12 @@ export interface Deck {
   downloadedAt: number | null;
 }
 
-/** How a question was derived, which decides the exam formats it supports. */
+/**
+ * How a question was derived, which decides the exam formats it supports.
+ *
+ * 'trivia' is the fallback for a stored question whose kind could not be
+ * recovered — see repair.ts. The parser never produces it.
+ */
 export type QuestionKind = 'definition' | 'cloze' | 'enumeration' | 'trivia';
 
 export interface Question {
