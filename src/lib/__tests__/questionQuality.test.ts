@@ -274,3 +274,49 @@ describe('options written the same way as each other', () => {
     }
   });
 });
+
+describe('questions already saved that the parser would now refuse', () => {
+  // Verbatim from the reported subject.
+  const WELDED = {
+    prompt:
+      'Which term means: Evaporation (water turns to vapor) $\\rightarrow$ Condensation (clouds ' +
+      'form) $\\rightarrow$ Precipitation (rain/snow falls).Solar System: The Sun is a star at the ' +
+      "center, orbited by 8 planets (Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, " +
+      "Neptune).Seasons: Caused by Earth's tilted axis as it orbits the Sun, not by how close " +
+      'Earth is to the Sun?',
+    answer: 'Earth & SpaceWater Cycle',
+  };
+
+  it('refuses the one the student kept failing', () => {
+    expect(isAskable(WELDED)).toBe(false);
+  });
+
+  it('keeps the ordinary questions from the same note', () => {
+    expect(
+      isAskable({
+        prompt: 'Which term means: The Sun is a star at the center, orbited by 8 planets?',
+        answer: 'Solar System',
+      })
+    ).toBe(true);
+    expect(
+      isAskable({
+        prompt:
+          "Which term means: Caused by Earth's tilted axis as it orbits the Sun, not by how " +
+          'close Earth is to the Sun?',
+        answer: 'Seasons',
+      })
+    ).toBe(true);
+  });
+
+  it('keeps a list question, whose prompt is short and whose answer is one item', () => {
+    expect(isAskable({ prompt: 'List the 3: Water Cycle', answer: 'Evaporation' })).toBe(true);
+  });
+
+  it('keeps a short answer with no content words of its own', () => {
+    // The cleanup runs over real decks; "36" and "pH" must survive it.
+    expect(isAskable({ prompt: 'Mitochondria produce ______ ATP per glucose.', answer: '36' })).toBe(
+      true
+    );
+    expect(isAskable({ prompt: 'Which term means: a measure of acidity?', answer: 'pH' })).toBe(true);
+  });
+});

@@ -1,6 +1,7 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { rebuildOptions } from './noteParser';
+import { isAskable } from './questionQuality';
 import { inferRepair, repairListAnswers } from './repair';
 
 import type {
@@ -159,6 +160,55 @@ export async function initDb(): Promise<void> {
   await repairNoteQuestions(db);
   await repairStoredLists(db);
   await repairStoredOptions(db);
+  await dropUnaskableQuestions(db);
+}
+
+/**
+ * Removes questions the parser would refuse to make today.
+ *
+ * A subject keeps its questions, not the note behind them, so a question
+ * built by an older parser is permanent: one paste that had lost its line
+ * breaks left a sixty-word prompt whose answer was two headings welded
+ * together, and no answer a student could type would ever match it. Every
+ * sitting asked it again and marked them wrong.
+ *
+ * isAskable is the same gate a fresh question passes, so nothing is judged
+ * by a standard the parser does not hold itself to.
+ *
+ * A deck is left completely alone if the gate would empty it. A subject with
+ * no questions is worse than a subject with bad ones, and a gate that
+ * rejects everything is far more likely to be a bug here than a truth about
+ * the student's notes.
+ */
+async function dropUnaskableQuestions(db: SQLiteDatabase): Promise<void> {
+  const decks = await db.getAllAsync<{ id: string }>(
+    `SELECT id FROM decks WHERE source = 'notes'`
+  );
+
+  for (const deck of decks) {
+    const rows = await db.getAllAsync<{ id: string; prompt: string; correct_answer: string }>(
+      `SELECT id, prompt, correct_answer FROM questions WHERE deck_id = ?`,
+      deck.id
+    );
+    if (rows.length === 0) continue;
+
+    const doomed = rows.filter(
+      (row) => !isAskable({ prompt: row.prompt, answer: row.correct_answer })
+    );
+    if (doomed.length === 0 || doomed.length === rows.length) continue;
+
+    await db.withTransactionAsync(async () => {
+      for (const row of doomed) {
+        await db.runAsync('DELETE FROM questions WHERE id = ?', row.id);
+      }
+      await db.runAsync(
+        `UPDATE decks SET question_count = (SELECT COUNT(*) FROM questions WHERE deck_id = ?)
+         WHERE id = ?`,
+        deck.id,
+        deck.id
+      );
+    });
+  }
 }
 
 /**
