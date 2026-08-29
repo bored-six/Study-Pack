@@ -169,3 +169,18 @@ describe('the same answer, written differently', () => {
     expect(checkAnswer('35', '36').correct).toBe(false);
   });
 });
+
+describe('an ampersand the note used to save space', () => {
+  it('accepts "and" where the note wrote "&"', () => {
+    expect(checkAnswer('Earth and Space', 'Earth & Space').correct).toBe(true);
+    expect(checkAnswer('Earth & Space', 'Earth and Space').correct).toBe(true);
+  });
+
+  it('does not make different answers equal', () => {
+    expect(checkAnswer('Earth and Water', 'Earth & Space').correct).toBe(false);
+  });
+
+  it('handles it with no spaces around it', () => {
+    expect(checkAnswer('supply and demand', 'Supply&Demand').correct).toBe(true);
+  });
+});

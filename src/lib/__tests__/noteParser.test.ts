@@ -379,6 +379,54 @@ describe('rebuilding options for a deck already on the phone', () => {
   });
 });
 
+describe('a paste that lost its line breaks', () => {
+  // Reported from a real subject: a heading welded to the front of the next
+  // heading became the answer to a sixty-word question.
+  const PASTE =
+    "Earth & SpaceWater Cycle: Evaporation (water turns to vapor) $\\rightarrow$ Condensation " +
+    "(clouds form) $\\rightarrow$ Precipitation (rain/snow falls).Solar System: The Sun is a star " +
+    "at the center, orbited by 8 planets (Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, " +
+    "Neptune).Seasons: Caused by Earth's tilted axis as it orbits the Sun, not by how close Earth " +
+    "is to the Sun.";
+
+  it('never welds one heading onto the next', () => {
+    for (const q of parseNotes(PASTE).questions) {
+      expect(q.correctAnswer).not.toMatch(/[a-z][A-Z]/);
+    }
+  });
+
+  it('asks three ordinary questions instead of one enormous one', () => {
+    const { questions } = parseNotes(PASTE);
+    expect(questions).toHaveLength(3);
+    for (const q of questions) {
+      expect(q.prompt.split(/\s+/).length).toBeLessThanOrEqual(LIMITS.maxSentenceWords);
+    }
+  });
+
+  it('reads the arrow chain as the ordered list it is', () => {
+    const list = parseNotes(PASTE).questions.find((q) => q.kind === 'enumeration');
+    expect(list?.answers).toEqual(['Evaporation', 'Condensation', 'Precipitation']);
+    expect(list?.ordered).toBe(true);
+  });
+
+  it('leaves compound words that are really one word alone', () => {
+    // The seam only counts when what follows reads as a heading of its own:
+    // Title Case, two words or more, ending in a colon.
+    for (const text of [
+      'PowerPoint: a program for making slide decks in an office suite.',
+      'The iPhone Settings: where the device options are changed by the user.',
+      'mRNA: the messenger molecule that carries the code out of the nucleus.',
+    ]) {
+      for (const q of parseNotes(text).questions) {
+        expect(q.correctAnswer).not.toContain('\n');
+      }
+      expect(parseNotes(text).questions.every((q) => !/^(Power|i|m)$/.test(q.correctAnswer))).toBe(
+        true
+      );
+    }
+  });
+});
+
 describe('limits', () => {
   it('flags and truncates oversized input', () => {
     const line = 'Mitochondria produce 36 ATP per glucose molecule.\n';

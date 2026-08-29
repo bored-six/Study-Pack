@@ -16,9 +16,13 @@ export function normalizeAnswer(value: string): string {
     .trim()
     .toLowerCase()
     .replace(/[“”"'’]/g, '')
+    // A note that saved space with "&" is not asking you to type "&". The
+    // student who writes "Earth and Space" knows the answer.
+    .replace(/\s*&\s*/g, ' and ')
     .replace(/[.,;:!?]+$/g, '')
     .replace(LEADING_ARTICLES, '')
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**

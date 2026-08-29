@@ -198,6 +198,23 @@ function normalize(text: string): string {
       .replace(/\\(?:rightarrow|to|Rightarrow|longrightarrow)\b/g, '→')
       .replace(/\$+/g, ' ')
       .replace(/\*\*|__|`/g, '')
+      /**
+       * A heading whose line break did not survive the paste.
+       *
+       * "Earth & Space\nWater Cycle: ..." arrives from a PDF as "Earth &
+       * SpaceWater Cycle: ...", and the definition parser reads the whole
+       * glued run as one term. That is where "Which term means: ...?" with
+       * the answer "Earth & SpaceWater Cycle" came from — a heading welded
+       * to the front of the next heading.
+       *
+       * Splitting every lowercase-to-uppercase seam would wreck mRNA, pH
+       * and PowerPoint, so the seam only counts as a lost line break when
+       * what follows it reads as a heading in its own right: Title Case,
+       * at least two words, ending in a colon. "PowerPoint:" is one word
+       * before its colon and survives; so does "iPhone", because three
+       * lowercase letters have to precede the seam.
+       */
+      .replace(/(?<=[a-z]{3})(?=[A-Z][a-z]+(?:[ \t]+[A-Za-z&]+){1,3}[ \t]*:)/g, '\n')
       .replace(/[ \t]+/g, ' ')
   );
 }
@@ -903,8 +920,8 @@ function findInlineSeries(line: string): EnumDraft | null {
    */
   const match =
     /^(.{3,60}?)\s+(?:are|include|consist of|comprise)\s+(.+)$/i.exec(line) ??
-    /^(.{3,60}?)\s*[:\u2013\u2014]\s+(.+[,;].+)$/.exec(line) ??
-    /^(.{3,60}?)\s+-\s+(.+[,;].+)$/.exec(line);
+    /^(.{3,60}?)\s*[:\u2013\u2014]\s+(.+[,;\u2192].+)$/.exec(line) ??
+    /^(.{3,60}?)\s+-\s+(.+[,;\u2192].+)$/.exec(line);
   if (!match) return null;
 
   // Read the count from the raw title — cleanListTitle removes it.
@@ -936,10 +953,21 @@ function findInlineSeries(line: string): EnumDraft | null {
    * exactly what the student wrote down.
    */
   const named = CATEGORY_TITLE.test(title);
-  if (!/[,;]/.test(listable) && !(named && /\s+(?:and|or)\s+/i.test(listable))) return null;
+  if (!/[,;\u2192]/.test(listable) && !(named && /\s+(?:and|or)\s+/i.test(listable))) return null;
+
+  /**
+   * An arrow is a list that also states its order.
+   *
+   * "Water Cycle: Evaporation → Condensation → Precipitation" is the
+   * clearest list in a set of notes and produced nothing at all, because
+   * the splitter only knew commas. It is a sequence, not a bag, so it is
+   * marked ordered the way a numbered list is — asking for the stages of
+   * the water cycle in any order would be asking a different question.
+   */
+  const sequence = /\u2192/.test(listable);
 
   const items = listable
-    .split(/\s*[,;]\s*|\s+and\s+|\s+or\s+/i)
+    .split(/\s*[,;\u2192]\s*|\s+and\s+|\s+or\s+/i)
     .map(listItem)
     .filter(Boolean);
 
@@ -950,7 +978,7 @@ function findInlineSeries(line: string): EnumDraft | null {
   // When the title states a count, it must agree — otherwise we split wrong.
   if (stated != null && stated !== items.length) return null;
 
-  return { title, items, ordered: false, source: line };
+  return { title, items, ordered: sequence, source: line };
 }
 
 /**
