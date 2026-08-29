@@ -20,13 +20,26 @@ jest.mock('react-native-safe-area-context', () => ({
  * load hands over at once here; the animation's own contract — cover,
  * swap, reveal, and never strand anyone — is CartridgeLoad.test.tsx.
  */
-jest.mock('@/components/CartridgeLoad', () => ({
-  CartridgeLoad: ({ onCovered, onDone }: { onCovered: () => void; onDone: () => void }) => {
-    onCovered();
-    onDone();
-    return null;
-  },
-}));
+const mockLoads = { mounted: 0 };
+jest.mock('@/components/CartridgeLoad', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useEffect } = require('react');
+  return {
+    CartridgeLoad: ({ onCovered, onDone }: { onCovered: () => void; onDone: () => void }) => {
+      useEffect(() => {
+        // Counting mounts, not renders: the load played twice because
+        // committing the mode swapped which step was rendering, and the
+        // overlay was written inside each of them, so one was torn down
+        // and a fresh one built — which started the whole thing again.
+        mockLoads.mounted += 1;
+        onCovered();
+        onDone();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    },
+  };
+});
 jest.mock('@/lib/db', () => ({
   getDeckById: jest.fn(),
   listQuestions: jest.fn(),
@@ -107,6 +120,7 @@ function type(tree: ReactTestRenderer, accessibilityLabel: string, value: string
 }
 
 beforeEach(() => {
+  mockLoads.mounted = 0;
   mockSettings.clear();
   act(() => useExamStore.getState().reset());
   db.getDeckById.mockResolvedValue(DECK);
@@ -121,7 +135,9 @@ beforeEach(() => {
  */
 function chooseMode(tree: ReactTestRenderer, name: string) {
   press(tree, name);
-  press(tree, 'Choose questions');
+  // A mode that builds its own paper has nothing to choose, so its sheet
+  // offers to start instead.
+  press(tree, texts(tree).includes('Choose questions') ? 'Choose questions' : 'Start');
 }
 
 async function open(): Promise<ReactTestRenderer> {
@@ -155,6 +171,23 @@ describe('the exam setup screen', () => {
     expect(shown.filter((text) => text === 'Max 30')).toHaveLength(1);
     expect(shown).toContain('30 ready');
     expect(shown).toContain('not in these notes');
+  });
+
+  it('loads the cartridge once, not once per step', async () => {
+    const tree = await open();
+    chooseMode(tree, 'Take your time');
+    // One pick, one load. It reached the build form either way — the bug
+    // was that it played the whole animation twice getting there.
+    expect(mockLoads.mounted).toBe(1);
+    expect(texts(tree)).toContain('WHAT GOES ON THE PAPER');
+  });
+
+  it('loads once again when a mode builds its own paper', async () => {
+    const tree = await open();
+    // Survival skips the format form, so it commits straight to the run
+    // screen — a different path to the same overlay.
+    chooseMode(tree, 'Survival');
+    expect(mockLoads.mounted).toBe(1);
   });
 
   it('says which rows are on, which are off, and which cannot be used', async () => {

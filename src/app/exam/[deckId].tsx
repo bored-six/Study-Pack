@@ -399,11 +399,35 @@ export default function ExamSetupScreen() {
     );
   }
 
+  /**
+   * The cartridge stays in the slot across the step change.
+   *
+   * The overlay used to be written twice, once inside each step's own
+   * return. Committing the mode switches which return renders, so React
+   * unmounted one copy and mounted the other — a brand new component that
+   * ran its whole sequence again. The load played twice, every time.
+   *
+   * One overlay, in one place, after whichever content is showing.
+   */
+  const cartridgeLoad = loading ? (
+    <CartridgeLoad
+      // First child of the screen in both steps, and keyed: React matches
+      // children by position, so an overlay written last sat at a different
+      // index in each branch and was torn down and rebuilt on the step
+      // change. It covers the screen by z-index, not by draw order.
+      key="cartridge-load"
+      spec={MODES[loading]}
+      onCovered={() => commitMode(loading)}
+      onDone={() => setLoading(null)}
+    />
+  ) : null;
+
   if (step === 'mode') {
     const peeked = peek ? MODES[peek] : null;
 
     return (
       <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+        {cartridgeLoad}
         <View style={styles.contentWrapper}>
         <View style={styles.navRow}>
           <Pressable
@@ -498,13 +522,6 @@ export default function ExamSetupScreen() {
           </Pressable>
         </Modal>
 
-        {loading ? (
-          <CartridgeLoad
-            spec={MODES[loading]}
-            onCovered={() => commitMode(loading)}
-            onDone={() => setLoading(null)}
-          />
-        ) : null}
       </View>
     );
   }
@@ -518,6 +535,7 @@ export default function ExamSetupScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
+      {cartridgeLoad}
       <View style={styles.contentWrapper}>
       <View style={styles.navRow}>
         <Pressable
@@ -620,13 +638,6 @@ export default function ExamSetupScreen() {
         </View>
       </View>
 
-      {loading ? (
-        <CartridgeLoad
-            spec={MODES[loading]}
-            onCovered={() => commitMode(loading)}
-            onDone={() => setLoading(null)}
-        />
-      ) : null}
     </View>
   );
 }
