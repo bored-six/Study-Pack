@@ -119,3 +119,45 @@ describe('what Android will tell people this app wants', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('the permissions a library sneaks in', () => {
+  /**
+   * A library's AndroidManifest is merged into the app's, additively. So
+   * expo-audio's own manifest hands Flipp RECORD_AUDIO whatever the plugin
+   * options say — its `recordAudioAndroid: false` only governs what gets
+   * written into our manifest, and cannot unsay what the library declared.
+   * The first two builds shipped a microphone permission because of that,
+   * and it took reading the APK to notice.
+   *
+   * withTrimmedPermissions names each one with tools:node="remove", which is
+   * the only thing the merger honours.
+   */
+  const plugin = readFileSync(join(ROOT, 'plugins', 'withTrimmedPermissions.js'), 'utf8');
+
+  it('is registered, or it does nothing at all', () => {
+    expect(expo.plugins).toContain('./plugins/withTrimmedPermissions');
+  });
+
+  it('removes the ones that scare people off an install', () => {
+    for (const permission of [
+      'android.permission.RECORD_AUDIO',
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    ]) {
+      expect(plugin).toContain(permission);
+    }
+  });
+
+  it('declares the tools namespace, without which the merger ignores it', () => {
+    expect(plugin).toContain('xmlns:tools');
+    expect(plugin).toContain("'tools:node': 'remove'");
+  });
+
+  it('does not touch the ones Flipp actually needs', () => {
+    // Reminders, reminders that survive a reboot, and haptics.
+    for (const keep of ['POST_NOTIFICATIONS', 'RECEIVE_BOOT_COMPLETED', 'VIBRATE']) {
+      expect(plugin).not.toContain(`android.permission.${keep}'`);
+    }
+  });
+});

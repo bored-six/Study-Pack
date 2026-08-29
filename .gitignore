@@ -49,3 +49,4 @@ qa/report.md
 
 # one-shot local edit scripts, never source
 *.py
+builds/
