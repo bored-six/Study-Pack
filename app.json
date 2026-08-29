@@ -36,7 +36,12 @@
       ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-asset",
       [
         "expo-notifications",
@@ -50,6 +55,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "918cd658-c2a0-4309-8128-4babc52193b1"
+      }
+    },
+    "owner": "bored-six"
   }
 }

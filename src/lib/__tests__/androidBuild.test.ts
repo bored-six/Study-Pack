@@ -75,3 +75,47 @@ describe('the promise the settings screen makes', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('what Android will tell people this app wants', () => {
+  /**
+   * expo-audio adds RECORD_AUDIO by default, because the library can record.
+   * Flipp only ever plays sounds, so the permission was pure cost: Android
+   * lists "Microphone" on the install screen, and for an app handed out as a
+   * download from a link that reads as spyware — while the Settings card two
+   * taps away promises no tracking of any kind.
+   *
+   * If this fails, either something genuinely needs the permission and the
+   * privacy card has to change, or a plugin default has crept back in.
+   */
+  it('asks for no permissions it does not use', () => {
+    const declared: string[] = expo.android?.permissions ?? [];
+    expect(declared).toEqual([]);
+  });
+
+  it('tells expo-audio it is a player, not a recorder', () => {
+    const audio = expo.plugins.find(
+      (plugin: unknown) => Array.isArray(plugin) && plugin[0] === 'expo-audio'
+    );
+    expect(audio).toBeDefined();
+    expect(audio[1].recordAudioAndroid).toBe(false);
+  });
+
+  it('has no recording code that would justify one', () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const path = join(dir, entry);
+        if (statSync(path).isDirectory()) {
+          if (entry !== '__tests__') walk(path);
+          continue;
+        }
+        if (!/\.tsx?$/.test(path)) continue;
+        if (/useAudioRecorder|AudioRecorder|RecordingPresets/.test(readFileSync(path, 'utf8'))) {
+          offenders.push(path.replace(/.*src[\\/]/, 'src/'));
+        }
+      }
+    };
+    walk(join(ROOT, 'src'));
+    expect(offenders).toEqual([]);
+  });
+});
