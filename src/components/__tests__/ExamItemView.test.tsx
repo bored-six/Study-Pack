@@ -333,6 +333,75 @@ describe('matching', () => {
     press('movement of water');
     expect(() => press('Check')).toThrow();
   });
+
+  /**
+   * The pen lines are an absolutely-positioned layer over both columns, so
+   * whether the chips can be tapped at all depends on that layer letting
+   * touches through. It only appears once the columns have been measured,
+   * which never happens in the test renderer — so every test above passes
+   * with the layer absent, and on web it was covering the chips and
+   * swallowing every tap. Measure the columns first, then look at it.
+   */
+  describe('once the pen lines are on screen', () => {
+    /** Feeds the component the layout it would get on a real screen. */
+    const withLayout = (item: MatchingItem) => {
+      const driven = drive(item);
+      const layout = { x: 0, y: 0, width: 130, height: 220 };
+      act(() => {
+        driven.tree.root
+          .findAll((node) => typeof node.props?.onLayout === 'function', { deep: true })
+          .forEach((node) => node.props.onLayout({ nativeEvent: { layout } }));
+      });
+      return driven;
+    };
+
+    it('lets touches through to the chips underneath', () => {
+      const { press, tree } = withLayout(MATCH);
+      press('Osmosis');
+      press('movement of water');
+
+      const svg = tree.root.findAll(
+        (node) => typeof node.type !== 'string' && node.props?.style && node.props?.width == null,
+        { deep: true }
+      );
+      expect(svg.length).toBeGreaterThan(0);
+
+      // Every absolutely-positioned layer sitting over the columns has to be
+      // transparent to touch.
+      const overlays = tree.root.findAll(
+        (node) => node.props?.pointerEvents === 'none',
+        { deep: true }
+      );
+      expect(overlays.length).toBeGreaterThan(0);
+    });
+
+    it('can still be answered end to end', () => {
+      const { press, onDone } = withLayout(MATCH);
+      press('Osmosis');
+      press('movement of water');
+      press('Mitosis');
+      press('cell division');
+      press('Glycolysis');
+      press('breakdown of glucose');
+      press('Check');
+      press('Next');
+      expect(onDone).toHaveBeenCalledWith(true);
+    });
+
+    it('says how many pairs landed rather than the same line every time', () => {
+      // Two right, one wrong. The old copy said "Some pairs were wrong"
+      // whatever happened, including on a clean sheet.
+      const { press, texts } = withLayout(MATCH);
+      press('Osmosis');
+      press('cell division'); // wrong
+      press('Mitosis');
+      press('movement of water'); // wrong
+      press('Glycolysis');
+      press('breakdown of glucose'); // right
+      press('Check');
+      expect(texts().join(' ')).toContain('You joined 1 of 3');
+    });
+  });
 });
 
 describe('withheld answers (exam simulation)', () => {

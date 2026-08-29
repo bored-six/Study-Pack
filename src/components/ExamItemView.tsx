@@ -596,7 +596,8 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
   const checked = reveal && draft.checked;
 
   const allPaired = Object.keys(pairs).length === item.terms.length;
-  const correct = item.terms.every((_, i) => pairs[i] === item.correctIndexFor[i]);
+  const rightPairs = item.terms.filter((_, i) => pairs[i] === item.correctIndexFor[i]).length;
+  const correct = rightPairs === item.terms.length;
   const takenMeanings = new Set(Object.values(pairs));
 
   // Chip geometry, measured relative to the two columns, for the pen lines.
@@ -724,15 +725,27 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
                 ]}>
                 <Text
                   style={[styles.matchText, tone && !checked && styles.matchTextOnWash]}
-                  numberOfLines={3}>
+                  numberOfLines={5}>
                   {meaning}
                 </Text>
               </Pressable>
             );
           })}
         </View>
-        {/* The pen lines, drawn over the chips so mobile's narrow gap can't hide them. */}
+        {/*
+          * The pen lines, drawn over the chips so mobile's narrow gap can't
+          * hide them.
+          *
+          * The wrapping View is what makes them untouchable. `pointerEvents`
+          * on Svg itself is only honoured on native — react-native-svg's web
+          * build never maps it to CSS — so on web this overlay covered both
+          * columns from the first layout pass and swallowed every tap on
+          * every chip. Matching looked completely dead, and no test caught it
+          * because onLayout never fires in the test renderer, so `cols` stays
+          * null and the overlay is never rendered at all.
+          */}
         {cols.left && cols.right ? (
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <Svg pointerEvents="none" style={StyleSheet.absoluteFill}>
             {Object.entries(pairs).map(([termKey, j]) => {
               const i = Number(termKey);
@@ -763,12 +776,17 @@ function Matching({ item, draft, setDraft, reveal, onDone }: Field<MatchingItem,
               );
             })}
           </Svg>
+          </View>
         ) : null}
 
       </View>
 
       {checked ? (
-        <Verdict correct={correct} detail="Some pairs were wrong" onNext={() => onDone(correct)} />
+        <Verdict
+          correct={correct}
+          detail={`You joined ${rightPairs} of ${item.terms.length}`}
+          onNext={() => onDone(correct)}
+        />
       ) : reveal ? (
         <ChunkyButton
           label="Check"
@@ -1273,7 +1291,12 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   matchCols: {
     flexDirection: 'row',
-    gap: 26,
+    /**
+     * The pad writes inside a 30pt red margin, which left each column about
+     * 107pt for text. A 26pt gutter on top of that was spending width the
+     * meanings needed.
+     */
+    gap: 14,
   },
   matchCol: {
     flex: 1,
