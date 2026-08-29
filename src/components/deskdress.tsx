@@ -18,7 +18,7 @@ import Animated, {
 
 import { Icon } from '@/components/Icon';
 import type { ExamFormat } from '@/lib/exam';
-import { font, getColors, useThemeStore } from '@/theme/tokens';
+import { font, getColors, onWash, useThemeStore } from '@/theme/tokens';
 
 /** Progress as a graphite stroke: longer as you go, bolder as combos grow. */
 export function PencilProgress({ progress, combo }: { progress: number; combo: number }) {
@@ -346,13 +346,23 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     gap: 3.5,
   },
+  /**
+   * An eye is an object, not a surface.
+   *
+   * These followed the theme, so at night the white became dark and the
+   * pupil became light — a pale pupil floating in a dark socket, which is
+   * the face every horror film draws. Cartoon eyes keep a light white and a
+   * dark pupil under any lighting, so both are pinned. The lids below still
+   * follow the theme, because a closed eye is a drawn line and has to stay
+   * visible against the body.
+   */
   eye: {
     width: 8,
     height: 8,
     borderRadius: 4.5,
-    backgroundColor: colors.surface,
+    backgroundColor: '#F7F4EA',
     borderWidth: 1,
-    borderColor: colors.ink,
+    borderColor: onWash.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -360,7 +370,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: colors.ink,
+    backgroundColor: onWash.ink,
   },
   eyeShut: {
     width: 8,
@@ -374,8 +384,8 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: 4,
     borderRadius: 1.5,
     borderWidth: 1.2,
-    borderColor: colors.ink,
-    backgroundColor: colors.surface,
+    borderColor: onWash.ink,
+    backgroundColor: '#F7F4EA',
     marginTop: 1,
   },
   zzz: {
