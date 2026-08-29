@@ -17,7 +17,6 @@ import { Icon, type IconName } from '@/components/Icon';
 import { RuledPaper } from '@/components/notebook';
 import {
   clearPracticeHistory,
-  clearTriviaDownloads,
   eraseEverything,
   storageSummary,
   type StorageSummary,
@@ -33,7 +32,6 @@ import {
   type Prefs,
 } from '@/lib/prefs';
 import { LEAD_LABEL } from '@/lib/schedule';
-import { useDecksStore } from '@/store/decks';
 import { useNotesStore } from '@/store/notes';
 import { usePlannerStore } from '@/store/planner';
 import { useProgressStore } from '@/store/progress';
@@ -138,7 +136,6 @@ export default function SettingsScreen() {
   const { capability, leads, askPermission, refresh: refreshPlanner } = usePlannerStore();
   const refreshNotes = useNotesStore((s) => s.refresh);
   const refreshProgress = useProgressStore((s) => s.refresh);
-  const refreshDecks = useDecksStore((s) => s.refresh);
 
   const readStorage = useCallback(() => {
     void storageSummary().then(setStorage);
@@ -180,8 +177,6 @@ export default function SettingsScreen() {
     setPending(null);
 
     if (action === 'trivia') {
-      await clearTriviaDownloads();
-      await refreshDecks();
       setNotice({
         title: 'Trivia cleared',
         message: 'Your subjects are untouched. Trivia decks download again whenever you have signal.',
@@ -195,12 +190,12 @@ export default function SettingsScreen() {
       });
     } else if (action === 'eraseReally') {
       await eraseEverything();
-      await Promise.all([refreshNotes(), refreshDecks(), refreshProgress(), refreshPlanner()]);
+      await Promise.all([refreshNotes(), refreshProgress(), refreshPlanner()]);
       setPrefs(DEFAULT_PREFS);
       setNotice({ title: 'Wiped', message: 'Flipp is back to the day you installed it.' });
     }
     readStorage();
-  }, [pending, readStorage, refreshDecks, refreshNotes, refreshPlanner, refreshProgress]);
+  }, [pending, readStorage, refreshNotes, refreshPlanner, refreshProgress]);
 
   const version = Constants.expoConfig?.version ?? '1.0.0';
   const reminderValue =
@@ -327,9 +322,9 @@ export default function SettingsScreen() {
             */}
             <PrivacyLine text="Your notes, answers and streak stay on this phone." />
             <PrivacyLine text="Nothing you write is uploaded. There is no server to upload it to." />
+            <PrivacyLine text="Flipp never calls the internet. The fonts and sounds are built in." />
             <PrivacyLine text="No account, no sign-in, no ads, no tracking of any kind." />
             <PrivacyLine text="Reminders are set by the phone itself, not sent from anywhere." />
-            <PrivacyLine text="Trivia questions are the one thing fetched from the internet, from Open Trivia DB. Nothing about you goes with the request." />
             <PrivacyLine text="Delete everything whenever you like, below. It is gone from the phone, and there is no copy elsewhere." />
           </View>
         </View>
@@ -342,9 +337,6 @@ export default function SettingsScreen() {
               <Text style={styles.cardTitle}>Danger Zone</Text>
             </View>
             
-            {storage && storage.triviaDecks > 0 ? (
-              <DangerRow icon="dice" label="Remove saved trivia" sub={`${storage.triviaDecks} deck${storage.triviaDecks === 1 ? '' : 's'} kept offline`} onPress={() => setPending('trivia')} />
-            ) : null}
             <DangerRow icon="chart" label="Clear practice history" sub="Scores and streak. Your notes stay." onPress={() => setPending('history')} />
             <DangerRow icon="trash" label="Delete everything" sub="No undo. Wipes the app." onPress={() => setPending('erase')} />
           </View>

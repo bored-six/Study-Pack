@@ -16,6 +16,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import Svg, { Path, Rect } from 'react-native-svg';
+
 import { Icon } from '@/components/Icon';
 import type { ExamFormat } from '@/lib/exam';
 import { font, getColors, onWash, useThemeStore } from '@/theme/tokens';
@@ -79,6 +81,48 @@ export type DeskMood = 'watch' | 'happy' | 'wince' | 'sleep';
  */
 const PROP_FILL = { lead: '#FAECCB', red: '#FBE1D7' } as const;
 const PROP_INK = { lead: '#27362B', red: '#C24E38' } as const;
+const PROP_METAL = '#C9CDC4';
+const PROP_WOOD = '#F2E4C7';
+
+/**
+ * The deskmate himself.
+ *
+ * He used to be the app's plain pencil glyph turned on its side with two
+ * eyes floated over it, so the face landed wherever the rotation left it and
+ * he read as an object wearing stickers. This is a drawn character: he
+ * stands up, the face sits on the barrel where a face goes, and he has a
+ * ferrule, a wood collar and stubby arms.
+ *
+ * Colours are passed in rather than read from the theme — see PROP_FILL.
+ */
+function PencilBody({ ink, fill }: { ink: string; fill: string }) {
+  return (
+    <Svg width={46} height={72} viewBox="0 0 46 72">
+      {/* eraser */}
+      <Path
+        d="M11 12V7a4 4 0 0 1 4-4h16a4 4 0 0 1 4 4v5z"
+        fill={PROP_FILL.red}
+        stroke={ink}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      {/* ferrule */}
+      <Rect x={10} y={11.5} width={26} height={6.5} rx={1.5} fill={PROP_METAL} stroke={ink} strokeWidth={2} />
+      {/* barrel */}
+      <Rect x={11} y={18} width={24} height={30} rx={2.5} fill={fill} stroke={ink} strokeWidth={2} />
+      {/* the flats of a hexagonal barrel */}
+      <Path d="M19 19v28M27 19v28" stroke={ink} strokeWidth={1} opacity={0.22} />
+      {/* wood collar and lead */}
+      <Path d="M11 48h24l-12 16z" fill={PROP_WOOD} stroke={ink} strokeWidth={2} strokeLinejoin="round" />
+      <Path d="M18.4 58h9.2L23 64z" fill={ink} />
+      {/* arms */}
+      <Path d="M11 31c-6 1.4-8.4 5-7.4 9.4" stroke={ink} strokeWidth={2} fill="none" strokeLinecap="round" />
+      <Path d="M35 31c6 1.4 8.4 5 7.4 9.4" stroke={ink} strokeWidth={2} fill="none" strokeLinecap="round" />
+      {/* mouth */}
+      <Path d="M19.4 35q3.6 3 7.2 0" stroke={ink} strokeWidth={1.8} fill="none" strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 export function DeskProp({
   format,
@@ -174,7 +218,7 @@ export function DeskProp({
 
   const style = useAnimatedStyle(() => ({
     transform: [
-      { rotate: `${30 + sway.value * 2.5 + tap.value * 7 - lean.value * 14}deg` },
+      { rotate: `${sway.value * 3 + tap.value * 6 - lean.value * 11}deg` },
       { translateY: tap.value * -2 - bounce.value * 5 + (lean.value === 1 ? -3 : 0) },
     ],
   }));
@@ -202,12 +246,9 @@ export function DeskProp({
             washes it turned into a mud-brown stick with a pale outline, which
             is what made it look grim at night rather than friendly.
           */}
-          <Icon
-            name="pencil"
-            size={40}
-            color={prop === 'redpen' ? PROP_INK.red : PROP_INK.lead}
+          <PencilBody
+            ink={prop === 'redpen' ? PROP_INK.red : PROP_INK.lead}
             fill={prop === 'redpen' ? PROP_FILL.red : PROP_FILL.lead}
-            strokeWidth={1.8}
           />
           <View style={styles.face}>
             {effectiveMood === 'sleep' ? (
@@ -235,9 +276,9 @@ export function DeskProp({
         </Animated.View>
       )}
       {/* eraser crumbs */}
-      <View style={[styles.crumb, { right: 34, bottom: 6 }]} />
-      <View style={[styles.crumb, { right: 42, bottom: 11, width: 3 }]} />
-      <View style={[styles.crumb, { right: 28, bottom: 13 }]} />
+      <View style={[styles.crumb, { left: 10, bottom: 2 }]} />
+      <View style={[styles.crumb, { left: 30, bottom: 5, width: 3 }]} />
+      <View style={[styles.crumb, { left: 20, bottom: 0 }]} />
     </View>
   );
 }
@@ -332,10 +373,10 @@ const getStyles = (colors: any) => StyleSheet.create({
    */
   propCorner: {
     position: 'absolute',
-    left: 2,
-    top: 26,
-    width: 92,
-    height: 58,
+    left: 0,
+    top: 22,
+    width: 46,
+    height: 72,
     zIndex: 2,
   },
   ruler: {
@@ -357,12 +398,13 @@ const getStyles = (colors: any) => StyleSheet.create({
     backgroundColor: PROP_INK.lead,
     opacity: 0.55,
   },
+  /** On the barrel: two eyes above the drawn mouth at y=35. */
   face: {
     position: 'absolute',
-    top: 13,
-    left: 11,
+    top: 23,
+    left: 14,
     flexDirection: 'row',
-    gap: 3.5,
+    gap: 2.5,
   },
   /**
    * An eye is an object, not a surface.
@@ -408,8 +450,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   zzz: {
     position: 'absolute',
-    top: -14,
-    right: -2,
+    top: -8,
+    right: -4,
     fontFamily: font.hero,
     fontSize: 16,
     color: colors.textFaint,

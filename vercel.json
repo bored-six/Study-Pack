@@ -4,6 +4,10 @@
   "buildCommand": "npx expo export -p web && node scripts/postexport.mjs",
   "outputDirectory": "dist",
   "cleanUrls": true,
+  "rewrites": [
+    { "source": "/exam/(.*)", "destination": "/exam/[deckId]" },
+    { "source": "/quiz/(.*)", "destination": "/quiz/[deckId]" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

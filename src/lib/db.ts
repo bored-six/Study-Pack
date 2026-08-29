@@ -161,6 +161,27 @@ export async function initDb(): Promise<void> {
   await repairStoredLists(db);
   await repairStoredOptions(db);
   await dropUnaskableQuestions(db);
+  await dropRetiredTriviaDecks(db);
+}
+
+/**
+ * Clears out downloaded trivia, which no longer has a screen.
+ *
+ * The trivia half of the app is gone, so any deck still carrying
+ * source='trivia' is unreachable: it cannot be listed, played or deleted
+ * from Settings any more. Leaving it would be invisible weight on the phone
+ * for the rest of the app's life. Notes decks are untouched — the WHERE
+ * clause names the other source explicitly rather than negating this one.
+ */
+async function dropRetiredTriviaDecks(db: SQLiteDatabase): Promise<void> {
+  const stale = await db.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM decks WHERE source = 'trivia'`
+  );
+  if (!stale?.n) return;
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM questions WHERE deck_id IN (SELECT id FROM decks WHERE source = 'trivia')`);
+    await db.runAsync(`DELETE FROM decks WHERE source = 'trivia'`);
+  });
 }
 
 /**
@@ -369,7 +390,7 @@ function toDeck(row: DeckRow): Deck {
 }
 
 /** Trivia decks sort by name; notes decks sort newest first. */
-export async function listDecks(source: DeckSource = 'trivia'): Promise<Deck[]> {
+export async function listDecks(source: DeckSource = 'notes'): Promise<Deck[]> {
   const order =
     source === 'notes'
       ? 'downloaded_at DESC'
@@ -381,83 +402,11 @@ export async function listDecks(source: DeckSource = 'trivia'): Promise<Deck[]> 
   return rows.map(toDeck);
 }
 
-/**
- * Refreshes the browsable catalog. Never touches downloaded_at or questions,
- * so a catalog refresh can't corrupt an existing download.
- */
-export async function upsertCatalog(
-  decks: Omit<Deck, 'downloadedAt' | 'source' | 'color' | 'icon'>[]
-): Promise<void> {
-  const db = getDb();
-  await db.withTransactionAsync(async () => {
-    for (const deck of decks) {
-      await db.runAsync(
-        `INSERT INTO decks (id, category_id, name, difficulty, question_count, source)
-         VALUES (?, ?, ?, ?, ?, 'trivia')
-         ON CONFLICT(id) DO UPDATE SET
-           name = excluded.name,
-           question_count = CASE
-             WHEN downloaded_at IS NULL THEN excluded.question_count
-             ELSE question_count
-           END`,
-        deck.id,
-        deck.categoryId,
-        deck.name,
-        deck.difficulty,
-        deck.questionCount
-      );
-    }
-  });
-}
 
 export type DownloadableQuestion = Pick<Question, 'prompt' | 'correctAnswer' | 'answers'> &
   Partial<Pick<Question, 'kind' | 'sourceLine' | 'ordered'>>;
 
-/**
- * Persists a deck's questions and marks it downloaded, atomically.
- * If any insert fails the transaction rolls back and the deck stays
- * not-downloaded — there is no half-downloaded state.
- */
-export async function saveDeckDownload(
-  deckId: string,
-  questions: DownloadableQuestion[]
-): Promise<void> {
-  const db = getDb();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM questions WHERE deck_id = ?', deckId);
-    for (let position = 0; position < questions.length; position++) {
-      const q = questions[position];
-      await db.runAsync(
-        `INSERT INTO questions
-           (id, deck_id, position, prompt, correct_answer, answers_json, kind, source_line, ordered)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        `${deckId}:${position}`,
-        deckId,
-        position,
-        q.prompt,
-        q.correctAnswer,
-        JSON.stringify(q.answers),
-        q.kind ?? 'trivia',
-        q.sourceLine ?? null,
-        q.ordered ? 1 : 0
-      );
-    }
-    await db.runAsync(
-      'UPDATE decks SET downloaded_at = ?, question_count = ? WHERE id = ?',
-      Date.now(),
-      questions.length,
-      deckId
-    );
-  });
-}
 
-export async function removeDownload(deckId: string): Promise<void> {
-  const db = getDb();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM questions WHERE deck_id = ?', deckId);
-    await db.runAsync('UPDATE decks SET downloaded_at = NULL WHERE id = ?', deckId);
-  });
-}
 
 /**
  * Creates an empty subject (a notes deck). Notes decks are local by
@@ -869,9 +818,6 @@ export interface StorageSummary {
   subjects: number;
   /** Questions inside subjects — the student's own material. */
   noteQuestions: number;
-  /** Trivia decks currently held offline, and what they cost. */
-  triviaDecks: number;
-  triviaQuestions: number;
   sittings: number;
   answers: number;
   plans: number;
@@ -885,17 +831,13 @@ export interface StorageSummary {
 export async function storageSummary(): Promise<StorageSummary> {
   const db = getDb();
   const [decks, questions, sittings, answers, plans] = await Promise.all([
-    db.getFirstAsync<{ subjects: number; trivia: number }>(
-      `SELECT
-         SUM(CASE WHEN source = 'notes' THEN 1 ELSE 0 END) AS subjects,
-         SUM(CASE WHEN source != 'notes' AND downloaded_at IS NOT NULL THEN 1 ELSE 0 END) AS trivia
-       FROM decks`
+    db.getFirstAsync<{ subjects: number }>(
+      `SELECT COUNT(*) AS subjects FROM decks WHERE source = 'notes'`
     ),
-    db.getFirstAsync<{ notes: number; trivia: number }>(
-      `SELECT
-         SUM(CASE WHEN d.source = 'notes' THEN 1 ELSE 0 END) AS notes,
-         SUM(CASE WHEN d.source != 'notes' THEN 1 ELSE 0 END) AS trivia
-       FROM questions q JOIN decks d ON d.id = q.deck_id`
+    db.getFirstAsync<{ notes: number }>(
+      `SELECT COUNT(*) AS notes
+       FROM questions q JOIN decks d ON d.id = q.deck_id
+       WHERE d.source = 'notes'`
     ),
     db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM attempts'),
     db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM answers'),
@@ -904,8 +846,6 @@ export async function storageSummary(): Promise<StorageSummary> {
   return {
     subjects: decks?.subjects ?? 0,
     noteQuestions: questions?.notes ?? 0,
-    triviaDecks: decks?.trivia ?? 0,
-    triviaQuestions: questions?.trivia ?? 0,
     sittings: sittings?.n ?? 0,
     answers: answers?.n ?? 0,
     plans: plans?.n ?? 0,
@@ -940,18 +880,6 @@ export async function clearPracticeHistory(): Promise<void> {
   });
 }
 
-/** Drops the offline copies of trivia decks; the catalog stays browsable. */
-export async function clearTriviaDownloads(): Promise<void> {
-  const db = getDb();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(
-      `DELETE FROM questions WHERE deck_id IN (SELECT id FROM decks WHERE source != 'notes')`
-    );
-    await db.runAsync(
-      `UPDATE decks SET downloaded_at = NULL WHERE source != 'notes'`
-    );
-  });
-}
 
 /**
  * Factory reset. Everything the app has ever written, gone — there is no

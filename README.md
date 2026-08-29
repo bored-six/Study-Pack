@@ -11,7 +11,6 @@ should survive a dropped connection. Downloading a deck is the feature, not a ca
 
 | Screen | What happens |
 |--------|--------------|
-| **Decks** | Live catalog from [Open Trivia DB](https://opentdb.com) — 24 categories × 3 difficulties. Each deck shows a downloaded / not-downloaded state. The catalog itself is cached in SQLite, so even browsing works offline. |
 | **Quiz** | Reads *only* from the local database — there is no network code path in the quiz at all. Airplane mode changes nothing. |
 | **Results** | Score, duration, and a verdict; the attempt is persisted before results render. |
 | **Progress** | Score history, best score, and a day streak computed from attempt timestamps. |
@@ -19,7 +18,6 @@ should survive a dropped connection. Downloading a deck is the feature, not a ca
 ## Architecture
 
 ```
-  Open Trivia DB ──fetch──▶  lib/api.ts        typed client: response_code handling,
                                 │              url3986 decoding, 5s rate-limit queue
                                 ▼
                             lib/db.ts          expo-sqlite: schema, migrations,
@@ -55,7 +53,6 @@ half-downloaded state.
   to corrupt. A streak with no attempt yet today stays alive until midnight.
 - **The offline banner is gold, not red.** In an offline-first app, offline is a
   supported state to reassure about, not an error to warn about.
-- **Open Trivia DB's quirks are absorbed in one module** (`lib/api.ts`): success or
   failure lives in the JSON `response_code` (a 200 can still mean "no results"),
   text arrives percent-encoded, and the API allows one question request per ~5
   seconds per IP — handled with a single-flight throttle queue, plus a fallback to a

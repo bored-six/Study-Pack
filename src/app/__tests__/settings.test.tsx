@@ -21,7 +21,6 @@ jest.mock('@/lib/db', () => ({
     subjects: 2,
     noteQuestions: 60,
     triviaDecks: 1,
-    triviaQuestions: 20,
     sittings: 7,
     answers: 140,
     plans: 1,
@@ -52,9 +51,6 @@ jest.mock('@/store/notes', () => ({
 }));
 jest.mock('@/store/progress', () => ({
   useProgressStore: (select: (s: unknown) => unknown) => select({ refresh: mockRefresh }),
-}));
-jest.mock('@/store/decks', () => ({
-  useDecksStore: (select: (s: unknown) => unknown) => select({ refresh: mockRefresh }),
 }));
 
 /** What one Text reads as, interpolated children and all. */
@@ -205,7 +201,7 @@ describe('the privacy card', () => {
     expect(said).toContain('stay on this phone');
     expect(said).toContain('Nothing you write is uploaded');
     expect(said).toContain('no ads, no tracking');
-    expect(said).toContain('Open Trivia DB');
+    expect(said).toContain('never calls the internet');
   });
 
   it('sits above the way to delete everything, not instead of it', async () => {

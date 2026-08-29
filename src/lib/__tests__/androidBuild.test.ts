@@ -11,7 +11,7 @@
  * it after release and every existing user ends up with two Flipps, and the
  * new one is empty.
  */
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
 const ROOT = join(__dirname, '..', '..', '..');
@@ -46,13 +46,32 @@ describe('the theme the OS is told about', () => {
   });
 });
 
-describe('the trivia licence', () => {
-  it('names the licence, not just the source', () => {
-    // Open Trivia DB is CC BY-SA 4.0. Credit under CC BY needs the source
-    // *and* the licence, and it applies however the app is distributed —
-    // leaving the stores behind does not leave this behind.
-    const screen = readFileSync(join(ROOT, 'src', 'app', 'trivia.tsx'), 'utf8');
-    expect(screen).toContain('Open Trivia DB');
-    expect(screen).toMatch(/CC BY-SA 4\.0/);
+
+describe('the promise the settings screen makes', () => {
+  /**
+   * The privacy card tells students Flipp never calls the internet. That was
+   * only made true by removing trivia, and it is the kind of claim that
+   * quietly becomes a lie the first time somebody adds a fetch. If this
+   * fails, either take the network call out or change what the card says —
+   * but do not leave both.
+   */
+  it('is not contradicted by a network call anywhere in the app', () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const path = join(dir, entry);
+        if (statSync(path).isDirectory()) {
+          if (entry !== '__tests__') walk(path);
+          continue;
+        }
+        if (!/\.tsx?$/.test(path)) continue;
+        const source = readFileSync(path, 'utf8');
+        if (/\bfetch\(|XMLHttpRequest|new WebSocket\(/.test(source)) {
+          offenders.push(path.replace(/.*src[\\/]/, 'src/'));
+        }
+      }
+    };
+    walk(join(ROOT, 'src'));
+    expect(offenders).toEqual([]);
   });
 });

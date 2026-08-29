@@ -13,7 +13,6 @@ import { updateSubject } from '@/lib/db';
 import { derpRadius, font, getColors, outlineOn, shadow, subjectInkFor, tabClearance, useThemeStore } from '@/theme/tokens';
 import { formatClock, joinDeckNames } from '@/lib/schedule';
 import { usePlannerStore } from '@/store/planner';
-import { useDecksStore } from '@/store/decks';
 import { useNotesStore } from '@/store/notes';
 import { useProgressStore } from '@/store/progress';
 import { useAchievementsStore } from '@/store/achievements';
@@ -39,7 +38,6 @@ export default function HomeScreen() {
   const colors = getColors(isDark);
   const insets = useSafeAreaInsets();
 
-  const { refresh } = useDecksStore();
   const { refresh: refreshPlanner, upcoming } = usePlannerStore();
   const {
     subjects: noteDecks,
@@ -52,10 +50,6 @@ export default function HomeScreen() {
   const { pending, clearPending, refresh: refreshAchievements } = useAchievementsStore();
   const [revealIndex, setRevealIndex] = useState(0);
   const [revealing, setRevealing] = useState(false);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
 
   useFocusEffect(
     useCallback(() => {
@@ -251,15 +245,6 @@ export default function HomeScreen() {
             <Text style={styles.actionLabel}>Add notes</Text>
           </BouncyPressable>
         </View>
-
-        <BouncyPressable onPress={() => router.push('/trivia')} style={styles.triviaCard}>
-          <Icon name="dice" size={28} color="#1A211C" fill="#FFFFFF" />
-          <View style={styles.triviaText}>
-            <Text style={styles.triviaTitle}>Play Trivia</Text>
-            <Text style={styles.triviaKicker}>MINIGAME · TRIVIA PACKS</Text>
-          </View>
-          <Icon name="play" size={15} color="#BC5A2E" />
-        </BouncyPressable>
 
       </ScrollView>
 
