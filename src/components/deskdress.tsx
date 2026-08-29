@@ -70,6 +70,16 @@ export type DeskMood = 'watch' | 'happy' | 'wince' | 'sleep';
  * dozes off when you stall. One small component on purpose — if a proper
  * mascot ever lands, this is the single place it replaces.
  */
+/**
+ * What the deskmate is made of.
+ *
+ * Fixed in both themes, for the same reason the pad's cartridge face is: a
+ * small object in the corner of a page keeps its own colour when the lights
+ * go down. Only the paper behind it changes.
+ */
+const PROP_FILL = { lead: '#FAECCB', red: '#FBE1D7' } as const;
+const PROP_INK = { lead: '#27362B', red: '#C24E38' } as const;
+
 export function DeskProp({
   format,
   idle,
@@ -185,11 +195,18 @@ export function DeskProp({
         </View>
       ) : (
         <Animated.View style={style}>
+          {/*
+            The deskmate is an object, not a surface — the same rule the pad
+            states for its cartridge face. A pencil is yellow and a red pen is
+            red at midnight too, so its colours are pinned. Left on the theme's
+            washes it turned into a mud-brown stick with a pale outline, which
+            is what made it look grim at night rather than friendly.
+          */}
           <Icon
             name="pencil"
             size={40}
-            color={prop === 'redpen' ? colors.coral : colors.ink}
-            fill={prop === 'redpen' ? colors.coralWash : colors.goldWash}
+            color={prop === 'redpen' ? PROP_INK.red : PROP_INK.lead}
+            fill={prop === 'redpen' ? PROP_FILL.red : PROP_FILL.lead}
             strokeWidth={1.8}
           />
           <View style={styles.face}>
@@ -324,9 +341,9 @@ const getStyles = (colors: any) => StyleSheet.create({
   ruler: {
     width: 54,
     height: 14,
-    backgroundColor: colors.goldWash,
+    backgroundColor: PROP_FILL.lead,
     borderWidth: 1.5,
-    borderColor: colors.edge,
+    borderColor: PROP_INK.lead,
     borderRadius: 3,
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -337,7 +354,8 @@ const getStyles = (colors: any) => StyleSheet.create({
   rulerTick: {
     width: 1.2,
     height: 5,
-    backgroundColor: colors.textDim,
+    backgroundColor: PROP_INK.lead,
+    opacity: 0.55,
   },
   face: {
     position: 'absolute',
