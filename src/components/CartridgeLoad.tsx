@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -53,6 +53,14 @@ export function CartridgeLoad({ spec, onCovered, onDone }: Props) {
   const styles = getStyles(colors);
 
   const reduced = useReducedMotion();
+  /**
+   * One load per mount.
+   *
+   * The effect keyed on `reduced`, which Reanimated resolves after the
+   * first render — so the whole sequence, sound included, started a second
+   * time a frame later and the cartridge clunked twice.
+   */
+  const started = useRef(false);
 
   /** 0 held above the slot, 1 seated in it. */
   const drop = useSharedValue(0);
@@ -64,6 +72,9 @@ export function CartridgeLoad({ spec, onCovered, onDone }: Props) {
   const cartOut = useSharedValue(0);
 
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+
     if (reduced) {
       // No theatre, but the same contract: cover, swap, uncover.
       onCovered();

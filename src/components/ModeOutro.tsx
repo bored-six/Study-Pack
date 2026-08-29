@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -63,6 +63,8 @@ export function ModeOutro({ spec, onCovered }: Props) {
   const styles = getStyles(colors);
 
   const reduced = useReducedMotion();
+  /** One ending per sitting, for the same reason the load needed one. */
+  const started = useRef(false);
 
   /** Drives the mode's own image, 0 → 1. */
   const play = useSharedValue(0);
@@ -70,6 +72,9 @@ export function ModeOutro({ spec, onCovered }: Props) {
   const cover = useSharedValue(0);
 
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+
     if (reduced) {
       onCovered();
       return;

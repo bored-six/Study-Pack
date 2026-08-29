@@ -85,9 +85,35 @@ function playerFor(name: SfxName): AudioPlayer {
   return player;
 }
 
+/**
+ * The same clip twice in a breath is a bug, not a rhythm.
+ *
+ * Nothing in the app ever means to play one sound twice inside a tenth of
+ * a second — but an effect that re-runs does exactly that, and the ways an
+ * effect re-runs are many and boring: a reduced-motion preference that
+ * resolves after the first render, a re-render from a store, a remount.
+ * The cartridge clunked twice on every mode pick for that reason.
+ *
+ * Guarding here rather than at the call site means it is guarded for every
+ * sound, including the ones nobody has written yet. Repeats further apart
+ * than this — a per-second tick, a run of stars — are untouched.
+ */
+const REPEAT_GUARD_MS = 90;
+const lastPlayedAt: Partial<Record<SfxName, number>> = {};
+
+/** Test seam: forget what was played, so one test cannot mute the next. */
+export function resetSfxThrottle(): void {
+  for (const key of Object.keys(lastPlayedAt) as SfxName[]) delete lastPlayedAt[key];
+}
+
 export function playSfx(name: SfxName): void {
   void init();
   if (!enabled) return;
+
+  const now = Date.now();
+  if (now - (lastPlayedAt[name] ?? 0) < REPEAT_GUARD_MS) return;
+  lastPlayedAt[name] = now;
+
   try {
     const player = playerFor(name);
     // A fresh player plays as soon as it loads; only a replay needs the

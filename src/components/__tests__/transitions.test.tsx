@@ -80,9 +80,46 @@ describe('loading the cartridge', () => {
     expect(texts(tree)).toContain(MODES[mode].name);
   });
 
-  it('clicks the cartridge home', () => {
+  it('clicks the cartridge home, and gives each mode its own note', () => {
     mount(<CartridgeLoad spec={MODES.rapid} onCovered={() => {}} onDone={() => {}} />);
     expect(playSfx).toHaveBeenCalledWith('cartridge_click');
+
+    advance(400);
+    // The clunk is the slot; the note is which cartridge went into it.
+    expect(playSfx).toHaveBeenCalledWith(MODES.rapid.loadSfx);
+  });
+
+  it.each(MODE_ORDER)('%s clunks once, not twice', (mode) => {
+    const tree = mount(
+      <CartridgeLoad spec={MODES[mode]} onCovered={() => {}} onDone={() => {}} />
+    );
+    advance(LOAD_MS + 50);
+
+    const clunks = playSfx.mock.calls.filter((c: unknown[]) => c[0] === 'cartridge_click');
+    expect(clunks).toHaveLength(1);
+    act(() => tree.unmount());
+  });
+
+  it('still clunks once when the effect is re-run under it', () => {
+    // Reanimated resolves the reduced-motion preference after the first
+    // render, which re-ran the effect and played the whole sequence again a
+    // frame later — the double clunk. A re-render must change nothing.
+    const tree = mount(
+      <CartridgeLoad spec={MODES.mastery} onCovered={() => {}} onDone={() => {}} />
+    );
+    act(() => {
+      tree.update(<CartridgeLoad spec={MODES.mastery} onCovered={() => {}} onDone={() => {}} />);
+    });
+    advance(LOAD_MS + 50);
+
+    expect(
+      playSfx.mock.calls.filter((c: unknown[]) => c[0] === 'cartridge_click')
+    ).toHaveLength(1);
+  });
+
+  it('gives each mode a different note under the clunk', () => {
+    const notes = MODE_ORDER.map((mode) => MODES[mode].loadSfx);
+    expect(new Set(notes).size).toBe(notes.length);
   });
 
   it('hands over even if it is unmounted mid-flight', () => {
