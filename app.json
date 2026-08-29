@@ -36,7 +36,15 @@
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sfx/bell.wav"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

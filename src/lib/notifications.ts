@@ -26,7 +26,37 @@ export type Capability =
   /** No scheduled-notification support here yet (web build). */
   | 'unsupported';
 
-const CHANNEL_ID = 'quiz-reminders';
+/**
+ * The channel this app's reminders live on, versioned.
+ *
+ * Android freezes a channel's sound the moment it is created and refuses
+ * every later change to it — only the name and description stay editable.
+ * So giving reminders their own sound needs a channel the device has never
+ * seen; adding one to `quiz-reminders` would have changed nothing for
+ * anybody who had already opened the app, and would have looked broken
+ * while being correct. Bump this again if the sound ever changes.
+ */
+const CHANNEL_ID = 'quiz-reminders-v2';
+
+/**
+ * Channels this app used to create. Left behind they sit in the system
+ * notification settings forever, and a student muting the wrong one would
+ * wonder why the reminders kept arriving.
+ */
+const RETIRED_CHANNELS = ['quiz-reminders'];
+
+/**
+ * The reminder's own sound: the same small ring the exam rings before its
+ * last page, so a reminder sounds like the thing it is reminding you of.
+ *
+ * Bundled by the expo-notifications config plugin in app.json, and looked
+ * up by base filename — Android wants no path. Inert until then: the file
+ * is only compiled in by a development or release build, and in Expo Go
+ * Android simply falls back to the default chime rather than failing. To
+ * change it, put a short .wav in assets/sfx, name it here, list it in the
+ * plugin, and bump CHANNEL_ID.
+ */
+const REMINDER_SOUND = 'bell.wav';
 
 /** Web has no way to fire a local notification while the app is closed. */
 const SUPPORTED = Platform.OS === 'android' || Platform.OS === 'ios';
@@ -50,7 +80,16 @@ async function ensureChannel(): Promise<void> {
     name: 'Quiz reminders',
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
+    sound: REMINDER_SOUND,
   });
+
+  for (const retired of RETIRED_CHANNELS) {
+    try {
+      await Notifications.deleteNotificationChannelAsync(retired);
+    } catch {
+      /* never created on this device, which is the common case */
+    }
+  }
 }
 
 export async function getCapability(): Promise<Capability> {
@@ -116,6 +155,9 @@ export async function armReminders(
         content: {
           title,
           body,
+          // Android takes its sound from the channel and ignores this;
+          // iOS is the other way round and takes it from here.
+          sound: REMINDER_SOUND,
           data: {
             deckIds: [...new Set(reminder.session.occurrences.map((o) => o.deckId))],
             sessionAt: reminder.session.at,
