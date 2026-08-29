@@ -445,21 +445,21 @@ describe('the word a false statement is built from', () => {
    * false version of a sentence is the real one with a decoy swapped in. A
    * decoy that would have stood out in a list stands out here too.
    */
-  const CLOZE = (): Question => ({
-    id: 'q:rna',
-    prompt: 'Ribosomes assemble proteins from amino acids delivered by transfer ______.',
-    correctAnswer: 'RNA',
-    answers: ['RNA', 'Human', 'Chlorophyll', 'ATP'],
-    kind: 'cloze',
-    sourceLine: 'Ribosomes assemble proteins from amino acids delivered by transfer RNA.',
-  });
+  const RNA = () =>
+    question({
+      kind: 'cloze',
+      prompt: 'Ribosomes assemble proteins from amino acids delivered by transfer ______.',
+      correctAnswer: 'RNA',
+      answers: ['RNA', 'Human', 'Chlorophyll', 'ATP'],
+      sourceLine: 'Ribosomes assemble proteins from amino acids delivered by transfer RNA.',
+    });
 
   it('prefers a decoy the same size as the answer', () => {
     // "transfer Human" is not a claim anyone has to think about; "transfer
     // ATP" is. Both are wrong; only one is a question.
     const seen = new Set<string>();
     for (let n = 0; n < 40; n++) {
-      const items = buildExam([CLOZE()], [{ format: 'true_false', count: 1 }], `seed-${n}`);
+      const items = buildExam([RNA()], [{ format: 'true_false', count: 1 }], `seed-${n}`);
       const statement = (items[0] as { statement?: string })?.statement;
       if (!statement || statement.includes('RNA.')) continue;
       const swapped = /transfer (\w+)\./.exec(statement)?.[1];
@@ -470,8 +470,8 @@ describe('the word a false statement is built from', () => {
   });
 
   it('still builds the format when nothing is the right size', () => {
-    const awkward: Question = {
-      ...CLOZE(),
+    const awkward = {
+      ...RNA(),
       answers: ['RNA', 'Chlorophyll', 'Photosynthesis', 'Mitochondria'],
     };
     const items = buildExam([awkward], [{ format: 'true_false', count: 1 }], 'seed');
