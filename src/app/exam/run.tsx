@@ -33,7 +33,6 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExamItemView } from '@/components/ExamItemView';
 import { ExamSheet } from '@/components/ExamSheet';
 import { FormatBadge, FORMAT_META } from '@/components/FormatBadge';
-import { ModeCrest } from '@/components/ModeCrest';
 import { ModeOutro } from '@/components/ModeOutro';
 import { ModeHud, clockText } from '@/components/ModeHud';
 import { DayTint, EmberDrift, type DeskMood } from '@/components/deskdress';
@@ -451,14 +450,64 @@ export default function ExamRunScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.screen, { paddingTop: insets.top + 8 }]}>
         <RuledPaper />
-        <View style={styles.header}>
+        {/* The cartridge label: which game you are playing, in its own
+            colour, across the top of every page. It used to be a small pill
+            under a row of controls, below which the format was named a
+            second time — so the loudest thing on the stage was furniture
+            and the mode was the quietest. */}
+        <View style={[styles.band, { backgroundColor: spec.wash, borderColor: spec.edge }]}>
           <Pressable
             onPress={() => setConfirmQuit(true)}
             hitSlop={12}
-            style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
-            <Icon name="cross" size={14} color={colors.textDim} strokeWidth={2.6} />
+            accessibilityLabel="Leave this exam"
+            style={({ pressed }) => [styles.bandBtn, pressed && styles.pressed]}>
+            <Icon name="cross" size={14} color={spec.ink} strokeWidth={2.6} />
           </Pressable>
 
+          <View style={[styles.bandBadge, { borderColor: spec.edge }]}>
+            <Icon name={spec.icon} size={19} color={spec.ink} fill="#FFFFFF" strokeWidth={1.9} />
+          </View>
+
+          <View style={styles.bandText}>
+            <Text style={[styles.bandName, { color: spec.ink }]} numberOfLines={1}>
+              {spec.name}
+            </Text>
+            <Text style={styles.bandDeck} numberOfLines={1}>
+              {deck?.name}
+            </Text>
+          </View>
+
+          {spec.feedback === 'deferred' ? (
+            <Pressable
+              onPress={() => store.toggleFlag(item.id)}
+              hitSlop={12}
+              accessibilityLabel={isFlagged ? 'Unflag this question' : 'Flag this question'}
+              style={({ pressed }) => [
+                styles.bandBtn,
+                isFlagged && { backgroundColor: colors.goldWash },
+                pressed && styles.pressed,
+              ]}>
+              <Icon
+                name="flag"
+                size={14}
+                color={isFlagged ? colors.gold : spec.ink}
+                strokeWidth={2.2}
+              />
+            </Pressable>
+          ) : null}
+
+          <Pressable
+            onPress={() => setShowHelp(true)}
+            hitSlop={12}
+            accessibilityLabel="How this format works"
+            style={({ pressed }) => [styles.bandBtn, pressed && styles.pressed]}>
+            <Text style={[styles.helpText, { color: spec.ink }]}>?</Text>
+          </Pressable>
+        </View>
+
+        {/* Where you are, on the page rather than on the mode's colour, so
+            every readout keeps the theme's own contrast. */}
+        <View style={styles.hudRow}>
           <ModeHud
             spec={spec}
             state={{
@@ -474,32 +523,6 @@ export default function ExamRunScreen() {
               questionLeft: questionSecondsLeft,
             }}
           />
-
-          {spec.feedback === 'deferred' ? (
-            <Pressable
-              onPress={() => store.toggleFlag(item.id)}
-              hitSlop={12}
-              style={({ pressed }) => [
-                styles.iconBtn,
-                isFlagged && styles.iconBtnOn,
-                pressed && styles.pressed,
-              ]}>
-              <Icon
-                name="flag"
-                size={14}
-                color={isFlagged ? colors.gold : colors.textDim}
-                fill={isFlagged ? colors.goldWash : 'none'}
-                strokeWidth={2.2}
-              />
-            </Pressable>
-          ) : null}
-
-          <Pressable
-            onPress={() => setShowHelp(true)}
-            hitSlop={12}
-            style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
-            <Text style={styles.helpText}>?</Text>
-          </Pressable>
         </View>
 
         {spec.clock === 'per_question' ? (
@@ -517,19 +540,6 @@ export default function ExamRunScreen() {
         ) : null}
 
         <OfflineBanner message="Offline — running from device storage" style={styles.offline} />
-
-        <View style={styles.formatRow}>
-          <View style={[styles.formatChip, { backgroundColor: FORMAT_META[item.format].wash }]}>
-            <Icon
-              name={FORMAT_META[item.format].icon}
-              size={16}
-              color={onWash.ink}
-              fill="#FFFFFF"
-              strokeWidth={2.2}
-            />
-          </View>
-          <ModeCrest spec={spec} detail={deck?.name} style={styles.crest} />
-        </View>
 
         <ScrollView
           style={styles.fill}
@@ -779,6 +789,65 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /**
+   * The cartridge label across the top of every page.
+   *
+   * The mode used to be a small pill on a second row, under the controls
+   * and beside a badge that named the format a second time — so the stage
+   * shouted furniture and whispered which game you were in. The band is
+   * the mode's own colour, its name is the largest thing on it, and the
+   * format is named once, on the paper, where it belongs.
+   */
+  band: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    borderWidth: 1.5,
+    borderRadius: 18,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+    ...shadow.card,
+  },
+  bandBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 11,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bandBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-3deg' }],
+  },
+  bandText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  bandName: {
+    fontFamily: font.hero,
+    fontSize: 19,
+    lineHeight: 22,
+  },
+  bandDeck: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11,
+    // On the mode's fixed wash, so it cannot take the theme's text colour.
+    color: onWash.dim,
+  },
+  hudRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 34,
+    paddingHorizontal: 2,
+    marginTop: 8,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -857,22 +926,11 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     transform: [{ rotate: '-3deg' }],
   },
-  formatRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginTop: 14,
-    marginBottom: 4,
-  },
   formatLabel: {
     fontFamily: font.bodyHeavy,
     fontSize: 11,
     letterSpacing: 1.2,
     color: colors.accentDeep,
-  },
-  crest: {
-    flex: 1,
   },
   deckName: {
     flexShrink: 1,
