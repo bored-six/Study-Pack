@@ -118,9 +118,34 @@ function DebugFabInner() {
       setBusy(true);
       try {
         const db = getDb();
-        await db.runAsync(`DELETE FROM attempts WHERE deck_id = ?`, DEBUG_DECK);
+        const now = Date.now();
+
+        if (days === 0) {
+          // A streak of zero means nothing on the wall at all: the streak is
+          // counted from the same attempts the chart is drawn from, so
+          // leaving the chart behind would leave a streak behind with it.
+          await db.runAsync(`DELETE FROM attempts WHERE deck_id = ?`, DEBUG_DECK);
+        } else {
+          /**
+           * Clear only the window this streak owns.
+           *
+           * This used to delete every debug attempt, which is why filling
+           * the wall chart and then setting a streak made the chart vanish
+           * — both tools write to the same deck, and the streak tool was
+           * wiping the chart's twelve weeks to lay down its own few days.
+           *
+           * The run needs the days it covers, plus the day before it: that
+           * empty day is what makes the streak stop at exactly `days`.
+           * Everything older is the chart's, and it stays.
+           */
+          await db.runAsync(
+            `DELETE FROM attempts WHERE deck_id = ? AND completed_at > ?`,
+            DEBUG_DECK,
+            now - (days + 1) * DAY
+          );
+        }
+
         if (days > 0) {
-          const now = Date.now();
           await db.withTransactionAsync(async () => {
             for (let i = 0; i < days; i++) {
               await db.runAsync(
@@ -136,7 +161,7 @@ function DebugFabInner() {
           });
         }
         await refreshAll();
-        say(days === 0 ? 'Streak cleared' : `Streak set to ${days} days`);
+        say(days === 0 ? 'Streak cleared, chart too' : `Streak set to ${days} days`);
       } catch (e) {
         say(`Failed: ${String(e)}`);
       } finally {

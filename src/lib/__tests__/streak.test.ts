@@ -64,3 +64,41 @@ describe('computeStreaks', () => {
     expect(result.current).toBe(1);
   });
 });
+
+/**
+ * The rule the debug tools lean on.
+ *
+ * Both "fill wall chart" and "set streak" write into the same attempts
+ * table, because the streak is counted from the same rows the chart is
+ * drawn from. Setting a streak used to delete every debug attempt so its
+ * number would be exact, which is what made the chart disappear. It now
+ * clears only its own window, and relies on the gap below.
+ */
+describe('an exact streak needs only the gap under it', () => {
+  const DAY_MS = 86_400_000;
+  const NOW = 1_700_000_000_000;
+  const daysAgo = (n: number) => NOW - n * DAY_MS;
+
+  it('counts exactly the run, whatever sits older than the gap', () => {
+    const run = [0, 1, 2, 3, 4].map(daysAgo);
+    // Twelve weeks of scattered chart activity, starting well below the gap.
+    const chart = [6, 7, 9, 10, 12, 13, 14, 20, 33, 47, 60, 80].map(daysAgo);
+
+    // Day 5 is empty: that is the whole mechanism.
+    expect(computeStreaks([...run, ...chart], NOW).current).toBe(5);
+  });
+
+  it('runs on past the gap when the day is not actually empty', () => {
+    const run = [0, 1, 2, 3, 4].map(daysAgo);
+    const leftover = [5, 6].map(daysAgo);
+    expect(computeStreaks([...run, ...leftover], NOW).current).toBe(7);
+  });
+
+  it('still reports the longest run the chart holds', () => {
+    const run = [0, 1].map(daysAgo);
+    const chart = [10, 11, 12, 13, 14, 15].map(daysAgo);
+    const streaks = computeStreaks([...run, ...chart], NOW);
+    expect(streaks.current).toBe(2);
+    expect(streaks.longest).toBe(6);
+  });
+});
