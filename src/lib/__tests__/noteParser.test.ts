@@ -1,4 +1,4 @@
-import { LIMITS, parseNotes } from '../noteParser';
+import { LIMITS, parseNotes, rebuildOptions } from '../noteParser';
 
 /** Convenience: parse and return prompts only. */
 function prompts(notes: string): string[] {
@@ -321,6 +321,61 @@ describe('a list item is a list item, however the list was written', () => {
     );
     expect(questions[0].answers).toContain('andirons are not organs');
     expect(questions[0].answers).toContain('organs filter waste');
+  });
+});
+
+describe('rebuilding options for a deck already on the phone', () => {
+  // What a stale subject can still tell us: its other answers, and the
+  // sentences they came from.
+  const POOL = ['Inflation', 'Deflation', 'Equilibrium', 'Monopsony', 'Elasticity'];
+  const SOURCE = [
+    'Inflation: a sustained rise in the general price level',
+    'Deflation: a sustained fall in the general price level',
+    'Equilibrium: the price at which supply equals demand',
+    'Monopsony: a market with a single buyer',
+    'Elasticity: how far demand responds to a change in price',
+  ].join('\n');
+
+  it('builds four options including the answer', () => {
+    const built = rebuildOptions(
+      'Equilibrium',
+      'Which term means: the price at which supply equals demand?',
+      POOL,
+      SOURCE,
+      'seed'
+    );
+    expect(built).not.toBeNull();
+    expect(built).toHaveLength(4);
+    expect(built).toContain('Equilibrium');
+  });
+
+  it('leaves the answer byte-for-byte alone', () => {
+    // Other code finds it inside its own source line by exact match.
+    const built = rebuildOptions('Monopsony', 'Which term means: a market with a single buyer?', POOL, SOURCE, 's');
+    expect(built?.filter((o) => o.toLowerCase() === 'monopsony')).toEqual(['Monopsony']);
+  });
+
+  it('writes the decoys the way the answer is written', () => {
+    const built = rebuildOptions(
+      'equilibrium',
+      'Subsidies lower the ______ price.',
+      POOL,
+      SOURCE,
+      'seed'
+    );
+    expect(built).not.toBeNull();
+    const capitalised = built!.filter((o) => /^[A-Z]/.test(o));
+    expect(capitalised).toEqual([]);
+  });
+
+  it('gives up rather than pad, when the deck has too little to draw on', () => {
+    expect(rebuildOptions('Osmosis', 'Which term means: water moving?', ['Osmosis'], '', 's')).toBeNull();
+  });
+
+  it('is deterministic, so the launch repair settles after one pass', () => {
+    const once = rebuildOptions('Elasticity', 'Which term means: how far demand responds?', POOL, SOURCE, 'x');
+    const twice = rebuildOptions('Elasticity', 'Which term means: how far demand responds?', POOL, SOURCE, 'x');
+    expect(twice).toEqual(once);
   });
 });
 

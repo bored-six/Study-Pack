@@ -1,5 +1,6 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
+import { rebuildOptions } from './noteParser';
 import { inferRepair, repairListAnswers } from './repair';
 
 import type {
@@ -157,6 +158,72 @@ export async function initDb(): Promise<void> {
   // nothing once everything is labelled, so running it every launch is free.
   await repairNoteQuestions(db);
   await repairStoredLists(db);
+  await repairStoredOptions(db);
+}
+
+/**
+ * Rebuilds the wrong answers on subjects made before the picker knew what a
+ * believable decoy was.
+ *
+ * A subject keeps its questions, not the note behind them, so every
+ * improvement to the picker stopped at the phone's front door: decks already
+ * saved kept offering a verb among nouns and the only capitalised word in
+ * the list. The deck can supply what the note would have — its own answers
+ * are the sibling terms, its own source lines carry the capitalisation.
+ *
+ * Ungated, like the repairs above, and self-limiting: the rebuild is
+ * deterministic, so once a deck has been through it the options come back
+ * identical and nothing is written.
+ */
+async function repairStoredOptions(db: SQLiteDatabase): Promise<void> {
+  const decks = await db.getAllAsync<{ id: string }>(
+    `SELECT id FROM decks WHERE source = 'notes'`
+  );
+
+  for (const deck of decks) {
+    const rows = await db.getAllAsync<{
+      id: string;
+      prompt: string;
+      correct_answer: string;
+      answers_json: string;
+      kind: string;
+      source_line: string | null;
+    }>(
+      `SELECT id, prompt, correct_answer, answers_json, kind, source_line
+       FROM questions WHERE deck_id = ? ORDER BY position`,
+      deck.id
+    );
+    // Enumeration carries its own items; it has no decoys to rebuild.
+    const usable = rows.filter((row) => row.kind !== 'enumeration');
+    if (usable.length < 4) continue;
+
+    const pool = usable.map((row) => row.correct_answer);
+    const sourceText = rows
+      .map((row) => row.source_line)
+      .filter((line): line is string => !!line)
+      .join('\n');
+
+    const writes: [string, string][] = [];
+    for (const row of usable) {
+      const rebuilt = rebuildOptions(
+        row.correct_answer,
+        row.prompt,
+        pool,
+        sourceText,
+        `${deck.id}:${row.id}`
+      );
+      if (!rebuilt) continue;
+      const next = JSON.stringify(rebuilt);
+      if (next !== row.answers_json) writes.push([next, row.id]);
+    }
+    if (writes.length === 0) continue;
+
+    await db.withTransactionAsync(async () => {
+      for (const [answers, id] of writes) {
+        await db.runAsync('UPDATE questions SET answers_json = ? WHERE id = ?', answers, id);
+      }
+    });
+  }
 }
 
 /**

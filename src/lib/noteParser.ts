@@ -709,6 +709,42 @@ function termDistractors(
  * Exported because a question the student wrote by hand needs decoys too,
  * and it must get them from the same code the parser's questions use.
  */
+/**
+ * A fresh option set for a question whose notes are no longer to hand.
+ *
+ * A deck stores its questions, not the note they were made from, so
+ * improving the picker does nothing for a subject already on the phone: the
+ * options it was built with are the options it keeps. The deck is enough to
+ * rebuild them, though. Its other answers are exactly the sibling terms a
+ * decoy should be drawn from, and its stored source lines carry the
+ * capitalisation the notes used, which is what tells a proper noun from a
+ * term that merely opened its line.
+ *
+ * The answer is passed through untouched — other code finds it inside its
+ * own source line by exact match. Returns null when it cannot do better, so
+ * the caller leaves the row alone rather than making it worse.
+ */
+export function rebuildOptions(
+  answer: string,
+  prompt: string,
+  pool: readonly string[],
+  sourceText: string,
+  seed: string
+): string[] | null {
+  const clean = answer.trim();
+  if (!clean) return null;
+
+  const usable = pool.filter((term) => fitsAsOption(term, prompt, clean));
+  const distractors = isNumeric(clean)
+    ? numericDistractors(clean, seed)
+    : termDistractors(clean, usable, seed, fragmentsOf(usable));
+  if (distractors.length < 3) return null;
+
+  const proper = properNouns(sourceText);
+  const levelled = distractors.map((term) => conformCase(clean, term, proper));
+  return seededShuffle([answer, ...levelled], seed);
+}
+
 export function suggestDistractors(
   answer: string,
   pool: readonly string[],
@@ -850,9 +886,25 @@ function findListBlocks(lines: Line[]): { drafts: EnumDraft[]; consumed: Set<num
 
 /** "The four stages of mitosis are prophase, metaphase, anaphase and telophase." */
 function findInlineSeries(line: string): EnumDraft | null {
+  /**
+   * A title, a separator, then the items.
+   *
+   * The separator used to have to be a colon, and the items had to be
+   * divided by commas. Both are just one way of writing a list down: a dash
+   * after the title is as common as a colon, and semicolons are what people
+   * reach for once the items themselves contain commas. Neither produced a
+   * single question — the line fell through to the definition path and was
+   * dropped for want of decoys, so the student was told nothing.
+   *
+   * The dash needs spaces around it so a bullet ("- Hearts pump blood") and
+   * a hyphenated word ("carbon-dioxide") are not read as titles, and both
+   * shapes still need a comma or semicolon in the tail before anything is
+   * treated as a list.
+   */
   const match =
     /^(.{3,60}?)\s+(?:are|include|consist of|comprise)\s+(.+)$/i.exec(line) ??
-    /^(.{3,60}?):\s+(.+,.+)$/.exec(line);
+    /^(.{3,60}?)\s*[:\u2013\u2014]\s+(.+[,;].+)$/.exec(line) ??
+    /^(.{3,60}?)\s+-\s+(.+[,;].+)$/.exec(line);
   if (!match) return null;
 
   // Read the count from the raw title — cleanListTitle removes it.
@@ -884,10 +936,10 @@ function findInlineSeries(line: string): EnumDraft | null {
    * exactly what the student wrote down.
    */
   const named = CATEGORY_TITLE.test(title);
-  if (!/,/.test(listable) && !(named && /\s+(?:and|or)\s+/i.test(listable))) return null;
+  if (!/[,;]/.test(listable) && !(named && /\s+(?:and|or)\s+/i.test(listable))) return null;
 
   const items = listable
-    .split(/\s*,\s*|\s+and\s+|\s+or\s+/i)
+    .split(/\s*[,;]\s*|\s+and\s+|\s+or\s+/i)
     .map(listItem)
     .filter(Boolean);
 
