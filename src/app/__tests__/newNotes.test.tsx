@@ -24,6 +24,10 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 jest.mock('@/lib/sfx', () => ({ playSfx: jest.fn(), setSfxEnabled: jest.fn() }));
 jest.mock('@/lib/db', () => ({
+  // '1' means the walkthrough has already been seen, so it never covers the
+  // screen these tests are reading.
+  readSetting: jest.fn(async () => '1'),
+  writeSetting: jest.fn(async () => undefined),
   listDecks: jest.fn(async () => []),
   listAnswerPool: jest.fn(async () => []),
   createSubject: jest.fn(),

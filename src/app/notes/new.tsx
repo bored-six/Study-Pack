@@ -25,6 +25,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { readSetting, writeSetting } from '@/lib/db';
+import { NotesHowTo } from '@/components/NotesHowTo';
 import { Icon, type IconName } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { LIMITS } from '@/lib/noteParser';
@@ -48,6 +50,9 @@ const SCAN_MS = 900;
  * description of a format is a much worse way to learn it than watching
  * one land in the box.
  */
+/** Set once the walkthrough has been seen, so it never interrupts twice. */
+const HOWTO_KEY = 'notes_howto_seen';
+
 const RECIPES: { icon: IconName; name: string; sample: string }[] = [
   {
     icon: 'book',
@@ -98,6 +103,27 @@ export default function NewNotesScreen() {
   const advice = useMemo(() => shapeAdvice(shape), [shape]);
 
   /** Drops one worked example at the end of whatever is already there. */
+  /**
+   * Shown the first time only. Adding notes is the one screen a student
+   * cannot work out by poking at it — the shapes the parser reads are not
+   * guessable from the empty box.
+   */
+  const [howTo, setHowTo] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void readSetting(HOWTO_KEY).then((seen) => {
+      if (alive && seen !== '1') setHowTo(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const closeHowTo = useCallback(() => {
+    setHowTo(false);
+    void writeSetting(HOWTO_KEY, '1');
+  }, []);
+
   const addSample = useCallback((sample: string) => {
     playSfx('derp_pop');
     setBody((current) => (current.trim() ? `${current.replace(/\s+$/, '')}\n${sample}` : sample));
@@ -154,7 +180,17 @@ export default function NewNotesScreen() {
               </View>
               <Squiggle width={84} style={styles.squiggle} />
             </View>
+            <Pressable
+              onPress={() => setHowTo(true)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="How adding notes works"
+              style={({ pressed }) => [styles.helpBtn, pressed && styles.pressed]}>
+              <Text style={styles.helpMark}>?</Text>
+            </Pressable>
           </View>
+
+          <NotesHowTo visible={howTo} onClose={closeHowTo} />
 
           <ScrollView
             style={styles.flex}
@@ -443,6 +479,23 @@ const getStyles = (colors: any) => StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: colors.accent,
+  },
+  helpBtn: {
+    marginLeft: 'auto',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.surface,
+    ...outlineOn(colors),
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.card,
+  },
+  helpMark: {
+    fontFamily: font.hero,
+    fontSize: 19,
+    color: colors.textDim,
+    top: -1,
   },
   navRow: {
     flexDirection: 'row',
