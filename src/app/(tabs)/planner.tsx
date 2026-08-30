@@ -4,7 +4,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { GetTheApp } from '@/components/GetTheApp';
 import { Icon } from '@/components/Icon';
 import { PlanQuizSheet, type PlanDraft } from '@/components/PlanQuizSheet';
 import { RuledPaper } from '@/components/notebook';
@@ -267,7 +266,6 @@ export default function PlannerScreen() {
             <Icon name="calendar" size={40} color={colors.ink} fill={colors.bg} />
             <Text style={styles.emptyTitle}>Nothing planned yet!</Text>
             <Text style={styles.emptySub}>Schedule a quiz to build a habit.</Text>
-            <GetTheApp what="Reminders that actually arrive" />
           </View>
         ) : (
           <>

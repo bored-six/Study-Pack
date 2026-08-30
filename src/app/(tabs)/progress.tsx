@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AchievementModal } from '@/components/AchievementModal';
 import { AchievementSticker } from '@/components/AchievementSticker';
 import { DoodleFlame } from '@/components/DoodleFlame';
-import { GetTheApp } from '@/components/GetTheApp';
 import { Icon } from '@/components/Icon';
 import { RuledPaper } from '@/components/notebook';
 import { ACHIEVEMENTS, achievementById, type Unlock } from '@/lib/achievements';
@@ -215,9 +214,6 @@ export default function ProgressScreen() {
               Add your notes and take a quiz. Every answer counts towards how well you know
               each subject — so this fills in as you go.
             </Text>
-            {/* On the web this empty state is misleading: it reads as "you have
-                not studied" when the truth is "a browser cannot hold this". */}
-            <GetTheApp what="Tracking how well you know a subject" />
           </View>
         ) : (
           <>

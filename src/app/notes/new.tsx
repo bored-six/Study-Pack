@@ -170,11 +170,7 @@ export default function NewNotesScreen() {
                   onPress={() => addSample(recipe.sample)}
                   accessibilityRole="button"
                   accessibilityLabel={`Add an example: ${recipe.name}`}
-                  style={({ pressed }) => [
-                    styles.recipe,
-                    { transform: [{ rotate: i % 2 === 0 ? '-1.5deg' : '1.5deg' }] },
-                    pressed && styles.pressed,
-                  ]}>
+                  style={({ pressed }) => [styles.recipe, pressed && styles.pressed]}>
                   <View style={styles.recipeHead}>
                     <Icon
                       name={recipe.icon}
@@ -513,8 +509,17 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
 
   // --- worked examples --------------------------------------------------
+  /**
+   * Straight, and further apart than they were.
+   *
+   * These alternated -1.5 and +1.5 degrees, which reads as a stack of
+   * sticky notes at phone width. At the 600px the web build allows, the
+   * same angle throws each corner about eight pixels — the whole of the gap
+   * — so neighbouring cards collided and the row looked broken rather than
+   * casual.
+   */
   recipes: {
-    gap: 8,
+    gap: 12,
   },
   recipe: {
     backgroundColor: colors.surface,
