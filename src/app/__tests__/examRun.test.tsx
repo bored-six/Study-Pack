@@ -33,7 +33,6 @@ jest.mock('@/lib/haptics', () => ({
   tapTier: jest.fn(),
   setHapticsEnabled: jest.fn(),
 }));
-jest.mock('@/hooks/useOnline', () => ({ useOnline: () => true }));
 jest.mock('@/lib/db', () => ({
   getDeckById: jest.fn(),
   listQuestions: jest.fn(),

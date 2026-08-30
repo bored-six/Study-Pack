@@ -33,6 +33,16 @@ const REMOVE = [
   // the screen, so it never runs a foreground service.
   'android.permission.FOREGROUND_SERVICE',
   'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+  // Nothing in Flipp opens a socket. This used to be needed by the offline
+  // banner, which asked NetInfo whether the device was online — and NetInfo
+  // answers that by pinging clients3.google.com. With trivia gone, being
+  // offline changed nothing, so the banner reported a state with no
+  // consequence at the cost of the one outbound request the app made. Both
+  // are gone, and dropping the permission is what makes "Flipp never calls
+  // the internet" a promise Android enforces rather than one we merely keep.
+  'android.permission.INTERNET',
+  'android.permission.ACCESS_NETWORK_STATE',
+  'android.permission.ACCESS_WIFI_STATE',
 ];
 
 const TOOLS = 'http://schemas.android.com/tools';

@@ -11,7 +11,7 @@
  * it after release and every existing user ends up with two Flipps, and the
  * new one is empty.
  */
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
 const ROOT = join(__dirname, '..', '..', '..');
@@ -159,5 +159,41 @@ describe('the permissions a library sneaks in', () => {
     for (const keep of ['POST_NOTIFICATIONS', 'RECEIVE_BOOT_COMPLETED', 'VIBRATE']) {
       expect(plugin).not.toContain(`android.permission.${keep}'`);
     }
+  });
+});
+
+describe('nothing reaches the network, including libraries', () => {
+  /**
+   * The first version of this checked src/ for fetch, XHR and WebSocket, and
+   * passed — while @react-native-community/netinfo pinged
+   * clients3.google.com on a timer to answer "are we online?". None of that
+   * appears in our code, so the sweep never saw it, and the Settings card
+   * promised something the app was quietly breaking.
+   *
+   * A dependency that exists to talk to the network is the thing to look
+   * for, not a call site. Adding one has to be a deliberate act that turns
+   * this red.
+   */
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+
+  it('ships no dependency whose job is to reach the network', () => {
+    const networked = deps.filter((name) =>
+      /netinfo|axios|superagent|socket\.io|pusher|firebase|amplitude|sentry|analytics|expo-updates/.test(
+        name
+      )
+    );
+    expect(networked).toEqual([]);
+  });
+
+  it('has no offline state to report, because offline changes nothing', () => {
+    // The banner was the only reason the app cared whether it was connected.
+    expect(existsSync(join(ROOT, 'src', 'hooks', 'useOnline.ts'))).toBe(false);
+    expect(existsSync(join(ROOT, 'src', 'components', 'OfflineBanner.tsx'))).toBe(false);
+  });
+
+  it('gives up the permission, so Android enforces the promise', () => {
+    const plugin = readFileSync(join(ROOT, 'plugins', 'withTrimmedPermissions.js'), 'utf8');
+    expect(plugin).toContain('android.permission.INTERNET');
   });
 });

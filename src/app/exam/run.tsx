@@ -37,7 +37,6 @@ import { ModeOutro } from '@/components/ModeOutro';
 import { ModeHud, clockText } from '@/components/ModeHud';
 import { DayTint, EmberDrift } from '@/components/deskdress';
 import { Icon } from '@/components/Icon';
-import { OfflineBanner } from '@/components/OfflineBanner';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { readSetting, writeSetting } from '@/lib/db';
 import { tapThud, tapTier } from '@/lib/haptics';
@@ -554,7 +553,6 @@ export default function ExamRunScreen() {
           </View>
         ) : null}
 
-        <OfflineBanner message="Offline — running from device storage" style={styles.offline} />
 
         <ScrollView
           style={styles.fill}

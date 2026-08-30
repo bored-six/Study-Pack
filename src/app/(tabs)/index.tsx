@@ -7,7 +7,6 @@ import { Icon, type IconName } from '@/components/Icon';
 import { PromptModal } from '@/components/PromptModal';
 import { SubjectSheet } from '@/components/SubjectSheet';
 import { RuledPaper } from '@/components/notebook';
-import { OfflineBanner } from '@/components/OfflineBanner';
 import type { Deck } from '@/lib/types';
 import { updateSubject } from '@/lib/db';
 import { derpRadius, font, getColors, outlineOn, shadow, subjectInkFor, tabClearance, useThemeStore } from '@/theme/tokens';
@@ -193,7 +192,6 @@ export default function HomeScreen() {
         </View>
         <Text style={styles.title}>My binder</Text>
 
-        <OfflineBanner message="Offline — everything saved still works" style={styles.banner} />
 
         {nextSession ? (
           <BouncyPressable onPress={() => router.push('/planner')} style={styles.ribbon}>
