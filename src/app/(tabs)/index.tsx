@@ -244,6 +244,22 @@ export default function HomeScreen() {
           </BouncyPressable>
         </View>
 
+        {/*
+          Its own row rather than a third slot above: three across leaves each
+          button about a third of a phone wide, and "Add notes" wraps. Full
+          width also says what this is — not a third kind of subject, but the
+          other way to get notes in when they are not written in shapes.
+        */}
+        <BouncyPressable
+          onPress={() => router.push('/notes/new')}
+          style={[styles.actionBtn, styles.actionBtnNib]}>
+          <Icon name="spark" size={20} color="#1A211C" fill="#FFFFFF" />
+          <View style={styles.nibText}>
+            <Text style={styles.actionLabel}>Ask Nib</Text>
+            <Text style={styles.nibSub}>Reads messy notes · needs internet</Text>
+          </View>
+        </BouncyPressable>
+
       </ScrollView>
 
       <PromptModal
@@ -535,6 +551,21 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   actionBtnNew: { backgroundColor: '#DDF3DC', transform: [{ rotate: '0.6deg' }] }, // mint
   actionBtnNotes: { backgroundColor: '#FCEBC0', transform: [{ rotate: '-0.8deg' }] }, // sun
+  actionBtnNib: {
+    backgroundColor: '#E3E7FB', // periwinkle — the one thing here that leaves the phone
+    transform: [{ rotate: '0.4deg' }],
+    marginTop: 10,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  nibText: { alignItems: 'flex-start' },
+  nibSub: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
+    lineHeight: 15,
+    color: '#4A5348',
+    marginTop: 1,
+  },
   actionLabel: {
     fontFamily: font.hero,
     fontSize: 19,
