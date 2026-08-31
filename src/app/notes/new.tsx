@@ -30,7 +30,7 @@ import { NotesHowTo } from '@/components/NotesHowTo';
 import { Icon, type IconName } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { LIMITS } from '@/lib/noteParser';
-import { readShape, shapeAdvice } from '@/lib/noteShape';
+import { readShape, shapeAdvice, shapeNeedsReader } from '@/lib/noteShape';
 import { playSfx } from '@/lib/sfx';
 import { useNotesStore } from '@/store/notes';
 import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
@@ -78,9 +78,10 @@ export default function NewNotesScreen() {
   const styles = getStyles(colors);
 
   const insets = useSafeAreaInsets();
-  const { refresh, parse } = useNotesStore();
+  const { refresh, parse, scanWithReader, rescueError, credits } = useNotesStore();
   const [body, setBody] = useState('');
   const [scan, setScan] = useState<{ lines: number; found: number } | null>(null);
+  const [reading, setReading] = useState(false);
   const [nothing, setNothing] = useState<string | null>(null);
   const input = useRef<TextInput>(null);
 
@@ -101,6 +102,9 @@ export default function NewNotesScreen() {
   // What the page can see, live. A shape read, not a parse — see lib/noteShape.
   const shape = useMemo(() => readShape(body), [body]);
   const advice = useMemo(() => shapeAdvice(shape), [shape]);
+  // Paragraphs the parser has no shape for. Offering a reading is a better
+  // answer than telling the student to rewrite their notes to suit us.
+  const needsReader = useMemo(() => shapeNeedsReader(shape), [shape]);
 
   /** Drops one worked example at the end of whatever is already there. */
   /**
@@ -151,6 +155,29 @@ export default function NewNotesScreen() {
       router.push('/notes/review');
     }, SCAN_MS);
   }, [body, parse]);
+
+  /**
+   * Scan, then read. The parse runs either way, so a reading that never
+   * arrives lands the student on the same review screen Scan would have —
+   * with the failure explained there rather than losing the trip.
+   */
+  const runReader = useCallback(() => {
+    setReading(true);
+    void scanWithReader(body).then((staged) => {
+      setReading(false);
+      if (staged === 0) {
+        // A reading that never happened is not evidence about the notes, so
+        // it must not be reported as one.
+        const failed = useNotesStore.getState().rescueError;
+        setNothing(
+          failed ??
+            'Neither the scan nor the reader found a fact to test in these. Try a few lines with more in them.'
+        );
+        return;
+      }
+      router.push('/notes/review');
+    });
+  }, [body, scanWithReader]);
 
   useEffect(() => () => setScan(null), []);
 
@@ -307,6 +334,33 @@ export default function NewNotesScreen() {
               onPress={runParse}
               style={styles.cta}
             />
+
+            {/*
+              Offered only when the shape read says these notes have little
+              the parser can catch. On notes that parse well it stays hidden,
+              or a student spends an allowance on questions Scan gives free.
+            */}
+            {needsReader && ready ? (
+              <Animated.View entering={FadeInDown.duration(220)} style={styles.reader}>
+                <ChunkyButton
+                  label={reading ? 'Reading your notes…' : 'Read these with AI'}
+                  icon={reading ? 'pencil' : 'spark'}
+                  variant="soft"
+                  disabled={reading}
+                  onPress={runReader}
+                />
+                <Text style={styles.readerNote}>
+                  {reading
+                    ? 'Keeping everything the scan already found.'
+                    : 'These read as paragraphs. AI can quiz them as they are — needs internet' +
+                      (credits != null ? `, ${credits.left} of ${credits.of} left this week.` : '.')}
+                </Text>
+                {rescueError != null ? (
+                  <Text style={styles.readerWarn}>{rescueError}</Text>
+                ) : null}
+              </Animated.View>
+            ) : null}
+
             <View style={styles.orRow}>
               <View style={styles.orLine} />
               <Text style={styles.orText}>or</Text>
@@ -319,7 +373,9 @@ export default function NewNotesScreen() {
               onPress={() => router.push('/notes/custom')}
             />
             <Text style={styles.footnote}>
-              Runs entirely on your phone — no internet, no AI, nothing uploaded.
+              {needsReader && ready
+                ? 'Making questions runs entirely on your phone. Only "Read these with AI" sends your notes anywhere, and only when you press it.'
+                : 'Runs entirely on your phone — no internet, no AI, nothing uploaded.'}
             </Text>
           </ScrollView>
         </View>
@@ -741,6 +797,26 @@ const getStyles = (colors: any) => StyleSheet.create({
   pillLabel: {
     fontFamily: font.bodySemibold,
     fontSize: 11,
+  },
+  reader: {
+    gap: 7,
+    marginTop: 10,
+  },
+  readerNote: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.textFaint,
+    textAlign: 'center',
+    paddingHorizontal: 6,
+  },
+  readerWarn: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.coral,
+    textAlign: 'center',
+    paddingHorizontal: 6,
   },
   advice: {
     flexDirection: 'row',

@@ -57,6 +57,14 @@ interface NotesState {
   /** Runs the offline parser and stages the result for review. */
   parse: (raw: string) => ParseResult;
   /**
+   * Parses, then asks for a reading in one go, for notes the shape read says
+   * the parser will get little out of. Returns how many questions are staged.
+   *
+   * The parse still runs first and its questions are still kept: a reading
+   * that fails leaves the student exactly where pressing Scan would have.
+   */
+  scanWithReader: (raw: string) => Promise<number>;
+  /**
    * Asks the reader to make questions from the lines the parser skipped, and
    * merges what comes back into the draft under review.
    *
@@ -123,6 +131,14 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       rescueError: null,
     });
     return result;
+  },
+
+  scanWithReader: async (raw) => {
+    get().parse(raw);
+    // rescue() reports failure through state rather than throwing, so the
+    // parser's questions survive a reading that never arrives.
+    await get().rescue();
+    return get().draft.length;
   },
 
   rescue: async () => {

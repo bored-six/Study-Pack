@@ -1,5 +1,5 @@
 import { LIMITS } from '../noteParser';
-import { looksLikeDefinition, readShape, shapeAdvice } from '../noteShape';
+import { looksLikeDefinition, readShape, shapeAdvice, shapeNeedsReader } from '../noteShape';
 
 describe('reading the shape of a paste', () => {
   it('says nothing about an empty box', () => {
@@ -119,5 +119,55 @@ describe('what the box says back', () => {
       )
     );
     expect(advice).toBeNull();
+  });
+});
+
+describe('offering a reading before the scan', () => {
+  it('stays quiet on plain prose, which the parser handles by cloze', () => {
+    // Measured: these five produce three questions with no definition among
+    // them. Offering here would spend an allowance on questions Scan gives
+    // away, which is why the gate is not "these look like paragraphs".
+    const shape = readShape(
+      [
+        'The war began after a long period of rising tension between the two powers',
+        'Trade routes had been contested for decades before anyone put it in writing',
+        'What followed was less a single conflict than a series of overlapping ones',
+        'The treaty was signed in Paris three years after the first shots were fired',
+        'Historians still argue about whether the outcome was ever really in doubt',
+      ].join('\n')
+    );
+    expect(shapeNeedsReader(shape)).toBe(false);
+  });
+
+  it('stays quiet on notes that already parse, so no allowance is wasted', () => {
+    const shape = readShape(
+      [
+        'Chlorophyll: the green pigment that absorbs light',
+        'Mitochondria produce 36 ATP per glucose molecule.',
+        'Osmosis: water moving across a membrane',
+        'Ribosome: builds proteins from amino acids',
+      ].join('\n')
+    );
+    expect(shapeNeedsReader(shape)).toBe(false);
+  });
+
+  it('stays quiet on an empty box and a single line', () => {
+    expect(shapeNeedsReader(readShape(''))).toBe(false);
+    expect(shapeNeedsReader(readShape('Cell'))).toBe(false);
+  });
+
+  it('offers when the shape read finds nothing askable at all', () => {
+    // The same case the advice answers with "rewrite these as Term: meaning".
+    const shape = readShape(['Cell', 'Wall', 'Nucleus', 'Golgi'].join('\n'));
+    expect(shape.usable).toBe(0);
+    expect(shapeNeedsReader(shape)).toBe(true);
+    expect(shapeAdvice(shape)).not.toBeNull();
+  });
+
+  it('does not offer once even one line is askable', () => {
+    const shape = readShape(
+      ['Cell', 'Wall', 'Nucleus', 'Osmosis: water moving across a membrane'].join('\n')
+    );
+    expect(shapeNeedsReader(shape)).toBe(false);
   });
 });
