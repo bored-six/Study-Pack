@@ -14,6 +14,7 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
+import type { Credits } from '@/lib/aiNotes';
 import { SKIP_LABEL, type ParsedQuestion, type SkippedLine } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
 import { candy, font, getColors, outlineOn, radius, shadow, subjectInkFor, useThemeStore } from '@/theme/tokens';
@@ -132,40 +133,124 @@ function QuestionCard({
   );
 }
 
-function SkippedPanel({ skipped }: { skipped: SkippedLine[] }) {
+/**
+ * The lines that produced nothing, and the one offer to go back over them.
+ *
+ * The offer lives here rather than on a tab or a screen of its own because
+ * this is where the shortfall is already reported — a student meets it at the
+ * moment they are looking at what they did not get, and nowhere else.
+ *
+ * Dumb on purpose: everything it needs arrives as props, so the panel can be
+ * driven through all of its states in a test without a store behind it.
+ */
+function SkippedPanel({
+  skipped,
+  credits,
+  busy,
+  added,
+  error,
+  canRescue,
+  onRescue,
+}: {
+  skipped: SkippedLine[];
+  credits: Credits | null;
+  busy: boolean;
+  /** Questions the last reading added, or null if none has run. */
+  added: number | null;
+  error: string | null;
+  canRescue: boolean;
+  onRescue: () => void;
+}) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
   const styles = getStyles(colors);
 
   const [open, setOpen] = useState(false);
-  if (skipped.length === 0) return null;
+
+  // A reading that cleared every skipped line still has something to say, so
+  // the card stays for its own outcome rather than vanishing with the list.
+  if (skipped.length === 0 && added == null && error == null) return null;
+
+  const spent = credits != null && credits.left <= 0;
+  const done = added != null;
+
+  const label = busy
+    ? 'Reading your notes…'
+    : spent
+      ? 'Readings come back Monday'
+      : 'Read these with AI';
+
+  const countLine =
+    credits == null
+      ? '10 readings a week'
+      : `${credits.left} of ${credits.of} left this week`;
 
   return (
     <View style={styles.skipCard}>
-      <Pressable
-        onPress={() => setOpen((v) => !v)}
-        style={({ pressed }) => [styles.skipHead, pressed && styles.pressed]}>
-        <Text style={styles.skipTitle}>
-          Skipped {skipped.length} line{skipped.length === 1 ? '' : 's'}
-        </Text>
-        <Text style={styles.skipToggle}>{open ? 'Hide' : 'Show'}</Text>
-      </Pressable>
-      {open ? (
-        <View style={styles.skipList}>
-          {skipped.map((line, i) => (
-            <View key={`${i}-${line.text}`} style={styles.skipRow}>
-              <Text style={styles.skipText} numberOfLines={2}>
-                "{line.text}"
-              </Text>
-              <Text style={styles.skipReason}>{SKIP_LABEL[line.reason]}</Text>
+      {skipped.length > 0 ? (
+        <>
+          <Pressable
+            onPress={() => setOpen((v) => !v)}
+            style={({ pressed }) => [styles.skipHead, pressed && styles.pressed]}>
+            <Text style={styles.skipTitle}>
+              Skipped {skipped.length} line{skipped.length === 1 ? '' : 's'}
+            </Text>
+            <Text style={styles.skipToggle}>{open ? 'Hide' : 'Show'}</Text>
+          </Pressable>
+          {open ? (
+            <View style={styles.skipList}>
+              {skipped.map((line, i) => (
+                <View key={`${i}-${line.text}`} style={styles.skipRow}>
+                  <Text style={styles.skipText} numberOfLines={2}>
+                    "{line.text}"
+                  </Text>
+                  <Text style={styles.skipReason}>{SKIP_LABEL[line.reason]}</Text>
+                </View>
+              ))}
             </View>
-          ))}
+          ) : (
+            <Text style={styles.skipHint}>
+              These didn't have a clear fact to test — tap Show to see them.
+            </Text>
+          )}
+        </>
+      ) : null}
+
+      {canRescue ? (
+        <View style={[styles.rescue, skipped.length === 0 && styles.rescueAlone]}>
+          {done ? (
+            // Read once per draft: asking again reads the same notes and
+            // spends a second reading to hand back what is already on screen.
+            <View style={styles.rescueNote}>
+              <Icon name="check" size={17} color={colors.leaf} strokeWidth={2.6} />
+              <Text style={styles.rescueNoteText}>
+                {added === 0
+                  ? 'Nothing more to pull out of these notes.'
+                  : `Added ${added} question${added === 1 ? '' : 's'}.`}
+                {credits != null ? ` ${credits.left} of ${credits.of} left this week.` : ''}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <ChunkyButton
+                label={label}
+                icon={busy ? 'pencil' : spent ? 'clock' : 'spark'}
+                variant="soft"
+                size="sm"
+                disabled={busy || spent}
+                onPress={onRescue}
+              />
+              <Text style={styles.rescueCount}>{countLine}</Text>
+              {error != null ? (
+                <View style={[styles.rescueNote, styles.rescueNoteWarn]}>
+                  <Icon name="alert" size={17} color={colors.coral} strokeWidth={2.6} />
+                  <Text style={[styles.rescueNoteText, styles.rescueNoteTextWarn]}>{error}</Text>
+                </View>
+              ) : null}
+            </>
+          )}
         </View>
-      ) : (
-        <Text style={styles.skipHint}>
-          These didn't have a clear fact to test — tap Show to see them.
-        </Text>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -187,6 +272,12 @@ export default function ReviewNotesScreen() {
     removeDraftQuestion,
     saveDraft,
     clearDraft,
+    source,
+    rescue,
+    rescuing,
+    rescueAdded,
+    rescueError,
+    credits,
   } = useNotesStore();
   const [saving, setSaving] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -328,7 +419,19 @@ export default function ReviewNotesScreen() {
             </View>
           </View>
         }
-        ListFooterComponent={<SkippedPanel skipped={stats.skipped} />}
+        ListFooterComponent={
+          <SkippedPanel
+            skipped={stats.skipped}
+            credits={credits}
+            busy={rescuing}
+            added={rescueAdded}
+            error={rescueError}
+            canRescue={source != null}
+            onRescue={() => {
+              void rescue();
+            }}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={styles.emptyBadge}>
@@ -701,6 +804,51 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontFamily: font.bodyHeavy,
     fontSize: 11,
     color: colors.coral,
+  },
+  // The offer sits under a hairline, so it reads as a reply to the list above
+  // rather than another item in it.
+  rescue: {
+    marginTop: 13,
+    paddingTop: 12,
+    borderTopWidth: 1.5,
+    borderTopColor: colors.lineSoft,
+    gap: 8,
+  },
+  /** Nothing was skipped, so there is no list to be separated from. */
+  rescueAlone: {
+    marginTop: 0,
+    paddingTop: 0,
+    borderTopWidth: 0,
+  },
+  rescueCount: {
+    fontFamily: font.bodySemibold,
+    fontSize: 11.5,
+    color: colors.textFaint,
+    textAlign: 'center',
+  },
+  rescueNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: colors.leafWash,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    borderRadius: radius.control,
+    paddingVertical: 9,
+    paddingHorizontal: 11,
+  },
+  rescueNoteWarn: {
+    backgroundColor: colors.coralWash,
+  },
+  rescueNoteText: {
+    flex: 1,
+    fontFamily: font.bodySemibold,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: colors.text,
+  },
+  rescueNoteTextWarn: {
+    color: colors.text,
   },
   empty: {
     backgroundColor: colors.surface,

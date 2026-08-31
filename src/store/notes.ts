@@ -7,8 +7,23 @@ import {
   listAnswerPool,
   listDecks,
 } from '@/lib/db';
-import { parseNotes, type ParseResult, type ParsedQuestion } from '@/lib/noteParser';
+import {
+  AI_FAILURE_MESSAGE,
+  failureReason,
+  readWithAI,
+  type Credits,
+} from '@/lib/aiNotes';
+import { LIMITS, parseNotes, type ParseResult, type ParsedQuestion } from '@/lib/noteParser';
 import type { Deck } from '@/lib/types';
+
+/**
+ * Two questions are the same question when they want the same answer typed
+ * back. It is the parser's own rule for `duplicate` — reused here so a rescue
+ * cannot hand back a question the parser already built from the same line.
+ */
+function answerKey(question: ParsedQuestion): string {
+  return question.correctAnswer.trim().toLowerCase();
+}
 
 interface NotesState {
   /** Subjects are notes decks: Biology, History, … */
@@ -22,11 +37,33 @@ interface NotesState {
   /** Questions awaiting review after a parse; edited in place before saving. */
   draft: ParsedQuestion[];
   stats: ParseResult['stats'] | null;
+  /**
+   * The notes the draft was built from, kept so a rescue has something to
+   * send. The parse only needs `raw` for as long as it runs; the review
+   * screen may need it again minutes later.
+   */
+  source: string | null;
+  /** A reading is in flight. Guards the button against a second press. */
+  rescuing: boolean;
+  /** How many questions the last reading added, or null if none has run. */
+  rescueAdded: number | null;
+  /** Why the last reading did not happen; cleared when another is tried. */
+  rescueError: string | null;
+  /** What the server said is left. Null until a reading comes back. */
+  credits: Credits | null;
   refresh: () => Promise<void>;
   setTarget: (deckId: string) => void;
   addSubject: (name: string) => Promise<string>;
   /** Runs the offline parser and stages the result for review. */
   parse: (raw: string) => ParseResult;
+  /**
+   * Asks the reader to make questions from the lines the parser skipped, and
+   * merges what comes back into the draft under review.
+   *
+   * Never replaces the parse. On any failure the draft is exactly as it was —
+   * the parser's work is not something a dropped connection can take away.
+   */
+  rescue: () => Promise<void>;
   /** Options already saved in a subject, to borrow wrong answers from. */
   poolFor: (deckId: string) => Promise<string[]>;
   /**
@@ -48,6 +85,11 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   targetId: null,
   draft: [],
   stats: null,
+  source: null,
+  rescuing: false,
+  rescueAdded: null,
+  rescueError: null,
+  credits: null,
 
   refresh: async () => {
     const subjects = await listDecks('notes');
@@ -70,8 +112,70 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     const result = parseNotes(raw);
     // Every scan arrives at review unassigned — the subject is a decision
     // made about *these* questions, not one inherited from last time.
-    set({ draft: result.questions, stats: result.stats, targetId: null });
+    // `source` is kept for the rescue; the outcome of any earlier one is not,
+    // or a new scan would open showing what the last scan's reading did.
+    set({
+      draft: result.questions,
+      stats: result.stats,
+      targetId: null,
+      source: raw,
+      rescueAdded: null,
+      rescueError: null,
+    });
     return result;
+  },
+
+  rescue: async () => {
+    const { source, draft, stats, rescuing } = get();
+    // Nothing to send, nowhere to put it, or one already in flight.
+    if (rescuing || source == null || stats == null) return;
+
+    set({ rescuing: true, rescueError: null });
+    try {
+      const reading = await readWithAI({ kind: 'text', body: source });
+
+      // Keep every question the parser built. Only genuinely new answers are
+      // appended — deduped against the draft *and* within the reading itself,
+      // or one repeated answer in the response lands twice.
+      const seen = new Set(draft.map(answerKey));
+      const fresh = reading.questions.filter((question) => {
+        const key = answerKey(question);
+        if (key.length === 0 || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // maxQuestions is a review-burden rule, not a parser limitation, so it
+      // holds here too: a reading that turns a page of prose into three
+      // hundred questions leaves a review screen nobody finishes.
+      const room = Math.max(0, LIMITS.maxQuestions - draft.length);
+      const added = fresh.slice(0, room);
+
+      // A line that finally produced a question is no longer a skipped line.
+      const rescued = new Set(
+        added.map((question) => question.sourceLine).filter((line): line is string => line != null)
+      );
+
+      set({
+        draft: [...draft, ...added],
+        stats: {
+          ...stats,
+          linesUsed: stats.linesUsed + added.length,
+          skipped: stats.skipped.filter((line) => !rescued.has(line.text)),
+          cappedQuestions: stats.cappedQuestions || added.length < fresh.length,
+        },
+        credits: reading.credits,
+        rescueAdded: added.length,
+        rescuing: false,
+      });
+    } catch (error) {
+      // The draft is untouched on purpose. Whatever the parser gave the
+      // student is still there, and no reading was spent getting here.
+      set({
+        rescuing: false,
+        rescueError: AI_FAILURE_MESSAGE[failureReason(error)],
+      });
+    }
   },
 
   poolFor: async (deckId) => listAnswerPool(deckId),
@@ -89,6 +193,11 @@ export const useNotesStore = create<NotesState>((set, get) => ({
         cappedQuestions: false,
       },
       targetId: deckId,
+      // A question the student wrote has no notes behind it, so there is
+      // nothing a reading could be asked to go back over.
+      source: null,
+      rescueAdded: null,
+      rescueError: null,
     });
   },
 
@@ -102,7 +211,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     set((s) => ({ draft: s.draft.filter((_, i) => i !== index) }));
   },
 
-  clearDraft: () => set({ draft: [], stats: null }),
+  clearDraft: () =>
+    set({ draft: [], stats: null, source: null, rescueAdded: null, rescueError: null }),
 
   saveDraft: async () => {
     const { draft, targetId } = get();
@@ -122,7 +232,14 @@ export const useNotesStore = create<NotesState>((set, get) => ({
         ordered: q.ordered ?? false,
       }))
     );
-    set({ draft: [], stats: null, subjects: await listDecks('notes') });
+    set({
+      draft: [],
+      stats: null,
+      source: null,
+      rescueAdded: null,
+      rescueError: null,
+      subjects: await listDecks('notes'),
+    });
   },
 
   remove: async (deckId) => {
