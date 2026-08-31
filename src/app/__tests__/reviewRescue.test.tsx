@@ -152,7 +152,7 @@ describe('the offer', () => {
   it('sits with the skipped lines, and says what a reading costs', () => {
     const text = allText(render({}));
     expect(text).toContain('Skipped 2 lines');
-    expect(text).toContain('Read these with AI');
+    expect(text).toContain('Read these with Nib');
     // No reading has run, so the allowance is stated rather than a balance.
     expect(text).toContain('10 readings a week');
   });
@@ -163,20 +163,20 @@ describe('the offer', () => {
   });
 
   it('asks the store to read when pressed', () => {
-    pressLabelled(render({}), 'Read these with AI');
+    pressLabelled(render({}), 'Read these with Nib');
     expect(mockRescue).toHaveBeenCalledTimes(1);
   });
 
   it('is absent when the questions came from the student, not notes', () => {
     // A hand-written question has no notes behind it and nothing skipped.
     const text = allText(render({ source: null, skipped: [] }));
-    expect(text).not.toContain('Read these with AI');
+    expect(text).not.toContain('Read these with Nib');
   });
 
   it('is absent when the parser used every line', () => {
     const text = allText(render({ skipped: [] }));
     expect(text).not.toContain('Skipped');
-    expect(text).not.toContain('Read these with AI');
+    expect(text).not.toContain('Read these with Nib');
   });
 });
 
@@ -194,7 +194,7 @@ describe('when a reading fails', () => {
     const text = allText(
       render({ rescueError: "Needs internet. Try again when you're back — nothing was used up." })
     );
-    expect(text).toContain('Read these with AI');
+    expect(text).toContain('Read these with Nib');
     expect(text).toContain('nothing was used up');
   });
 });
@@ -215,7 +215,7 @@ describe('after a reading lands', () => {
     const text = allText(render({ rescueAdded: 3, credits: { left: 7, of: 10 } }));
     expect(text).toContain('Added 3 questions.');
     expect(text).toContain('7 of 10 left this week');
-    expect(text).not.toContain('Read these with AI');
+    expect(text).not.toContain('Read these with Nib');
   });
 
   it('is honest when it found nothing', () => {

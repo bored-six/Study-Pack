@@ -178,7 +178,7 @@ function SkippedPanel({
     ? 'Reading your notes…'
     : spent
       ? 'Readings come back Monday'
-      : 'Read these with AI';
+      : 'Read these with Nib';
 
   const countLine =
     credits == null

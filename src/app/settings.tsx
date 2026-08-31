@@ -321,7 +321,7 @@ export default function SettingsScreen() {
               line here is true of the code as written.
             */}
             <PrivacyLine text="Your notes, answers and streak stay on this phone." />
-            <PrivacyLine text="Nothing leaves the phone unless you press &quot;Read these with AI&quot; — that sends the notes in the box, and nothing else." />
+            <PrivacyLine text="Nothing leaves the phone unless you press &quot;Read these with Nib&quot; — that sends the notes in the box, and nothing else." />
             <PrivacyLine text="Flipp makes no other call of any kind. The fonts and sounds are built in." />
             <PrivacyLine text="No account, no sign-in, no ads, no tracking of any kind." />
             <PrivacyLine text="Reminders are set by the phone itself, not sent from anywhere." />

@@ -212,7 +212,7 @@ describe('the privacy card', () => {
   it('names the one thing that leaves the phone, and who starts it', async () => {
     const said = await spoken();
     expect(said).toContain('Nothing leaves the phone unless you press');
-    expect(said).toContain('Read these with AI');
+    expect(said).toContain('Read these with Nib');
     expect(said).toContain('no other call');
   });
 

@@ -259,7 +259,11 @@ export default function NewNotesScreen() {
                 notes are paragraphs needs to know there is another way in
                 before they decide this app is not for their notes.
               */}
-              <View style={styles.recipeAlt}>
+              <Pressable
+                onPress={() => input.current?.focus()}
+                accessibilityRole="button"
+                accessibilityLabel="Notes not in these shapes? Nib can read them"
+                style={({ pressed }) => [styles.recipeAlt, pressed && styles.pressed]}>
                 <View style={styles.recipeHead}>
                   <Icon
                     name="spark"
@@ -271,10 +275,11 @@ export default function NewNotesScreen() {
                   <Text style={styles.recipeAltName}>Not written like these?</Text>
                 </View>
                 <Text style={styles.recipeAltBody}>
-                  Paste them anyway. AI can read plain paragraphs as they are — needs internet,
-                  10 a week. The scan is always free.
+                  Paste them anyway and ask Nib — the AI reader. It takes plain paragraphs as
+                  they are. Needs internet, 10 a week; the scan is always free.
                 </Text>
-              </View>
+                <Text style={styles.recipeAltAdd}>paste yours to see it +</Text>
+              </Pressable>
             </View>
 
             <View style={styles.labelRow}>
@@ -347,15 +352,15 @@ export default function NewNotesScreen() {
                   <View style={styles.readerBadge}>
                     <Icon name="spark" size={17} color={onWash.ink} strokeWidth={2.2} />
                   </View>
-                  <Text style={styles.readerTitle}>These aren't in "Term: meaning" shape</Text>
+                  <Text style={styles.readerTitle}>Nib can read these as they are</Text>
                 </View>
                 <Text style={styles.readerBody}>
-                  The scan looks for that shape and will get less out of writing like this. AI
-                  reads your notes as they are — it needs internet, and it only ever sees what
-                  you send it here.
+                  The scan looks for "Term: meaning" and gets less out of writing like this. Nib
+                  understands what your notes say instead — it needs internet, and it only ever
+                  sees the notes in the box.
                 </Text>
                 <ChunkyButton
-                  label={reading ? 'Reading your notes…' : 'Read these with AI'}
+                  label={reading ? 'Reading your notes…' : 'Read these with Nib'}
                   icon={reading ? 'pencil' : 'spark'}
                   variant="soft"
                   disabled={reading}
@@ -415,7 +420,7 @@ export default function NewNotesScreen() {
               being shifty about the one thing it should be plainest on.
             */}
             <Text style={styles.footnote}>
-              Making questions runs on your phone. Only AI reading uses the internet, and only
+              Making questions runs on your phone. Only Nib uses the internet, and only
               when you press it.
             </Text>
           </ScrollView>
@@ -701,6 +706,12 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 17,
     color: onWash.dim,
+  },
+  recipeAltAdd: {
+    fontFamily: font.bodyHeavy,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    color: onWash.ink,
   },
   recipeHead: {
     flexDirection: 'row',
