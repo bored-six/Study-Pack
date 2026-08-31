@@ -106,23 +106,16 @@ export function readShape(raw: string): NoteShape {
 /**
  * Whether to offer a reading before any scan has run.
  *
- * Narrow on purpose. The first version of this offered whenever fewer than
- * half the lines looked usable, on the assumption that the parser is poor at
- * paragraphs. Measured, it is not: five prose lines with no definition in them
- * still produced three questions by cloze deletion. A shape read also counts
- * a prose sentence as usable, so it cannot see the `no_options` failure that
- * comes later — it is optimistic exactly where the guess would need to be
- * careful, and a wrong guess spends an allowance on questions Scan gives free.
+ * The screen recommends one shape above all: "Term: meaning". Notes that are
+ * not written that way are the ones to offer a reading for — the parser can
+ * still cloze its way through prose, but it is working without the term pool
+ * it builds distractors from, and that is where `no_options` comes from.
  *
- * `usable === 0` is the one case it calls reliably, and it is the same case
- * the advice below currently answers by telling a student to rewrite their
- * notes as "Term: meaning" — the app asking the student to do its job.
- *
- * Everything softer than this belongs to the review screen, which offers
- * against the real parse instead of a prediction about it.
+ * So: no definitions in the paste, and enough lines to be a real attempt.
+ * A single line is someone still typing.
  */
 export function shapeNeedsReader(shape: NoteShape): boolean {
-  return shape.lines >= 2 && shape.usable === 0;
+  return shape.lines >= 2 && shape.definitions === 0;
 }
 
 export function shapeAdvice(shape: NoteShape): string | null {

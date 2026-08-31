@@ -123,10 +123,7 @@ describe('what the box says back', () => {
 });
 
 describe('offering a reading before the scan', () => {
-  it('stays quiet on plain prose, which the parser handles by cloze', () => {
-    // Measured: these five produce three questions with no definition among
-    // them. Offering here would spend an allowance on questions Scan gives
-    // away, which is why the gate is not "these look like paragraphs".
+  it('offers on paragraphs, which are not the shape the screen recommends', () => {
     const shape = readShape(
       [
         'The war began after a long period of rising tension between the two powers',
@@ -136,7 +133,8 @@ describe('offering a reading before the scan', () => {
         'Historians still argue about whether the outcome was ever really in doubt',
       ].join('\n')
     );
-    expect(shapeNeedsReader(shape)).toBe(false);
+    expect(shape.definitions).toBe(0);
+    expect(shapeNeedsReader(shape)).toBe(true);
   });
 
   it('stays quiet on notes that already parse, so no allowance is wasted', () => {
@@ -156,18 +154,17 @@ describe('offering a reading before the scan', () => {
     expect(shapeNeedsReader(readShape('Cell'))).toBe(false);
   });
 
-  it('offers when the shape read finds nothing askable at all', () => {
-    // The same case the advice answers with "rewrite these as Term: meaning".
+  it('offers on bare words, where the advice would say to reformat', () => {
     const shape = readShape(['Cell', 'Wall', 'Nucleus', 'Golgi'].join('\n'));
-    expect(shape.usable).toBe(0);
     expect(shapeNeedsReader(shape)).toBe(true);
     expect(shapeAdvice(shape)).not.toBeNull();
   });
 
-  it('does not offer once even one line is askable', () => {
+  it('goes quiet as soon as the notes are written the recommended way', () => {
     const shape = readShape(
       ['Cell', 'Wall', 'Nucleus', 'Osmosis: water moving across a membrane'].join('\n')
     );
+    expect(shape.definitions).toBe(1);
     expect(shapeNeedsReader(shape)).toBe(false);
   });
 });
