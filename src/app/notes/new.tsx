@@ -252,6 +252,29 @@ export default function NewNotesScreen() {
                   <Text style={styles.recipeAdd}>tap to add +</Text>
                 </Pressable>
               ))}
+
+              {/*
+                Sits with the recommended shapes rather than waiting for the
+                student to type something that misses them. Someone whose
+                notes are paragraphs needs to know there is another way in
+                before they decide this app is not for their notes.
+              */}
+              <View style={styles.recipeAlt}>
+                <View style={styles.recipeHead}>
+                  <Icon
+                    name="spark"
+                    size={15}
+                    color={onWash.ink}
+                    fill={colors.surface}
+                    strokeWidth={2}
+                  />
+                  <Text style={styles.recipeAltName}>Not written like these?</Text>
+                </View>
+                <Text style={styles.recipeAltBody}>
+                  Paste them anyway. AI can read plain paragraphs as they are — needs internet,
+                  10 a week. The scan is always free.
+                </Text>
+              </View>
             </View>
 
             <View style={styles.labelRow}>
@@ -656,6 +679,28 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 10,
     gap: 3,
     ...shadow.card,
+  },
+  /** The same card, washed, because it is the answer to the three above. */
+  recipeAlt: {
+    backgroundColor: colors.accentWash,
+    ...outlineOn(colors),
+    borderRadius: radius.control,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3,
+    ...shadow.card,
+  },
+  recipeAltName: {
+    flex: 1,
+    fontFamily: font.heading,
+    fontSize: 13.5,
+    color: onWash.ink,
+  },
+  recipeAltBody: {
+    fontFamily: font.body,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: onWash.dim,
   },
   recipeHead: {
     flexDirection: 'row',

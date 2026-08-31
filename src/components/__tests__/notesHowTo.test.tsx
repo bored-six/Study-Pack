@@ -48,8 +48,23 @@ describe('the add-notes walkthrough', () => {
     expect(said()).toContain('Nothing is saved yet');
   });
 
+  it('offers the reader for notes that are not in those shapes', () => {
+    const { said, press } = mount();
+    press('Next');
+    press('Next');
+    expect(said()).toContain('Notes not in those shapes?');
+    // A student whose notes are paragraphs has to learn this before they
+    // decide the app cannot read the way they write.
+    expect(said()).toContain('paragraphs');
+    // Both halves of the deal, on the same page as the offer.
+    expect(said()).toContain('needs internet');
+    expect(said()).toContain('ten readings a week');
+    expect(said()).toContain('free, instant');
+  });
+
   it('covers writing your own, and who supplies the wrong answers', () => {
     const { said, press } = mount();
+    press('Next');
     press('Next');
     press('Next');
     expect(said()).toContain('Write your own');
@@ -65,6 +80,7 @@ describe('the add-notes walkthrough', () => {
 
   it('closes on the last page, and can be skipped from the first', () => {
     const walked = mount();
+    walked.press('Next');
     walked.press('Next');
     walked.press('Next');
     walked.press('Got it');

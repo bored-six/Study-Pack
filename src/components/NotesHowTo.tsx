@@ -55,6 +55,15 @@ const PAGES: Page[] = [
   },
   {
     kicker: 'STEP THREE',
+    title: 'Notes not in those shapes?',
+    icon: 'spark',
+    body:
+      'Real notes are often just paragraphs, and the three shapes above are what Flipp reads best. When your notes are not written that way, Read these with AI takes them as they are — it understands the writing instead of matching a pattern, so it gets questions out of lines the ordinary scan would pass over. It is the one part of Flipp that needs internet, it only ever sees the notes in the box, and you get ten readings a week. The ordinary scan is free, instant, and works with no signal at all.',
+    example: 'The treaty was signed in Paris three years after the first shots',
+    becomes: 'Where was the treaty signed?',
+  },
+  {
+    kicker: 'STEP FOUR',
     title: 'Write your own',
     icon: 'question',
     body:
