@@ -197,9 +197,29 @@ describe('the privacy card', () => {
   it('promises the things that are actually true', async () => {
     const said = await spoken();
     expect(said).toContain('stay on this phone');
-    expect(said).toContain('Nothing you write is uploaded');
     expect(said).toContain('no ads, no tracking');
-    expect(said).toContain('never calls the internet');
+  });
+
+  /**
+   * The card used to say "Nothing you write is uploaded. There is no server
+   * to upload it to" and "Flipp never calls the internet". A reader arrived,
+   * this test failed, and the wording changed — which is what it is for.
+   *
+   * What replaced it has to keep saying two things: that the send is the
+   * student's own press, and that there is no other call. A card that only
+   * admits "we use the internet" would be true and useless.
+   */
+  it('names the one thing that leaves the phone, and who starts it', async () => {
+    const said = await spoken();
+    expect(said).toContain('Nothing leaves the phone unless you press');
+    expect(said).toContain('Read these with AI');
+    expect(said).toContain('no other call');
+  });
+
+  it('no longer makes the absolute claim the reader broke', async () => {
+    const said = await spoken();
+    expect(said).not.toContain('never calls the internet');
+    expect(said).not.toContain('There is no server');
   });
 
   it('sits above the way to delete everything, not instead of it', async () => {

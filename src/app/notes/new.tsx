@@ -33,7 +33,7 @@ import { LIMITS } from '@/lib/noteParser';
 import { readShape, shapeAdvice, shapeNeedsReader } from '@/lib/noteShape';
 import { playSfx } from '@/lib/sfx';
 import { useNotesStore } from '@/store/notes';
-import { font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { derpRadius, font, getColors, onWash, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 const PLACEHOLDER = `Chlorophyll: the green pigment that absorbs light
 ATP stands for adenosine triphosphate
@@ -313,6 +313,45 @@ export default function NewNotesScreen() {
               </Animated.View>
             ) : null}
 
+            {/*
+              These notes are not the shape the recipes above recommend, so
+              say what that costs and offer the way out — here, next to the
+              read of the paste, rather than buried under the scan button.
+            */}
+            {needsReader && ready ? (
+              <Animated.View entering={FadeInDown.duration(220)} style={styles.reader}>
+                <View style={styles.readerHead}>
+                  <View style={styles.readerBadge}>
+                    <Icon name="spark" size={17} color={onWash.ink} strokeWidth={2.2} />
+                  </View>
+                  <Text style={styles.readerTitle}>These aren't in "Term: meaning" shape</Text>
+                </View>
+                <Text style={styles.readerBody}>
+                  The scan looks for that shape and will get less out of writing like this. AI
+                  reads your notes as they are — it needs internet, and it only ever sees what
+                  you send it here.
+                </Text>
+                <ChunkyButton
+                  label={reading ? 'Reading your notes…' : 'Read these with AI'}
+                  icon={reading ? 'pencil' : 'spark'}
+                  variant="soft"
+                  disabled={reading}
+                  onPress={runReader}
+                  style={styles.readerBtn}
+                />
+                <Text style={styles.readerNote}>
+                  {reading
+                    ? 'Keeping everything the scan already found.'
+                    : credits != null
+                      ? `${credits.left} of ${credits.of} readings left this week.`
+                      : '10 readings a week. The scan below is always free.'}
+                </Text>
+                {rescueError != null ? (
+                  <Text style={styles.readerWarn}>{rescueError}</Text>
+                ) : null}
+              </Animated.View>
+            ) : null}
+
             {advice ? (
               <Animated.View entering={FadeInDown.duration(220)} style={styles.advice}>
                 <Icon name="bulb" size={16} color={colors.gold} strokeWidth={2.2} />
@@ -335,32 +374,6 @@ export default function NewNotesScreen() {
               style={styles.cta}
             />
 
-            {/*
-              Offered only when the shape read says these notes have little
-              the parser can catch. On notes that parse well it stays hidden,
-              or a student spends an allowance on questions Scan gives free.
-            */}
-            {needsReader && ready ? (
-              <Animated.View entering={FadeInDown.duration(220)} style={styles.reader}>
-                <ChunkyButton
-                  label={reading ? 'Reading your notes…' : 'Read these with AI'}
-                  icon={reading ? 'pencil' : 'spark'}
-                  variant="soft"
-                  disabled={reading}
-                  onPress={runReader}
-                />
-                <Text style={styles.readerNote}>
-                  {reading
-                    ? 'Keeping everything the scan already found.'
-                    : 'These read as paragraphs. AI can quiz them as they are — needs internet' +
-                      (credits != null ? `, ${credits.left} of ${credits.of} left this week.` : '.')}
-                </Text>
-                {rescueError != null ? (
-                  <Text style={styles.readerWarn}>{rescueError}</Text>
-                ) : null}
-              </Animated.View>
-            ) : null}
-
             <View style={styles.orRow}>
               <View style={styles.orLine} />
               <Text style={styles.orText}>or</Text>
@@ -372,10 +385,15 @@ export default function NewNotesScreen() {
               variant="soft"
               onPress={() => router.push('/notes/custom')}
             />
+            {/*
+              One line, true in every state. Switching it on whether the
+              reader is offered made the claim flicker as the student typed —
+              absolute one moment, hedged the next, which reads as the app
+              being shifty about the one thing it should be plainest on.
+            */}
             <Text style={styles.footnote}>
-              {needsReader && ready
-                ? 'Making questions runs entirely on your phone. Only "Read these with AI" sends your notes anywhere, and only when you press it.'
-                : 'Runs entirely on your phone — no internet, no AI, nothing uploaded.'}
+              Making questions runs on your phone. Only AI reading uses the internet, and only
+              when you press it.
             </Text>
           </ScrollView>
         </View>
@@ -799,16 +817,53 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 11,
   },
   reader: {
-    gap: 7,
-    marginTop: 10,
+    backgroundColor: colors.accentWash,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    ...derpRadius,
+    padding: 13,
+    marginTop: 2,
+    gap: 9,
+    ...shadow.card,
+  },
+  readerHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  readerBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.control,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.edge,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-4deg' }],
+  },
+  readerTitle: {
+    flex: 1,
+    fontFamily: font.heading,
+    fontSize: 15,
+    lineHeight: 19,
+    color: onWash.ink,
+  },
+  readerBody: {
+    fontFamily: font.body,
+    fontSize: 12.5,
+    lineHeight: 17.5,
+    color: onWash.dim,
+  },
+  readerBtn: {
+    marginTop: 1,
   },
   readerNote: {
     fontFamily: font.bodySemibold,
     fontSize: 11.5,
     lineHeight: 16,
-    color: colors.textFaint,
+    color: onWash.faint,
     textAlign: 'center',
-    paddingHorizontal: 6,
   },
   readerWarn: {
     fontFamily: font.bodyHeavy,
@@ -816,7 +871,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     lineHeight: 16,
     color: colors.coral,
     textAlign: 'center',
-    paddingHorizontal: 6,
   },
   advice: {
     flexDirection: 'row',
