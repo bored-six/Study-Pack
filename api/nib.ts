@@ -40,17 +40,6 @@ const WEEKLY_PER_DEVICE = 10;
 const DAILY_GLOBAL = 400;
 
 /**
- * Counters, in memory.
- *
- * Vercel throws these away whenever a function goes cold, so they under-count
- * rather than over-count: the limit is a brake on ordinary use, not a lock.
- * The moment this runs on a paid key, it has to move to real storage (Vercel
- * KV or Upstash), because then the ceiling is protecting money.
- */
-const weekly = new Map<string, { period: string; used: number }>();
-const daily = { period: '', used: 0 };
-
-/**
  * The same counting, by where the request came from.
  *
  * The device id is a courtesy, not a lock: it lives in the app's own storage,
@@ -63,8 +52,68 @@ const daily = { period: '', used: 0 };
  * ceiling is well above what any single student would ever use, and why it is
  * a backstop rather than the allowance itself.
  */
-const byAddress = new Map<string, { period: string; used: number }>();
 const DAILY_PER_ADDRESS = 30;
+
+// --- counting that survives ---------------------------------------------
+//
+// Counts used to live in a variable inside this function, which Vercel throws
+// away the moment the function goes idle — so the limits reset every few
+// minutes and anyone willing to wait walked straight past them.
+//
+// They live in Redis now, keyed with the period they belong to so nothing has
+// to be compared or swept: the key for last week simply stops being asked
+// for, and expires on its own.
+
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+/** No store connected yet: fall back to memory rather than to no limit. */
+const persistent = Boolean(REDIS_URL && REDIS_TOKEN);
+const fallback = new Map<string, number>();
+
+const DAY = 60 * 60 * 24;
+
+async function redis(command: (string | number)[]): Promise<unknown> {
+  const response = await fetch(REDIS_URL as string, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${REDIS_TOKEN as string}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(command),
+  });
+  if (!response.ok) throw new Error(`redis ${response.status}`);
+  return ((await response.json()) as { result: unknown }).result;
+}
+
+/**
+ * How many readings this key has spent. A store that is unreachable reports
+ * zero rather than throwing: a broken counter must not become a broken app,
+ * and the global ceiling is still there underneath.
+ */
+async function spent(key: string): Promise<number> {
+  if (!persistent) return fallback.get(key) ?? 0;
+  try {
+    const value = await redis(['GET', key]);
+    return value == null ? 0 : Number(value) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Adds one, and gives the key a life just past the period it counts. */
+async function charge(key: string, ttl: number): Promise<void> {
+  if (!persistent) {
+    fallback.set(key, (fallback.get(key) ?? 0) + 1);
+    return;
+  }
+  try {
+    const now = await redis(['INCR', key]);
+    if (Number(now) === 1) await redis(['EXPIRE', key, ttl]);
+  } catch {
+    // A reading already happened; failing to write it down is not worth
+    // taking away from the student.
+  }
+}
 
 /** Vercel puts the caller first in x-forwarded-for; everything after is proxies. */
 function callerAddress(req: VercelRequest): string {
@@ -195,12 +244,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const now = new Date();
   const week = weekKey(now);
   const today = dayKey(now);
+  const address = callerAddress(req);
 
-  if (daily.period !== today) {
-    daily.period = today;
-    daily.used = 0;
-  }
-  if (daily.used >= DAILY_GLOBAL) {
+  // Keys carry their own period, so nothing has to be compared or swept —
+  // yesterday's key is simply never asked for again, and expires by itself.
+  const globalKey = `nib:all:${today}`;
+  const addressKey = `nib:ip:${address}:${today}`;
+  const deviceKey = `nib:dev:${deviceId}:${week}`;
+
+  const [globalUsed, addressUsed, used] = await Promise.all([
+    spent(globalKey),
+    spent(addressKey),
+    spent(deviceKey),
+  ]);
+
+  if (globalUsed >= DAILY_GLOBAL) {
     res.status(429).json({ reason: 'unavailable', message: 'Nib is resting. Try tomorrow.' });
     return;
   }
@@ -208,16 +266,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Checked before the device allowance, because this is the one a fresh
   // private window cannot reset. The message stays vague on purpose: a
   // stranger probing the endpoint learns nothing about how it is counted.
-  const address = callerAddress(req);
-  const fromHere = byAddress.get(address);
-  const addressUsed = fromHere && fromHere.period === today ? fromHere.used : 0;
   if (addressUsed >= DAILY_PER_ADDRESS) {
     res.status(429).json({ reason: 'unavailable', message: 'Nib is resting. Try later.' });
     return;
   }
 
-  const seen = weekly.get(deviceId);
-  const used = seen && seen.period === week ? seen.used : 0;
   if (used >= WEEKLY_PER_DEVICE) {
     res.status(429).json({
       reason: 'spent',
@@ -322,9 +375,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Charged only now, and only because there is something to show for it. A
   // reading that failed on the way here has cost the student nothing.
-  weekly.set(deviceId, { period: week, used: used + 1 });
-  byAddress.set(address, { period: today, used: addressUsed + 1 });
-  daily.used += 1;
+  // Eight days and two, so a key outlives the period it counts and cannot
+  // expire early on somebody mid-week.
+  await Promise.all([
+    charge(deviceKey, DAY * 8),
+    charge(addressKey, DAY * 2),
+    charge(globalKey, DAY * 2),
+  ]);
 
   res.status(200).json({
     questions: kept,
