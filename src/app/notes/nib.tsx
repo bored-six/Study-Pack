@@ -21,6 +21,7 @@ import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
 import { ACCEPTED_FILE_TYPES, MAX_FILE_BYTES, WEEKLY_READINGS } from '@/lib/aiNotes';
 import { LIMITS } from '@/lib/noteParser';
+import { playSfx } from '@/lib/sfx';
 import { useNotesStore } from '@/store/notes';
 import {
   derpRadius,
@@ -35,8 +36,19 @@ import {
 
 /** Nib's own colour, the one thing in the app that leaves the phone. */
 const PERI = '#E3E7FB';
+/**
+ * The gap between ruled lines in RuledPaper.
+ *
+ * Nib's handwriting takes it as a line height, which is the whole trick: his
+ * words sit ON the ruling rather than floating somewhere across it, and the
+ * screen reads as a page he has written on rather than a chat with a paper
+ * background.
+ */
+const RULE = 30;
 
 type Picked = { base64: string; mime: string; name: string; bytes: number };
+/** What he hands over when he is done. */
+type Finished = { questions: number; kinds: number };
 
 function sizeLabel(bytes: number): string {
   return bytes < 1024 * 1024
@@ -45,13 +57,58 @@ function sizeLabel(bytes: number): string {
 }
 
 /**
- * Nib's own screen.
+ * The allowance, as dots that drain.
+ *
+ * "8 of 10 left this week" is a sentence you have to read. Ten dots with two
+ * missing is a thing you see on the way past.
+ */
+function Allowance({ left, of }: { left: number; of: number }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const styles = getStyles(getColors(isDark));
+  return (
+    <View
+      style={styles.dots}
+      accessibilityLabel={`${left} of ${of} readings left this week`}>
+      {Array.from({ length: of }, (_, i) => (
+        <View key={i} style={[styles.dot, i >= left && styles.dotSpent]} />
+      ))}
+    </View>
+  );
+}
+
+/** One thing Nib wrote, in his own hand, on the lines. */
+function Wrote({
+  children,
+  asleep = false,
+}: {
+  children: React.ReactNode;
+  asleep?: boolean;
+}) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+  return (
+    <View style={styles.wrote}>
+      <View style={[styles.who, asleep && styles.whoSleep]}>
+        <Icon name="nib" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={2.1} />
+      </View>
+      <Text style={styles.hand}>{children}</Text>
+    </View>
+  );
+}
+
+/**
+ * Nib's screen — a page of the binder, with notes passed back and forth.
  *
  * Separate from Add notes on purpose. Add notes is the free scan and always
- * will be — instant, offline, unlimited. This is the paid path: it costs one
- * of ten a week and it needs a connection, and a file picker with size limits
- * and a slow upload does not belong underneath a paste box that has none of
- * those things.
+ * will be: instant, offline, unlimited. This is the paid path, and a file
+ * picker with a size limit and a slow upload needed a shape of its own
+ * rather than a box bolted under a paste area that has neither.
+ *
+ * Five states. The one that matters most is `finished`: Nib says he is done,
+ * hands over a slip with the numbers on it, and then waits. Nothing moves on
+ * by itself — a screen that jumps to the next thing takes away the moment
+ * the waiting was for.
  */
 export default function NibScreen() {
   const isDark = useThemeStore((s) => s.isDark);
@@ -62,7 +119,9 @@ export default function NibScreen() {
   const { readFile, scanWithReader, rescuing, rescueError, credits } = useNotesStore();
 
   const [picked, setPicked] = useState<Picked | null>(null);
+  const [writing, setWriting] = useState(false);
   const [body, setBody] = useState('');
+  const [finished, setFinished] = useState<Finished | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const over = body.length > LIMITS.maxInputChars;
@@ -70,7 +129,13 @@ export default function NibScreen() {
     () => `${body.length.toLocaleString()} / ${LIMITS.maxInputChars.toLocaleString()}`,
     [body.length]
   );
-  const ready = picked != null || (body.trim().length > 0 && !over);
+
+  // Before the first reading the server has said nothing, so the allowance is
+  // what this platform gets rather than a balance we are pretending to know.
+  const of = credits?.of ?? WEEKLY_READINGS;
+  const left = credits?.left ?? WEEKLY_READINGS;
+  const spent = left <= 0;
+  const ready = (picked != null || (body.trim().length > 0 && !over)) && !spent;
 
   const pick = useCallback(() => {
     const run = async () => {
@@ -91,22 +156,23 @@ export default function NibScreen() {
       const bytes = asset.size ?? file.size ?? 0;
       if (bytes > MAX_FILE_BYTES) {
         setProblem(
-          `That one is ${sizeLabel(bytes)}. Nib can take up to 3 MB — try a single chapter rather than the whole book.`
+          `That one is ${sizeLabel(bytes)}. I can take 3 MB — try a single chapter rather than the whole book?`
         );
         return;
       }
 
+      playSfx('derp_pop');
       setPicked({
         base64: await file.base64(),
         mime: asset.mimeType ?? 'application/pdf',
         name: asset.name,
         bytes,
       });
-      // A file and a paste are two answers to one question; taking the file
-      // means the box is no longer what gets read.
+      // A file and a written page are two answers to one question.
+      setWriting(false);
       setBody('');
     };
-    run().catch(() => setProblem("Couldn't open that file. Try another one."));
+    run().catch(() => setProblem("I couldn't open that one. Try another?"));
   }, []);
 
   const send = useCallback(() => {
@@ -118,20 +184,25 @@ export default function NibScreen() {
       if (staged === 0) {
         setProblem(
           useNotesStore.getState().rescueError ??
-            'Nib found nothing in there worth testing. Try a page with more facts on it.'
+            "I couldn't find anything in there worth testing. Try a page with more facts on it?"
         );
         return;
       }
-      router.push('/notes/review');
+      // Held, not navigated. He has something to say first.
+      const kinds = new Set(useNotesStore.getState().draft.map((q) => q.kind)).size;
+      setFinished({ questions: staged, kinds });
     };
     void run();
   }, [body, picked, readFile, scanWithReader]);
 
-  const spent = credits != null && credits.left <= 0;
-  const countLine =
-    credits == null
-      ? `${WEEKLY_READINGS} ${WEEKLY_READINGS === 1 ? 'reading' : 'readings'} a week`
-      : `${credits.left} of ${credits.of} readings left this week`;
+  const takeBack = useCallback(() => {
+    setPicked(null);
+    setWriting(false);
+    setBody('');
+  }, []);
+
+  const idle = finished == null && !rescuing;
+  const empty = picked == null && !writing;
 
   return (
     <KeyboardAvoidingView
@@ -139,6 +210,12 @@ export default function NibScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.screen, { paddingTop: insets.top + 10 }]}>
         <RuledPaper />
+        <View pointerEvents="none" style={styles.holes}>
+          {Array.from({ length: 7 }, (_, i) => (
+            <View key={i} style={styles.hole} />
+          ))}
+        </View>
+
         <View style={styles.column}>
           <View style={styles.navRow}>
             <Pressable
@@ -149,116 +226,208 @@ export default function NibScreen() {
               <Text style={styles.backArrow}>←</Text>
             </Pressable>
             <View>
-              <View style={styles.titleRow}>
-                <Text style={styles.title}>Ask</Text>
-                <View style={styles.titleSticker}>
-                  <Text style={styles.titleStickerText}>Nib!</Text>
-                </View>
-              </View>
-              <Squiggle width={72} style={styles.squiggle} />
+              <Text style={styles.title}>Nib</Text>
+              <Squiggle width={52} style={styles.squiggle} />
             </View>
-            <View style={styles.crest}>
-              <Icon name="nib" size={22} color={onWash.ink} fill="#FFFFFF" strokeWidth={2} />
+            <View style={styles.navRight}>
+              <Allowance left={left} of={of} />
             </View>
           </View>
 
           <ScrollView
             style={styles.flex}
-            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 22 }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
 
-            <View style={styles.intro}>
-              <Tape />
-              <Text style={styles.introText}>
-                Nib reads notes that aren't in a shape the scan can catch — paragraphs, a
-                lecture handout, a photo of the board. It only ever sees what you hand it here.
-              </Text>
-            </View>
+            {/* --- what he says ------------------------------------------- */}
+            {idle && spent ? (
+              <Wrote asleep>
+                That&apos;s my {of === 1 ? 'one' : of} for the week.{'\n'}
+                Back on Monday. Add notes still{'\n'}
+                scans for nothing, and it never{'\n'}
+                needs a signal.
+              </Wrote>
+            ) : null}
 
-            <Text style={styles.kicker}>GIVE NIB A FILE</Text>
-            {picked ? (
-              <Animated.View entering={FadeInDown.duration(200)} style={styles.picked}>
-                <View style={styles.pickedIcon}>
-                  <Icon
-                    name={picked.mime === 'application/pdf' ? 'book' : 'monitor'}
-                    size={19}
-                    color={onWash.ink}
-                    fill="#FFFFFF"
-                    strokeWidth={1.9}
-                  />
+            {idle && !spent && empty ? (
+              <Wrote>
+                What have you got for me?{'\n'}
+                A chapter, a handout, a photo{'\n'}
+                of the board — or write it out{'\n'}
+                and I&apos;ll read that.
+              </Wrote>
+            ) : null}
+
+            {/* --- what you handed over ---------------------------------- */}
+            {picked != null ? (
+              <Animated.View entering={FadeInDown.duration(200)} style={styles.mine}>
+                <View style={styles.taped}>
+                  <Tape rotate="-3deg" style={styles.tapeOnCard} />
+                  <View style={styles.tapedRow}>
+                    <View style={styles.tapedIcon}>
+                      <Icon
+                        name={picked.mime === 'application/pdf' ? 'book' : 'monitor'}
+                        size={17}
+                        color={onWash.ink}
+                        fill="#FFFFFF"
+                        strokeWidth={1.9}
+                      />
+                    </View>
+                    <View style={styles.tapedMid}>
+                      <Text style={styles.tapedName} numberOfLines={1}>
+                        {picked.name}
+                      </Text>
+                      <Text style={styles.tapedSize}>{sizeLabel(picked.bytes)}</Text>
+                    </View>
+                    {idle ? (
+                      <Pressable
+                        onPress={takeBack}
+                        hitSlop={10}
+                        accessibilityLabel="Take this back"
+                        style={({ pressed }) => [styles.tapedX, pressed && styles.pressed]}>
+                        <Icon name="cross" size={11} color={colors.coral} strokeWidth={2.9} />
+                      </Pressable>
+                    ) : null}
+                  </View>
                 </View>
-                <View style={styles.pickedMid}>
-                  <Text style={styles.pickedName} numberOfLines={1}>
-                    {picked.name}
-                  </Text>
-                  <Text style={styles.pickedSize}>{sizeLabel(picked.bytes)} · ready to read</Text>
-                </View>
-                <Pressable
-                  onPress={() => setPicked(null)}
-                  hitSlop={10}
-                  accessibilityLabel="Remove this file"
-                  style={({ pressed }) => [styles.pickedX, pressed && styles.pressed]}>
-                  <Icon name="cross" size={13} color={colors.coral} strokeWidth={2.8} />
-                </Pressable>
               </Animated.View>
-            ) : (
-              <Pressable
-                onPress={pick}
-                accessibilityRole="button"
-                accessibilityLabel="Choose a PDF or a photo"
-                style={({ pressed }) => [styles.drop, pressed && styles.pressed]}>
-                <View style={styles.dropIcon}>
-                  <Icon name="plus" size={22} color={onWash.ink} strokeWidth={2.6} />
-                </View>
-                <Text style={styles.dropTitle}>Choose a PDF or a photo</Text>
-                <Text style={styles.dropHint}>Up to 3 MB — a chapter, a handout, a page of your own writing</Text>
-              </Pressable>
-            )}
+            ) : null}
 
-            {picked ? null : (
+            {idle && !spent && !empty ? (
+              <Wrote>
+                {picked
+                  ? 'Right, let me have a look.\nI’ll mix it up: some choices, some\nfill-the-blanks, and lists where\nyou’ve written lists.'
+                  : 'Write it out below.\nIt doesn’t need to be tidy —\nthat is rather the point of me.'}
+              </Wrote>
+            ) : null}
+
+            {/* --- reading ----------------------------------------------- */}
+            {rescuing ? (
+              <Wrote>
+                Reading it now…{'\n'}
+                Up to a minute and a half on a{'\n'}
+                long one. Stay here if you like,{'\n'}
+                I don&apos;t mind an audience.
+              </Wrote>
+            ) : null}
+
+            {/* --- finished: he says so, and waits ----------------------- */}
+            {finished != null ? (
               <>
-                <View style={styles.orRow}>
-                  <View style={styles.orLine} />
-                  <Text style={styles.orText}>or paste it</Text>
-                  <View style={styles.orLine} />
-                </View>
+                <Wrote>
+                  Finished! I read it all and{'\n'}
+                  wrote you {finished.questions}. Have a look{'\n'}
+                  before you keep any of them.
+                </Wrote>
+                <Animated.View entering={FadeInDown.duration(280)} style={styles.slip}>
+                  <View style={styles.slipCell}>
+                    <Text style={styles.slipNum}>{finished.questions}</Text>
+                    <Text style={styles.slipLab}>QUESTIONS</Text>
+                  </View>
+                  <View style={styles.slipDiv} />
+                  <View style={styles.slipCell}>
+                    <Text style={styles.slipNum}>{finished.kinds}</Text>
+                    <Text style={styles.slipLab}>{finished.kinds === 1 ? 'KIND' : 'KINDS'}</Text>
+                  </View>
+                  <View style={styles.slipDiv} />
+                  <View style={styles.slipCell}>
+                    <Text style={styles.slipNum}>{left}</Text>
+                    <Text style={styles.slipLab}>LEFT</Text>
+                  </View>
+                </Animated.View>
+                <ChunkyButton
+                  label="See what he made"
+                  icon="check"
+                  size="lg"
+                  onPress={() => router.push('/notes/review')}
+                  style={styles.cta}
+                />
+              </>
+            ) : null}
 
-                <View style={styles.labelRow}>
-                  <Text style={styles.kicker}>PASTE ANYTHING</Text>
+            {/* --- the two ways to answer him ---------------------------- */}
+            {idle && empty ? (
+              <View style={styles.picks}>
+                <Pressable
+                  onPress={pick}
+                  disabled={spent}
+                  accessibilityRole="button"
+                  accessibilityLabel="Give Nib a file"
+                  style={({ pressed }) => [
+                    styles.stick,
+                    styles.stickGold,
+                    spent && styles.faded,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Icon name="book" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={1.9} />
+                  <Text style={styles.stickLabel}>a file</Text>
+                  <Text style={styles.stickHint}>PDF or photo{'\n'}up to 3 MB</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setWriting(true)}
+                  disabled={spent}
+                  accessibilityRole="button"
+                  accessibilityLabel="Write it out for Nib"
+                  style={({ pressed }) => [
+                    styles.stick,
+                    styles.stickMint,
+                    spent && styles.faded,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Icon name="pencil" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={1.9} />
+                  <Text style={styles.stickLabel}>write it</Text>
+                  <Text style={styles.stickHint}>
+                    paste or type{'\n'}up to {(LIMITS.maxInputChars / 1000).toFixed(0)},000
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {idle && writing ? (
+              <Animated.View entering={FadeInDown.duration(200)} style={styles.padBlock}>
+                <View style={styles.padHead}>
+                  <Pressable
+                    onPress={takeBack}
+                    hitSlop={8}
+                    style={({ pressed }) => [pressed && styles.pressed]}>
+                    <Text style={styles.padBack}>← the other way</Text>
+                  </Pressable>
                   <Text style={[styles.counter, over && styles.counterOver]}>{counter}</Text>
                 </View>
                 <View style={styles.padWrap}>
                   <TextInput
                     value={body}
                     onChangeText={setBody}
-                    placeholder={'Paste a paragraph, a definition list, a wall of\nlecture notes — Nib will work out what to ask.'}
+                    placeholder={'Paste a paragraph, a page of\nlecture notes, a list of terms…'}
                     placeholderTextColor={colors.textFaint}
                     style={styles.pad}
                     multiline
+                    autoFocus
                     textAlignVertical="top"
                   />
                 </View>
-              </>
-            )}
+              </Animated.View>
+            ) : null}
 
-            <ChunkyButton
-              label={rescuing ? 'Nib is reading…' : spent ? 'Readings come back Monday' : 'Read it'}
-              icon={rescuing ? 'pencil' : spent ? 'clock' : 'nib'}
-              size="lg"
-              disabled={!ready || rescuing || spent}
-              onPress={send}
-              style={styles.cta}
-            />
-            <Text style={styles.count}>{countLine}</Text>
+            {/* --- the one button ---------------------------------------- */}
+            {(idle && !empty) || rescuing ? (
+              <ChunkyButton
+                label={rescuing ? 'Nib is reading…' : spent ? 'Back Monday' : 'Read it'}
+                icon={rescuing ? 'pencil' : spent ? 'clock' : 'nib'}
+                size="lg"
+                disabled={rescuing || !ready}
+                onPress={send}
+                style={styles.cta}
+              />
+            ) : null}
 
-            {rescueError != null && !rescuing ? (
+            {rescueError != null && idle ? (
               <Text style={styles.warn}>{rescueError}</Text>
             ) : null}
 
             <Text style={styles.footnote}>
-              This is the one screen that uses the internet. Everything else in Flipp runs on
-              your phone.
+              This is the one screen that uses the internet. Everything else runs on your phone.
             </Text>
           </ScrollView>
         </View>
@@ -281,9 +450,28 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
     flex: { flex: 1 },
     screen: { flex: 1, backgroundColor: colors.bg },
     column: { flex: 1, paddingHorizontal: 16 },
-    pressed: { opacity: 0.75 },
+    pressed: { opacity: 0.72 },
+    faded: { opacity: 0.4 },
 
-    navRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+    /** Punched binder holes, as on Home. Decoration, never over content. */
+    holes: {
+      position: 'absolute',
+      left: 4,
+      top: 128,
+      bottom: 34,
+      width: 14,
+      justifyContent: 'space-around',
+    },
+    hole: {
+      width: 11,
+      height: 11,
+      borderRadius: 999,
+      backgroundColor: colors.track,
+      borderWidth: 1.4,
+      borderColor: colors.lineSoft,
+    },
+
+    navRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
     backBtn: {
       width: 40,
       height: 40,
@@ -295,104 +483,67 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
       ...shadow.card,
     },
     backArrow: { fontFamily: font.heading, fontSize: 20, color: colors.ink, marginTop: -2 },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    title: { fontFamily: font.hero, fontSize: 32, lineHeight: 36, color: colors.ink },
-    titleSticker: {
-      backgroundColor: PERI,
-      ...outlineOn(colors),
-      ...derpRadius,
-      paddingHorizontal: 10,
-      paddingVertical: 2,
-      transform: [{ rotate: '-2deg' }],
+    title: { fontFamily: font.hero, fontSize: 30, lineHeight: 34, color: colors.ink },
+    squiggle: { marginTop: 1 },
+    navRight: { marginLeft: 'auto', maxWidth: 92 },
+    dots: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'flex-end' },
+    dot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: '#8892CE',
+      borderWidth: 1,
+      borderColor: colors.edge,
     },
-    titleStickerText: { fontFamily: font.hero, fontSize: 26, lineHeight: 32, color: onWash.ink },
-    squiggle: { marginTop: 2 },
-    crest: {
-      marginLeft: 'auto',
-      width: 40,
-      height: 40,
+    dotSpent: { backgroundColor: 'transparent', borderStyle: 'dashed', opacity: 0.45 },
+
+    content: { gap: 14, paddingTop: 6 },
+
+    // His hand, on the ruling — the line height is the gap between lines.
+    wrote: { flexDirection: 'row', gap: 9, alignItems: 'flex-start' },
+    who: {
+      width: 32,
+      height: 32,
+      borderRadius: radius.control,
       backgroundColor: PERI,
       ...outlineOn(colors),
-      ...derpRadius,
       alignItems: 'center',
       justifyContent: 'center',
       transform: [{ rotate: '-4deg' }],
-      ...shadow.card,
+      marginTop: 3,
     },
+    whoSleep: { backgroundColor: colors.disabledBg },
+    hand: { flex: 1, fontFamily: font.hero, fontSize: 17, lineHeight: RULE, color: colors.text },
 
-    content: { gap: 12, paddingTop: 4 },
-    intro: {
+    mine: { alignItems: 'flex-end' },
+    taped: {
+      maxWidth: '86%',
       backgroundColor: colors.surface,
       ...outlineOn(colors),
       ...derpRadius,
-      padding: 14,
-      paddingTop: 18,
+      paddingHorizontal: 11,
+      paddingVertical: 10,
+      marginTop: 8,
+      transform: [{ rotate: '-1.1deg' }],
       ...shadow.card,
     },
-    introText: { fontFamily: font.body, fontSize: 13.5, lineHeight: 19, color: colors.textDim },
-
-    kicker: {
-      fontFamily: font.bodyHeavy,
-      fontSize: 11,
-      letterSpacing: 1.2,
-      color: colors.textFaint,
-    },
-
-    drop: {
-      backgroundColor: PERI,
-      borderWidth: 2,
-      borderColor: colors.edge,
-      borderStyle: 'dashed',
-      ...derpRadius,
-      paddingVertical: 24,
-      paddingHorizontal: 16,
-      alignItems: 'center',
-      gap: 7,
-    },
-    dropIcon: {
-      width: 42,
-      height: 42,
+    tapeOnCard: { top: -9, left: '50%', marginLeft: -26 },
+    tapedRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    tapedIcon: {
+      width: 32,
+      height: 32,
       borderRadius: radius.control,
-      backgroundColor: '#FFFFFF',
-      ...outlineOn(colors),
-      alignItems: 'center',
-      justifyContent: 'center',
-      transform: [{ rotate: '-3deg' }],
-    },
-    dropTitle: { fontFamily: font.heading, fontSize: 16, color: onWash.ink, marginTop: 3 },
-    dropHint: {
-      fontFamily: font.body,
-      fontSize: 12,
-      lineHeight: 16.5,
-      color: onWash.faint,
-      textAlign: 'center',
-    },
-
-    picked: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 11,
       backgroundColor: PERI,
-      ...outlineOn(colors),
-      ...derpRadius,
-      padding: 12,
-      ...shadow.card,
-    },
-    pickedIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: radius.control,
-      backgroundColor: '#FFFFFF',
       ...outlineOn(colors),
       alignItems: 'center',
       justifyContent: 'center',
     },
-    pickedMid: { flex: 1, gap: 1 },
-    pickedName: { fontFamily: font.heading, fontSize: 14.5, color: onWash.ink },
-    pickedSize: { fontFamily: font.bodySemibold, fontSize: 11.5, color: onWash.faint },
-    pickedX: {
-      width: 28,
-      height: 28,
+    tapedMid: { flexShrink: 1, gap: 1 },
+    tapedName: { fontFamily: font.heading, fontSize: 13.5, color: colors.ink },
+    tapedSize: { fontFamily: font.bodySemibold, fontSize: 11, color: colors.textFaint },
+    tapedX: {
+      width: 25,
+      height: 25,
       borderRadius: 999,
       backgroundColor: colors.coralWash,
       ...outlineOn(colors),
@@ -400,11 +551,35 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
       justifyContent: 'center',
     },
 
-    orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 },
-    orLine: { flex: 1, height: 1.5, backgroundColor: colors.lineSoft },
-    orText: { fontFamily: font.bodyHeavy, fontSize: 11, color: colors.textFaint },
+    picks: { flexDirection: 'row', gap: 10 },
+    /** Sticky notes: square top, one rounded corner, a degree off true. */
+    stick: {
+      flex: 1,
+      ...outlineOn(colors),
+      borderTopLeftRadius: 4,
+      borderTopRightRadius: 4,
+      borderBottomRightRadius: 16,
+      borderBottomLeftRadius: 4,
+      paddingVertical: 14,
+      paddingHorizontal: 8,
+      alignItems: 'center',
+      gap: 5,
+      ...shadow.card,
+    },
+    stickGold: { backgroundColor: colors.goldWash, transform: [{ rotate: '-1deg' }] },
+    stickMint: { backgroundColor: colors.accentWash, transform: [{ rotate: '1deg' }] },
+    stickLabel: { fontFamily: font.hero, fontSize: 19, lineHeight: 22, color: onWash.ink },
+    stickHint: {
+      fontFamily: font.bodySemibold,
+      fontSize: 10.5,
+      lineHeight: 14,
+      color: onWash.faint,
+      textAlign: 'center',
+    },
 
-    labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    padBlock: { gap: 7 },
+    padHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    padBack: { fontFamily: font.bodyHeavy, fontSize: 11.5, color: colors.accentDeep },
     counter: { fontFamily: font.bodySemibold, fontSize: 11.5, color: colors.textFaint },
     counterOver: { color: colors.coral },
     padWrap: {
@@ -415,20 +590,37 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
       ...shadow.card,
     },
     pad: {
-      minHeight: 150,
+      minHeight: 140,
       fontFamily: font.body,
       fontSize: 14.5,
       lineHeight: 21,
       color: colors.text,
     },
 
-    cta: { marginTop: 6 },
-    count: {
-      fontFamily: font.bodySemibold,
-      fontSize: 11.5,
-      color: colors.textFaint,
-      textAlign: 'center',
+    /** What he hands over: three numbers on a torn-off slip. */
+    slip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.leafWash,
+      ...outlineOn(colors),
+      ...derpRadius,
+      paddingVertical: 11,
+      paddingHorizontal: 8,
+      transform: [{ rotate: '-0.5deg' }],
+      ...shadow.card,
     },
+    slipCell: { flex: 1, alignItems: 'center' },
+    slipNum: { fontFamily: font.hero, fontSize: 30, lineHeight: 32, color: onWash.ink },
+    slipLab: {
+      fontFamily: font.bodyHeavy,
+      fontSize: 9,
+      letterSpacing: 0.9,
+      color: onWash.dim,
+      marginTop: 2,
+    },
+    slipDiv: { width: 1.5, alignSelf: 'stretch', backgroundColor: colors.edge, opacity: 0.5 },
+
+    cta: { marginTop: 2 },
     warn: {
       fontFamily: font.bodyHeavy,
       fontSize: 12,
@@ -442,6 +634,6 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
       lineHeight: 16,
       color: colors.textFaint,
       textAlign: 'center',
-      marginTop: 6,
+      marginTop: 8,
     },
   });
