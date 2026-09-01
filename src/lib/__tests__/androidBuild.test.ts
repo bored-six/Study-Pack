@@ -49,13 +49,20 @@ describe('the theme the OS is told about', () => {
 
 describe('the promise the settings screen makes', () => {
   /**
-   * The privacy card tells students Flipp never calls the internet. That was
-   * only made true by removing trivia, and it is the kind of claim that
-   * quietly becomes a lie the first time somebody adds a fetch. If this
-   * fails, either take the network call out or change what the card says —
-   * but do not leave both.
+   * The card used to say Flipp never calls the internet, and this test was
+   * what kept that true. Nib arrived, the claim changed, and the test changed
+   * with it — but only by exactly one file.
+   *
+   * What it guards now is narrower and more useful: the card says the notes
+   * go nowhere unless the student presses "Read these with Nib", and that is
+   * only true while `aiNotes.ts` is the single place in the app that can
+   * reach the network. A fetch anywhere else — an analytics ping, a font, a
+   * crash reporter, a sync somebody adds in a hurry — breaks the promise
+   * without touching the sentence, which is the failure this catches.
    */
-  it('is not contradicted by a network call anywhere in the app', () => {
+  const ALLOWED_TO_REACH_OUT = ['src/lib/aiNotes.ts'];
+
+  it('keeps every network call in the one file the privacy card names', () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir)) {
@@ -72,7 +79,7 @@ describe('the promise the settings screen makes', () => {
       }
     };
     walk(join(ROOT, 'src'));
-    expect(offenders).toEqual([]);
+    expect(offenders.sort()).toEqual(ALLOWED_TO_REACH_OUT);
   });
 });
 

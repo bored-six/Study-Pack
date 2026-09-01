@@ -9,12 +9,12 @@
  * student did not press a button for — the settings card says so, and that
  * promise is the reason this file has exactly one export that reaches out.
  *
- * PHASE 0: `readWithAI` is not wired to anything. It always fails, which means
- * every caller lands in its failure path from the day it ships. That is the
- * point — the fallback is proven in the student's hands long before there is
- * anything to fall back from.
+ * It talks to one address: Flipp's own proxy, at api/nib.ts. Never straight
+ * to a model vendor — that would mean the key riding along inside the app,
+ * where anyone holding the app can take it out and spend it.
  */
 
+import { readSetting, writeSetting } from './db';
 import type { ParsedQuestion } from './noteParser';
 
 /** What a student has left in the current window, as the server counts it. */
@@ -83,9 +83,37 @@ export function failureReason(error: unknown): AiFailure {
 }
 
 /**
+ * Where Nib lives. Overridable for a local proxy while developing; the
+ * default is the deployed one, because a phone has no localhost to talk to.
+ */
+const NIB_URL =
+  process.env.EXPO_PUBLIC_NIB_URL ?? 'https://flipp-theta-gilt.vercel.app/api/nib';
+
+/** Long enough for a full page, short enough to give up rather than hang. */
+const TIMEOUT_MS = 25_000;
+
+/**
+ * This phone, to the server — a random id, not an identity.
+ *
+ * It exists only so one student's ten readings a week are their own. It is
+ * generated here, never derived from anything about the device or the person,
+ * and it is on the privacy card because it is the one thing besides the notes
+ * that leaves the phone.
+ */
+const DEVICE_KEY = 'nib_device_id';
+
+async function deviceId(): Promise<string> {
+  const saved = await readSetting(DEVICE_KEY);
+  if (saved != null && saved.length >= 8) return saved;
+  const made = `d${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  await writeSetting(DEVICE_KEY, made);
+  return made;
+}
+
+/**
  * Ask the reader to make questions out of notes the parser could not use.
  *
- * Two rules the caller depends on, and which the wired version must keep:
+ * Two rules the caller depends on:
  *
  *   1. It throws on every failure. There is no half-result — a caller that
  *      catches keeps whatever the parser already gave it and loses nothing.
@@ -93,6 +121,37 @@ export function failureReason(error: unknown): AiFailure {
  *      app never counts a reading itself, so a request that dies on the way
  *      home cannot cost a student anything.
  */
-export async function readWithAI(_source: AiSource): Promise<AiReading> {
-  throw aiFailure('offline');
+export async function readWithAI(source: AiSource): Promise<AiReading> {
+  if (source.kind !== 'text') throw aiFailure('unavailable');
+
+  const id = await deviceId();
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(NIB_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ notes: source.body, deviceId: id }),
+      signal: stop.signal,
+    });
+  } catch {
+    // No connection, DNS, a captive portal, a timeout — all the same to a
+    // student, and all of them mean nothing was spent.
+    throw aiFailure('offline');
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    const reason = response.status === 429 ? 'spent' : 'unavailable';
+    throw aiFailure(reason);
+  }
+
+  const body = (await response.json()) as Partial<AiReading>;
+  if (!Array.isArray(body.questions) || body.credits == null) {
+    throw aiFailure('unavailable');
+  }
+  return { questions: body.questions, credits: body.credits };
 }

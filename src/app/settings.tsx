@@ -321,7 +321,8 @@ export default function SettingsScreen() {
               line here is true of the code as written.
             */}
             <PrivacyLine text="Your notes, answers and streak stay on this phone." />
-            <PrivacyLine text="Nothing leaves the phone unless you press &quot;Read these with Nib&quot; — that sends the notes in the box, and nothing else." />
+            <PrivacyLine text="Nothing leaves the phone unless you press &quot;Read these with Nib&quot; — that sends the notes in the box, and a random id so your ten a week are yours." />
+            <PrivacyLine text="Nib is Google's Gemini. On the free plan Google may use what is sent to improve their models, so keep anything private out of a reading." />
             <PrivacyLine text="Flipp makes no other call of any kind. The fonts and sounds are built in." />
             <PrivacyLine text="No account, no sign-in, no ads, no tracking of any kind." />
             <PrivacyLine text="Reminders are set by the phone itself, not sent from anywhere." />

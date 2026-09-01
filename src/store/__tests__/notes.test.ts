@@ -19,7 +19,8 @@ jest.mock('@/lib/aiNotes', () => ({
 }));
 
 const mockedRead = readWithAI as jest.MockedFunction<typeof readWithAI>;
-const shippingStub = jest.requireActual('@/lib/aiNotes').readWithAI as typeof readWithAI;
+/** A failure shaped exactly like the one a dropped connection produces. */
+const offline = jest.requireActual('@/lib/aiNotes').aiFailure.bind(null, 'offline') as () => Error;
 
 /**
  * Enough definitions that the parser can borrow three wrong answers for each
@@ -95,9 +96,9 @@ describe('keeping the notes a draft came from', () => {
   });
 });
 
-describe('what ships today: every reading fails', () => {
+describe('when a reading does not arrive', () => {
   it('leaves the parser\'s work exactly as it was', async () => {
-    mockedRead.mockImplementation(shippingStub);
+    mockedRead.mockRejectedValue(offline());
 
     const parsed = useNotesStore.getState().parse(NOTES);
     const before = useNotesStore.getState();
@@ -114,7 +115,7 @@ describe('what ships today: every reading fails', () => {
   });
 
   it('says what happened, and that it cost nothing', async () => {
-    mockedRead.mockImplementation(shippingStub);
+    mockedRead.mockRejectedValue(offline());
 
     useNotesStore.getState().parse(NOTES);
     await useNotesStore.getState().rescue();
