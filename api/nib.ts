@@ -53,8 +53,8 @@ const MAX_FILE_B64 = Math.ceil((3 * 1024 * 1024 * 4) / 3);
  * gets one reading: enough to see what Nib does, not enough to be worth
  * farming, and the honest answer to someone who wants more is the app.
  */
-const WEEKLY_PAGES_DEVICE = 60;
-const WEEKLY_PAGES_WEB = 3;
+export const WEEKLY_PAGES_DEVICE = 150;
+export const WEEKLY_PAGES_WEB = 20;
 
 /**
  * What a page is, and why the week is measured in them.

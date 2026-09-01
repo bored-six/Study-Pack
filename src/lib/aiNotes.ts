@@ -168,7 +168,7 @@ export const onAndroid = Platform.OS === 'android';
  * a student spend their week how they like — sixty short pastes, or one long
  * chapter — instead of being handed ten of somebody else's idea of a reading.
  */
-export const WEEKLY_PAGES = onAndroid ? 60 : 3;
+export const WEEKLY_PAGES = onAndroid ? 150 : 20;
 
 /** A photo is one page. So is a page of pasted notes. */
 export const PAGES_FOR_IMAGE = 1;

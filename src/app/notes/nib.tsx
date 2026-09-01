@@ -74,7 +74,7 @@ function sizeLabel(bytes: number): string {
  * The week, as a bar that drains.
  *
  * It used to be one dot per reading, which read beautifully at ten and not at
- * all at sixty. A bar says the same thing at any size, and the number under
+ * all at a hundred and fifty. A bar says the same thing at any size, and the number under
  * it is there because "most of it left" is a feeling and "68%" is an answer.
  */
 function Allowance({ left, of }: { left: number; of: number }) {

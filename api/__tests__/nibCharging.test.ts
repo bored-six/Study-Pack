@@ -11,6 +11,8 @@
 
 import { PDFDocument } from 'pdf-lib';
 
+import { WEEKLY_PAGES_DEVICE, WEEKLY_PAGES_WEB } from '../nib';
+
 import handler, { __fallbackForTests } from '../nib';
 
 type Body = Record<string, unknown>;
@@ -94,14 +96,16 @@ let phone = 0;
 const nextPhone = () => `androidid${(phone++).toString().padStart(6, '0')}`;
 
 describe('what the week costs', () => {
-  it('gives Android sixty pages and the browser three', async () => {
+  it('gives the phone a bigger week than the browser', async () => {
     gemini = { questions: questionsFrom([NOTES.split('\n')[0]]) };
 
     const app = await ask({ notes: NOTES, deviceId: nextPhone(), platform: 'android' });
-    expect(app.credits?.of).toBe(60);
+    expect(app.credits?.of).toBe(WEEKLY_PAGES_DEVICE);
 
     const web = await ask({ notes: NOTES, platform: 'web' }, '10.0.0.99');
-    expect(web.credits?.of).toBe(3);
+    expect(web.credits?.of).toBe(WEEKLY_PAGES_WEB);
+    // The browser's is deliberately the smaller of the two.
+    expect(WEEKLY_PAGES_WEB).toBeLessThan(WEEKLY_PAGES_DEVICE);
   });
 
   it('charges nothing for a reading that gave nothing back', async () => {
@@ -111,18 +115,18 @@ describe('what the week costs', () => {
 
     const first = await ask({ notes: NOTES, deviceId: id, platform: 'android' });
     expect(first.questions).toHaveLength(0);
-    expect(first.credits?.left).toBe(60);
+    expect(first.credits?.left).toBe(WEEKLY_PAGES_DEVICE);
 
     // And again — a student cannot be drained by readings that give nothing.
     const second = await ask({ notes: NOTES, deviceId: id, platform: 'android' });
-    expect(second.credits?.left).toBe(60);
+    expect(second.credits?.left).toBe(WEEKLY_PAGES_DEVICE);
   });
 
   it('charges a paste one page when it worked', async () => {
     gemini = { questions: questionsFrom(NOTES.split('\n').slice(0, 4)) };
     const out = await ask({ notes: NOTES, deviceId: nextPhone(), platform: 'android' });
     expect(out.questions).toHaveLength(4);
-    expect(out.credits?.left).toBe(59);
+    expect(out.credits?.left).toBe(WEEKLY_PAGES_DEVICE - 1);
   });
 
   it('charges a thirty-page PDF five pages when it gave five questions', async () => {
@@ -138,7 +142,7 @@ describe('what the week costs', () => {
       platform: 'android',
     });
     expect(out.questions).toHaveLength(5);
-    expect(out.credits?.left).toBe(55);
+    expect(out.credits?.left).toBe(WEEKLY_PAGES_DEVICE - 5);
   });
 
   it('charges a small PDF in full when it earned it', async () => {
@@ -151,16 +155,18 @@ describe('what the week costs', () => {
       platform: 'android',
     });
     expect(out.questions).toHaveLength(6);
-    expect(out.credits?.left).toBe(58);
+    expect(out.credits?.left).toBe(WEEKLY_PAGES_DEVICE - 2);
   });
 
-  it('runs a browser out after three pages, and says so', async () => {
-    gemini = { questions: questionsFrom(NOTES.split('\n').slice(0, 3)) };
+  it('runs a browser out at the end of its week, and says so', async () => {
+    // One question per reading, so a paste costs exactly one page and the
+    // count walks down by one — however wide the browser's week is set.
+    gemini = { questions: questionsFrom(NOTES.split('\n').slice(0, 1)) };
     const ip = '10.0.0.55';
 
-    for (const left of [2, 1, 0]) {
+    for (let spent = 1; spent <= WEEKLY_PAGES_WEB; spent++) {
       const out = await ask({ notes: NOTES, platform: 'web' }, ip);
-      expect(out.credits?.left).toBe(left);
+      expect(out.credits?.left).toBe(WEEKLY_PAGES_WEB - spent);
     }
 
     const done = await ask({ notes: NOTES, platform: 'web' }, ip);
@@ -173,7 +179,7 @@ describe('what the week costs', () => {
     const mine = nextPhone();
     await ask({ notes: NOTES, deviceId: mine, platform: 'android' });
     const yours = await ask({ notes: NOTES, deviceId: nextPhone(), platform: 'android' });
-    expect(yours.credits?.left).toBe(59);
+    expect(yours.credits?.left).toBe(WEEKLY_PAGES_DEVICE - 1);
   });
 });
 
