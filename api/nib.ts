@@ -31,6 +31,10 @@ const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODE
 const MAX_QUESTIONS = 50;
 /** Mirrors LIMITS.maxInputChars. Anything longer is a mistake, not a paste. */
 const MAX_INPUT_CHARS = 10_000;
+/** What Gemini can read and a student is likely to have. */
+const ACCEPTED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+/** 3MB of file, which is about 4MB once base64 has had its way with it. */
+const MAX_FILE_B64 = Math.ceil((3 * 1024 * 1024 * 4) / 3);
 const WEEKLY_PER_DEVICE = 10;
 /**
  * Everyone, every day. The free tier bills nothing, so the worst case here is
@@ -145,29 +149,43 @@ interface Question {
   kind: 'definition' | 'cloze';
 }
 
+const QUESTION_SHAPE = {
+  type: 'object',
+  properties: {
+    prompt: { type: 'string' },
+    correctAnswer: { type: 'string' },
+    wrongAnswers: { type: 'array', items: { type: 'string' } },
+    sourceLine: { type: 'string' },
+    kind: { type: 'string', enum: ['definition', 'cloze'] },
+  },
+  required: ['prompt', 'correctAnswer', 'wrongAnswers', 'sourceLine', 'kind'],
+} as const;
+
 /**
  * The shape Gemini must answer in. Given a schema it fills the fields rather
  * than writing prose about them, so there is no output to parse loosely.
  */
-const SCHEMA = {
+const SCHEMA_TEXT = {
+  type: 'object',
+  properties: { questions: { type: 'array', items: QUESTION_SHAPE } },
+  required: ['questions'],
+} as const;
+
+/**
+ * A file needs one extra field. Grounding works by checking every quote
+ * against the notes — and for a PDF the server never sees the notes, only
+ * the bytes. So the model returns what it read as well as what it asked, and
+ * the quotes are checked against that. It cannot both invent a fact and hide
+ * it, because the invented line would have to appear in the text it hands
+ * back, where a student can see it.
+ */
+const SCHEMA_FILE = {
   type: 'object',
   properties: {
-    questions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          prompt: { type: 'string' },
-          correctAnswer: { type: 'string' },
-          wrongAnswers: { type: 'array', items: { type: 'string' } },
-          sourceLine: { type: 'string' },
-          kind: { type: 'string', enum: ['definition', 'cloze'] },
-        },
-        required: ['prompt', 'correctAnswer', 'wrongAnswers', 'sourceLine', 'kind'],
-      },
-    },
+    sourceText: { type: 'string' },
+    questions: { type: 'array', items: QUESTION_SHAPE },
   },
-  required: ['questions'],
+  required: ['sourceText', 'questions'],
 } as const;
 
 const INSTRUCTIONS = `You write quiz questions from a student's own study notes.
@@ -190,6 +208,22 @@ Rules, in order of importance:
 6. One question per fact. Do not ask the same thing twice.
 7. If a line has no testable fact in it, skip it. Returning fewer good
    questions is always better than padding with weak ones.`;
+
+/** Added when the notes arrive as a file rather than as typed text. */
+const FILE_INSTRUCTIONS = `
+This time the notes are a file — a PDF, a photo of a page, or a scan.
+
+First read it and put what it says into "sourceText": one fact per line, in
+the words the document uses, headings and page furniture left out. That field
+is what every "sourceLine" is checked against, so a question whose line is not
+in it will be thrown away.
+
+Then write the questions from "sourceText" and nothing else. Everything above
+still applies — especially that you must not use anything you know that the
+document does not say.
+
+Cover the whole document, but choose: the best forty questions from a chapter
+beat two hundred a student will never finish reviewing.`;
 
 /** Fisher-Yates. The correct answer must not sit in a predictable slot. */
 function shuffle<T>(items: T[]): T[] {
@@ -226,19 +260,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) ?? {};
   const notes: unknown = body.notes;
+  const file: unknown = body.file;
+  const mime: unknown = body.mime;
   const deviceId: unknown = body.deviceId;
 
-  if (typeof notes !== 'string' || notes.trim().length === 0) {
-    res.status(400).json({ reason: 'unavailable', message: 'No notes were sent.' });
-    return;
-  }
-  if (notes.length > MAX_INPUT_CHARS) {
-    res.status(400).json({ reason: 'unavailable', message: 'Those notes are too long to read.' });
-    return;
-  }
   if (typeof deviceId !== 'string' || deviceId.length < 8) {
     res.status(400).json({ reason: 'unavailable', message: 'Missing device id.' });
     return;
+  }
+
+  const isFile = typeof file === 'string' && file.length > 0;
+
+  if (isFile) {
+    if (typeof mime !== 'string' || !ACCEPTED_TYPES.includes(mime)) {
+      res.status(400).json({ reason: 'unavailable', message: 'Nib reads PDFs and photos.' });
+      return;
+    }
+    // Vercel caps a request body around 4.5MB and base64 adds about a third,
+    // so the file itself has to stay under three — checked on the phone too,
+    // where it can be said before the upload rather than after.
+    if (file.length > MAX_FILE_B64) {
+      res.status(413).json({ reason: 'unavailable', message: 'That file is too big — 3 MB is the most Nib can take.' });
+      return;
+    }
+  } else {
+    if (typeof notes !== 'string' || notes.trim().length === 0) {
+      res.status(400).json({ reason: 'unavailable', message: 'No notes were sent.' });
+      return;
+    }
+    if (notes.length > MAX_INPUT_CHARS) {
+      res.status(400).json({ reason: 'unavailable', message: 'Those notes are too long to read.' });
+      return;
+    }
   }
 
   const now = new Date();
@@ -284,17 +337,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
-      contents: [{ role: 'user', parts: [{ text: `Here are the notes:\n\n${notes}` }] }],
+      systemInstruction: {
+        parts: [{ text: isFile ? INSTRUCTIONS + FILE_INSTRUCTIONS : INSTRUCTIONS }],
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: isFile
+            ? [
+                { inlineData: { mimeType: mime as string, data: file as string } },
+                { text: 'Read this and make questions from it.' },
+              ]
+            : [{ text: `Here are the notes:\n\n${notes as string}` }],
+        },
+      ],
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: SCHEMA,
+        responseSchema: isFile ? SCHEMA_FILE : SCHEMA_TEXT,
         temperature: 0.3,
       },
     }),
   };
 
-  let payload: { questions?: Question[] };
+  let payload: { questions?: Question[]; sourceText?: string };
   try {
     let upstream = await fetch(ENDPOINT, request);
 
@@ -327,8 +392,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   //
   // Every line of the student's notes, indexed by its words. A question
   // survives only if the line it claims to come from is really in there.
+  //
+  // For a file that corpus is what the model says it read, because the server
+  // never sees inside a PDF. Weaker than checking against the student's own
+  // typing, but it still forces an invention to be written down where the
+  // student can see it, rather than appearing only as an answer.
+  const corpus = isFile ? (payload.sourceText ?? '') : (notes as string);
   const lines = new Set(
-    notes
+    corpus
       .split('\n')
       .map((line) => normalize(line))
       .filter((line) => line.length > 0)
@@ -369,7 +440,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // The line as the student wrote it, not the normalized form — the app
       // matches this against its own skipped list.
       sourceLine:
-        notes.split('\n').find((line) => normalize(line) === quoted)?.trim() ?? null,
+        corpus.split('\n').find((line) => normalize(line) === quoted)?.trim() ?? null,
     });
   }
 

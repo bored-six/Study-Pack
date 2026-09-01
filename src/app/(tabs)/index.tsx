@@ -251,7 +251,7 @@ export default function HomeScreen() {
           other way to get notes in when they are not written in shapes.
         */}
         <BouncyPressable
-          onPress={() => router.push('/notes/new')}
+          onPress={() => router.push('/notes/nib')}
           style={[styles.actionBtn, styles.actionBtnNib]}>
           <Icon name="nib" size={22} color="#1A211C" fill="#FFFFFF" />
           <View style={styles.nibText}>

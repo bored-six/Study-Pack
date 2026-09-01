@@ -65,6 +65,15 @@ interface NotesState {
    */
   scanWithReader: (raw: string) => Promise<number>;
   /**
+   * Reads a PDF or a photo and stages what comes back.
+   *
+   * No parse runs first, because there is nothing on the phone that can read
+   * inside a file — so unlike every other path into the review screen, this
+   * one has no offline half. It returns how many questions are staged, and
+   * zero means the failure is in `rescueError`.
+   */
+  readFile: (file: { base64: string; mime: string; name: string }) => Promise<number>;
+  /**
    * Asks the reader to make questions from the lines the parser skipped, and
    * merges what comes back into the draft under review.
    *
@@ -131,6 +140,35 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       rescueError: null,
     });
     return result;
+  },
+
+  readFile: async (file) => {
+    set({ rescuing: true, rescueError: null, rescueAdded: null });
+    try {
+      const reading = await readWithAI({ kind: 'file', ...file });
+      const questions = reading.questions.slice(0, LIMITS.maxQuestions);
+      set({
+        draft: questions,
+        stats: {
+          linesRead: questions.length,
+          linesUsed: questions.length,
+          skipped: [],
+          truncatedInput: false,
+          cappedQuestions: reading.questions.length > questions.length,
+        },
+        targetId: null,
+        // Nothing to rescue afterwards: the reading already was the reading,
+        // and the file is not text this app can hand back to itself.
+        source: null,
+        credits: reading.credits,
+        rescueAdded: questions.length,
+        rescuing: false,
+      });
+      return questions.length;
+    } catch (error) {
+      set({ rescuing: false, rescueError: AI_FAILURE_MESSAGE[failureReason(error)] });
+      return 0;
+    }
   },
 
   scanWithReader: async (raw) => {

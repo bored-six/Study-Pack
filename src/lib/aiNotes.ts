@@ -29,7 +29,26 @@ export interface Credits {
  */
 export type AiSource =
   | { kind: 'text'; body: string }
-  | { kind: 'pdf'; base64: string; name: string };
+  | { kind: 'file'; base64: string; mime: string; name: string };
+
+/** What Nib can open. Anything else is refused before the upload starts. */
+export const ACCEPTED_FILE_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+];
+
+/**
+ * Three megabytes.
+ *
+ * Not a guess about what is reasonable: a Vercel function will not accept a
+ * body much past four and a half, and base64 makes a file about a third
+ * bigger on the way. Checked here so a student is told before a slow upload
+ * rather than after one.
+ */
+export const MAX_FILE_BYTES = 3 * 1024 * 1024;
 
 export interface AiReading {
   /**
@@ -91,6 +110,8 @@ const NIB_URL =
 
 /** Long enough for a full page, short enough to give up rather than hang. */
 const TIMEOUT_MS = 25_000;
+/** Uploading a few megabytes and reading a chapter is a different wait. */
+const FILE_TIMEOUT_MS = 90_000;
 
 /**
  * This phone, to the server — a random id, not an identity.
@@ -122,18 +143,22 @@ async function deviceId(): Promise<string> {
  *      home cannot cost a student anything.
  */
 export async function readWithAI(source: AiSource): Promise<AiReading> {
-  if (source.kind !== 'text') throw aiFailure('unavailable');
-
   const id = await deviceId();
+  const payload =
+    source.kind === 'text'
+      ? { notes: source.body, deviceId: id }
+      : { file: source.base64, mime: source.mime, deviceId: id };
+
   const stop = new AbortController();
-  const timer = setTimeout(() => stop.abort(), TIMEOUT_MS);
+  // A file takes longer than a paste: it has to be uploaded and then read.
+  const timer = setTimeout(() => stop.abort(), source.kind === 'file' ? FILE_TIMEOUT_MS : TIMEOUT_MS);
 
   let response: Response;
   try {
     response = await fetch(NIB_URL, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ notes: source.body, deviceId: id }),
+      body: JSON.stringify(payload),
       signal: stop.signal,
     });
   } catch {
