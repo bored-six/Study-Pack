@@ -58,7 +58,10 @@ describe('the add-notes walkthrough', () => {
     expect(said()).toContain('paragraphs');
     // Both halves of the deal, on the same page as the offer.
     expect(said()).toContain('needs internet');
-    expect(said()).toContain('ten readings a week');
+    expect(said()).toContain('sixty pages of reading a week');
+    // What a page is, said where the offer is made — a budget nobody can
+    // convert into their own files is not a budget they can plan against.
+    expect(said()).toContain('a PDF is however many it has');
     expect(said()).toContain('free, instant');
   });
 

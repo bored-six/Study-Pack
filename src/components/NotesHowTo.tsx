@@ -58,7 +58,7 @@ const PAGES: Page[] = [
     title: 'Notes not in those shapes?',
     icon: 'spark',
     body:
-      'Real notes are often just paragraphs, and the three shapes above are what the ordinary scan reads best. When your notes are not written that way, ask Nib. Nib is the AI reader built into Flipp: it understands what your notes say instead of matching a pattern, so it gets questions out of lines the scan would pass over. It is the one part of Flipp that needs internet, it only ever sees the notes in the box, and you get ten readings a week. The scan stays free, instant, and works with no signal at all.',
+      'Real notes are often just paragraphs, and the three shapes above are what the ordinary scan reads best. When your notes are not written that way, ask Nib. Nib is the AI reader built into Flipp: it understands what your notes say instead of matching a pattern, so it gets questions out of lines the scan would pass over. It is the one part of Flipp that needs internet, it only ever sees the notes in the box, and you get sixty pages of reading a week — a photo or a page of notes is one page, a PDF is however many it has. The scan stays free, instant, and works with no signal at all.',
     example: 'The treaty was signed in Paris three years after the first shots',
     becomes: 'Where was the treaty signed?',
   },

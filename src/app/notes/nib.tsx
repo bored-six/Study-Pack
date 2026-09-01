@@ -19,7 +19,14 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
-import { ACCEPTED_FILE_TYPES, MAX_FILE_BYTES, WEEKLY_READINGS, newAttempt } from '@/lib/aiNotes';
+import {
+  ACCEPTED_FILE_TYPES,
+  MAX_FILE_BYTES,
+  WEEKLY_PAGES,
+  newAttempt,
+  pdfPageCount,
+  percentOfWeek,
+} from '@/lib/aiNotes';
 import { LIMITS } from '@/lib/noteParser';
 import { playSfx } from '@/lib/sfx';
 import { useNotesStore } from '@/store/notes';
@@ -46,7 +53,14 @@ const PERI = '#E3E7FB';
  */
 const RULE = 30;
 
-type Picked = { base64: string; mime: string; name: string; bytes: number };
+type Picked = {
+  base64: string;
+  mime: string;
+  name: string;
+  bytes: number;
+  /** Pages, once they have been counted. Null when the file would not open. */
+  pages: number | null;
+};
 /** What he hands over when he is done. */
 type Finished = { questions: number; kinds: number };
 
@@ -57,21 +71,22 @@ function sizeLabel(bytes: number): string {
 }
 
 /**
- * The allowance, as dots that drain.
+ * The week, as a bar that drains.
  *
- * "8 of 10 left this week" is a sentence you have to read. Ten dots with two
- * missing is a thing you see on the way past.
+ * It used to be one dot per reading, which read beautifully at ten and not at
+ * all at sixty. A bar says the same thing at any size, and the number under
+ * it is there because "most of it left" is a feeling and "68%" is an answer.
  */
 function Allowance({ left, of }: { left: number; of: number }) {
   const isDark = useThemeStore((s) => s.isDark);
   const styles = getStyles(getColors(isDark));
+  const percent = percentOfWeek(left, of);
   return (
-    <View
-      style={styles.dots}
-      accessibilityLabel={`${left} of ${of} readings left this week`}>
-      {Array.from({ length: of }, (_, i) => (
-        <View key={i} style={[styles.dot, i >= left && styles.dotSpent]} />
-      ))}
+    <View style={styles.meter} accessibilityLabel={`${percent}% of your week left`}>
+      <View style={styles.meterTrack}>
+        <View style={[styles.meterFill, { width: `${percent}%` }]} />
+      </View>
+      <Text style={styles.meterLabel}>{percent}%</Text>
     </View>
   );
 }
@@ -150,8 +165,8 @@ export default function NibScreen() {
 
   // Before the first reading the server has said nothing, so the allowance is
   // what this platform gets rather than a balance we are pretending to know.
-  const of = credits?.of ?? WEEKLY_READINGS;
-  const left = credits?.left ?? WEEKLY_READINGS;
+  const of = credits?.of ?? WEEKLY_PAGES;
+  const left = credits?.left ?? WEEKLY_PAGES;
   const spent = left <= 0;
   const ready = (picked != null || (body.trim().length > 0 && !over)) && !spent;
 
@@ -181,12 +196,13 @@ export default function NibScreen() {
 
       playSfx('derp_pop');
       attempt.current = newAttempt();
-      setPicked({
-        base64: await file.base64(),
-        mime: asset.mimeType ?? 'application/pdf',
-        name: asset.name,
-        bytes,
-      });
+      const base64 = await file.base64();
+      const mime = asset.mimeType ?? 'application/pdf';
+      // Counted here so the cost can be said while the student can still
+      // change their mind. The server counts it again, and that one is what
+      // is charged — a wrong number here is a wrong sentence, never a bill.
+      const pages = mime === 'application/pdf' ? await pdfPageCount(base64) : 1;
+      setPicked({ base64, mime, name: asset.name, bytes, pages });
       // A file and a written page are two answers to one question.
       setWriting(false);
       setBody('');
@@ -322,7 +338,11 @@ export default function NibScreen() {
                       <Text style={styles.tapedName} numberOfLines={1}>
                         {picked.name}
                       </Text>
-                      <Text style={styles.tapedSize}>{sizeLabel(picked.bytes)}</Text>
+                      <Text style={styles.tapedSize}>
+                        {picked.pages != null
+                          ? `${sizeLabel(picked.bytes)} · ${picked.pages} ${picked.pages === 1 ? 'page' : 'pages'} — up to ${percentOfWeek(picked.pages, of)}% of your week`
+                          : sizeLabel(picked.bytes)}
+                      </Text>
                     </View>
                     {idle ? (
                       <Pressable
@@ -572,16 +592,18 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
     title: { fontFamily: font.hero, fontSize: 30, lineHeight: 34, color: colors.ink },
     squiggle: { marginTop: 1 },
     navRight: { marginLeft: 'auto', maxWidth: 92 },
-    dots: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, justifyContent: 'flex-end' },
-    dot: {
-      width: 7,
-      height: 7,
+    meter: { alignItems: 'flex-end', gap: 3 },
+    meterTrack: {
+      width: 76,
+      height: 8,
       borderRadius: 999,
-      backgroundColor: '#8892CE',
+      backgroundColor: 'transparent',
       borderWidth: 1,
       borderColor: colors.edge,
+      overflow: 'hidden',
     },
-    dotSpent: { backgroundColor: 'transparent', borderStyle: 'dashed', opacity: 0.45 },
+    meterFill: { height: '100%', backgroundColor: '#8892CE' },
+    meterLabel: { fontFamily: font.body, fontSize: 11, color: colors.ink, opacity: 0.7 },
 
     content: { gap: 14, paddingTop: 6 },
 

@@ -20,6 +20,8 @@
 
 import { createHmac } from 'node:crypto';
 
+import { PDFDocument } from 'pdf-lib';
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
@@ -51,8 +53,23 @@ const MAX_FILE_B64 = Math.ceil((3 * 1024 * 1024 * 4) / 3);
  * gets one reading: enough to see what Nib does, not enough to be worth
  * farming, and the honest answer to someone who wants more is the app.
  */
-const WEEKLY_PER_DEVICE = 10;
-const WEEKLY_PER_WEB = 1;
+const WEEKLY_PAGES_DEVICE = 60;
+const WEEKLY_PAGES_WEB = 3;
+
+/**
+ * What a page is, and why the week is measured in them.
+ *
+ * Gemini does not read a PDF as text. It turns every page into a picture and
+ * charges about the same for each one, so a page holding three words costs
+ * very nearly what a page holding eight hundred does. That makes pages the
+ * honest unit: it is what the reading actually costs, it is knowable before
+ * a single byte is spent, and it is a thing a student already understands.
+ *
+ * A photo is one page. A pasted page of notes is one page. A PDF is however
+ * many pages it really has, counted rather than guessed at.
+ */
+const PAGES_FOR_TEXT = 1;
+const PAGES_FOR_IMAGE = 1;
 /**
  * Everyone, every day. The free tier bills nothing, so the worst case here is
  * a used-up quota rather than a bill — but a stranger hammering the endpoint
@@ -164,15 +181,22 @@ async function remember(key: string, value: unknown): Promise<void> {
 
 const fallbackResults = new Map<string, unknown>();
 
-/** Adds one, and gives the key a life just past the period it counts. */
-async function charge(key: string, ttl: number): Promise<void> {
+/**
+ * Adds an amount, and gives the key a life just past the period it counts.
+ *
+ * An amount rather than always one, because a week is counted in pages now
+ * and a reading can be worth several of them. Nothing is written for an
+ * amount of zero: a reading that found nothing must leave no mark at all.
+ */
+async function charge(key: string, ttl: number, amount = 1): Promise<void> {
+  if (amount <= 0) return;
   if (!persistent) {
-    fallback.set(key, (fallback.get(key) ?? 0) + 1);
+    fallback.set(key, (fallback.get(key) ?? 0) + amount);
     return;
   }
   try {
-    const now = await redis(['INCR', key]);
-    if (Number(now) === 1) await redis(['EXPIRE', key, ttl]);
+    const now = await redis(['INCRBY', key, amount]);
+    if (Number(now) === amount) await redis(['EXPIRE', key, ttl]);
   } catch {
     // A reading already happened; failing to write it down is not worth
     // taking away from the student.
@@ -209,6 +233,31 @@ function fingerprint(value: string): string {
  */
 async function blocked(holder: string): Promise<boolean> {
   return (await spent(`nib:blocked:${holder}`)) > 0;
+}
+
+/**
+ * How many pages are really in this PDF.
+ *
+ * Counted properly rather than by looking for `/Type /Page` in the bytes:
+ * anything saved by a modern writer keeps its page tree inside a compressed
+ * object stream, where a search of the raw file finds nothing at all and
+ * would quietly price a whole chapter as a single page.
+ *
+ * A file that cannot be opened is charged as one page, not refused. A student
+ * with an odd PDF should get their reading; the worst this can cost is that
+ * an unreadable file is priced generously, and the reading itself will fail
+ * on its own if the file really is broken.
+ */
+async function pdfPages(base64: string): Promise<number> {
+  try {
+    const doc = await PDFDocument.load(Buffer.from(base64, 'base64'), {
+      ignoreEncryption: true,
+      updateMetadata: false,
+    });
+    return Math.max(1, doc.getPageCount());
+  } catch {
+    return 1;
+  }
 }
 
 /** Vercel puts the caller first in x-forwarded-for; everything after is proxies. */
@@ -460,11 +509,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Who the week belongs to. On Android that is the phone, which an uninstall
   // does not change; in a browser there is only the address, which is why the
-  // browser's allowance is one and not ten.
+  // browser's budget is three pages and not sixty.
   const holder = onAndroid
     ? fingerprint(`dev:${deviceId as string}`)
     : fingerprint(`ip:${address}`);
-  const allowance = onAndroid ? WEEKLY_PER_DEVICE : WEEKLY_PER_WEB;
+  const allowance = onAndroid ? WEEKLY_PAGES_DEVICE : WEEKLY_PAGES_WEB;
   const weekly = `nib:${onAndroid ? 'dev' : 'web'}:${holder}:${week}`;
 
   // Asked first, and before any counting: someone who has been turned off
@@ -496,11 +545,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (used >= allowance) {
     res.status(429).json({
       reason: 'spent',
-      message: 'No readings left this week. They come back Monday.',
+      message: 'No pages left this week. They come back Monday.',
       credits: { left: 0, of: allowance },
     });
     return;
   }
+
+  /**
+   * What was sent, in pages.
+   *
+   * A ceiling, not a bill. What the student is finally charged is worked out
+   * after the reading, from what came back — see the note over `cost`.
+   */
+  const pages = isFile
+    ? mime === 'application/pdf'
+      ? await pdfPages(file as string)
+      : PAGES_FOR_IMAGE
+    : PAGES_FOR_TEXT;
 
   const request = {
     method: 'POST',
@@ -639,13 +700,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // Charged only now, and only because there is something to show for it. A
-  // reading that failed on the way here has cost the student nothing.
+  /**
+   * What the reading is finally worth.
+   *
+   * Never more pages than questions it gave back. A thirty-page PDF of
+   * diagrams that yields five questions costs five pages, not thirty — the
+   * student is charged for what they got rather than for what they sent, and
+   * a reading that returns nothing at all is free.
+   *
+   * This is what the comment here used to promise and the code did not do: a
+   * reading that survived the grounding check with nothing left still took a
+   * full credit off somebody who had been given no questions for it.
+   *
+   * Clamped to what is left so a big file cannot push a week below zero.
+   */
+  const cost =
+    kept.length === 0 ? 0 : Math.min(pages, kept.length, Math.max(0, allowance - used));
+
   // Eight days and two, so a key outlives the period it counts and cannot
   // expire early on somebody mid-week.
   const answer = {
     questions: kept,
-    credits: { left: Math.max(0, allowance - (used + 1)), of: allowance },
+    credits: { left: Math.max(0, allowance - (used + cost)), of: allowance },
   };
 
   // Remembered before it is charged, never after. Getting this order wrong
@@ -654,7 +730,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (attemptKey) await remember(attemptKey, answer);
 
   await Promise.all([
-    charge(weekly, DAY * 8),
+    charge(weekly, DAY * 8, cost),
+    // The daily ceilings count requests rather than pages: they are there to
+    // stop a stranger hammering the endpoint, and one call is one call
+    // however little it turned out to be worth.
     charge(addressKey, DAY * 2),
     charge(globalKey, DAY * 2),
   ]);

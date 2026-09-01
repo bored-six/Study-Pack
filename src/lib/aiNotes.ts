@@ -15,6 +15,7 @@
  */
 
 import * as Application from 'expo-application';
+import { PDFDocument } from 'pdf-lib';
 import { Platform } from 'react-native';
 
 import { readSetting, writeSetting } from './db';
@@ -85,7 +86,7 @@ export interface AiReading {
 export type AiFailure =
   /** No usable connection — the common one, and not the student's fault. */
   | 'offline'
-  /** The window's readings are used up. Ends with when they come back. */
+  /** The week's pages are used up. Ends with when they come back. */
   | 'spent'
   /** Anything else: a bad response, a server having a day, a timeout. */
   | 'unavailable';
@@ -93,7 +94,7 @@ export type AiFailure =
 /** Plain sentences. Each says what happened and what to do about it. */
 export const AI_FAILURE_MESSAGE: Record<AiFailure, string> = {
   offline: "Needs internet. Try again when you're back — nothing was used up.",
-  spent: 'No readings left this week. They come back Monday.',
+  spent: 'No pages left this week. They come back Monday.',
   unavailable: "Couldn't reach the reader. Nothing was used up — try again in a minute.",
 };
 
@@ -158,15 +159,97 @@ const DEVICE_KEY = 'nib_device_id';
 /** Which of the two allowances this build is asking against. */
 export const onAndroid = Platform.OS === 'android';
 
-/** What a full week looks like here. The copy reads this so it cannot drift. */
-export const WEEKLY_READINGS = onAndroid ? 10 : 1;
+/**
+ * A week, in pages. The copy reads this so it cannot drift.
+ *
+ * Pages rather than readings because that is what a reading actually costs:
+ * Gemini turns every PDF page into a picture and charges about the same for
+ * each, so a sparse page is no cheaper than a dense one. Counting pages lets
+ * a student spend their week how they like — sixty short pastes, or one long
+ * chapter — instead of being handed ten of somebody else's idea of a reading.
+ */
+export const WEEKLY_PAGES = onAndroid ? 60 : 3;
+
+/** A photo is one page. So is a page of pasted notes. */
+export const PAGES_FOR_IMAGE = 1;
+export const PAGES_FOR_TEXT = 1;
+
+/**
+ * How many pages a PDF really has, read on the phone before anything is sent.
+ *
+ * Only so the student can be told what a file will cost while they can still
+ * change their mind. The server counts it again and that count is the one
+ * that is charged, so a wrong answer here is a wrong sentence, never a wrong
+ * bill.
+ *
+ * Null when the file cannot be opened — the caller says nothing rather than
+ * guessing, because a made-up number in a sentence about cost is worse than
+ * no sentence at all.
+ */
+export async function pdfPageCount(base64: string): Promise<number | null> {
+  try {
+    const doc = await PDFDocument.load(base64ToBytes(base64), {
+      ignoreEncryption: true,
+      updateMetadata: false,
+    });
+    return Math.max(1, doc.getPageCount());
+  } catch {
+    return null;
+  }
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * Base64 to bytes, by hand.
+ *
+ * Neither shortcut is safe here. Handing pdf-lib the string and letting it
+ * decode only works for a data URI, and a bare payload comes back as nothing
+ * — which is how a real chapter was being reported as an unreadable file.
+ * `atob` is the other obvious answer and is not something to count on across
+ * every Hermes build the app will run on.
+ *
+ * Sixteen lines that work the same everywhere is the cheaper bargain.
+ */
+function base64ToBytes(base64: string): Uint8Array {
+  const clean = base64.replace(/^data:[^,]*,/, '').replace(/[^A-Za-z0-9+/]/g, '');
+  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  let at = 0;
+  let buffer = 0;
+  let bits = 0;
+  for (let i = 0; i < clean.length; i++) {
+    buffer = (buffer << 6) | B64.indexOf(clean[i]);
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[at++] = (buffer >> bits) & 0xff;
+    }
+  }
+  return out.subarray(0, at);
+}
+
+/** What a picked file will cost, at most. Null when it cannot be worked out. */
+export async function pagesFor(source: AiSource): Promise<number | null> {
+  if (source.kind === 'text') return PAGES_FOR_TEXT;
+  if (source.mime !== 'application/pdf') return PAGES_FOR_IMAGE;
+  return pdfPageCount(source.base64);
+}
+
+/** Pages as a share of the week, for the bar and for "up to 20%". */
+export function percentOfWeek(pages: number, of: number = WEEKLY_PAGES): number {
+  if (of <= 0 || pages <= 0) return 0;
+  // The floor of one is for the other end: a single page of sixty rounds to
+  // 1.6%, and showing that as 0% would promise a reading that costs nothing
+  // and then charge for it. Nothing is nothing; anything is at least one.
+  return Math.min(100, Math.max(1, Math.round((pages / of) * 100)));
+}
 
 /**
  * The invented id, kept only as a fallback.
  *
  * `getAndroidId` has been known to come back empty on an emulator or a
  * half-provisioned device. A student on one of those should still get their
- * ten readings, so there is something to fall back to — weaker, because it
+ * their own week, so there is something to fall back to — weaker, because it
  * dies with the app, but never worse than having no reading at all.
  */
 async function inventedId(): Promise<string> {
