@@ -234,7 +234,7 @@ function SkippedPanel({
             <>
               <ChunkyButton
                 label={label}
-                icon={busy ? 'pencil' : spent ? 'clock' : 'spark'}
+                icon={busy ? 'pencil' : spent ? 'clock' : 'nib'}
                 variant="soft"
                 size="sm"
                 disabled={busy || spent}

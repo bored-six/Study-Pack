@@ -269,6 +269,31 @@ const glyphs = {
       <Path d="M10 14h2" />
     </>
   ),
+  /**
+   * Nib — the reader, as a biro scribble that got up and walked.
+   *
+   * Not a pen and not a sparkle. A sparkle is what every AI product has worn
+   * since 2023, and a pen would be the literal reading of the name; this is
+   * the one shape that could only have come out of a notebook with a red
+   * margin down the side.
+   *
+   * Built to survive 20px on the home button: one blob, two eyes, and an
+   * antenna. The scribble across its middle is the first thing to go at small
+   * sizes and nothing is lost when it does.
+   */
+  nib: (f: string) => (
+    <>
+      <Path d="M12.6 7.6c0-2 .8-3.1 2.1-3.5" />
+      <Circle cx={15.3} cy={3.7} r={1.15} fill={f} />
+      <Path
+        d="M12 7c3.9 0 5.8 3 5.8 6.6 0 3.9-2.3 6.2-5.8 6.2s-5.8-2.3-5.8-6.2C6.2 10 8.1 7 12 7z"
+        fill={f}
+      />
+      <Path d="M8.4 16.5c1-.8 1.9.6 2.9 0s1.9.6 2.9 0 1.3.4 1.7.1" strokeWidth={1.3} />
+      <Circle cx={10} cy={12.4} r={1.2} fill={DETAIL_INK} stroke="none" />
+      <Circle cx={14} cy={12.4} r={1.2} fill={DETAIL_INK} stroke="none" />
+    </>
+  ),
   sprout: (f: string) => (
     <>
       <Path d="M12 21v-8" />

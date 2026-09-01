@@ -253,7 +253,7 @@ export default function HomeScreen() {
         <BouncyPressable
           onPress={() => router.push('/notes/new')}
           style={[styles.actionBtn, styles.actionBtnNib]}>
-          <Icon name="spark" size={20} color="#1A211C" fill="#FFFFFF" />
+          <Icon name="nib" size={22} color="#1A211C" fill="#FFFFFF" />
           <View style={styles.nibText}>
             <Text style={styles.actionLabel}>Ask Nib</Text>
             <Text style={styles.nibSub}>Reads messy notes · needs internet</Text>

@@ -266,7 +266,7 @@ export default function NewNotesScreen() {
                 style={({ pressed }) => [styles.recipeAlt, pressed && styles.pressed]}>
                 <View style={styles.recipeHead}>
                   <Icon
-                    name="spark"
+                    name="nib"
                     size={15}
                     color={onWash.ink}
                     fill={colors.surface}
@@ -350,7 +350,7 @@ export default function NewNotesScreen() {
               <Animated.View entering={FadeInDown.duration(220)} style={styles.reader}>
                 <View style={styles.readerHead}>
                   <View style={styles.readerBadge}>
-                    <Icon name="spark" size={17} color={onWash.ink} strokeWidth={2.2} />
+                    <Icon name="nib" size={19} color={onWash.ink} fill={colors.surface} strokeWidth={2.2} />
                   </View>
                   <Text style={styles.readerTitle}>Nib can read these as they are</Text>
                 </View>
