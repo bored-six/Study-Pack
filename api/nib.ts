@@ -68,14 +68,50 @@ export const WEEKLY_PAGES_WEB = 20;
  * A photo is one page. A pasted page of notes is one page. A PDF is however
  * many pages it really has, counted rather than guessed at.
  */
-const PAGES_FOR_TEXT = 1;
+/**
+ * How much pasted text makes a page.
+ *
+ * Measured rather than guessed. Gemini charges a PDF page about 525 tokens
+ * however little is on it, and pasted text by what it says: a thousand
+ * characters is 180 tokens, ten thousand is 1,772. So a full box of pasted
+ * notes costs about three and a half pages and used to be charged one.
+ *
+ * Three thousand characters lands within a rounding of the measurement at
+ * every size, and it is a number a student can feel: about a page of writing
+ * is about a page of reading.
+ */
+const TEXT_CHARS_PER_PAGE = 3_000;
+
+/** A page at minimum, because nothing sent is still something read. */
+function pagesForText(body: string): number {
+  return Math.max(1, Math.ceil(body.trim().length / TEXT_CHARS_PER_PAGE));
+}
 const PAGES_FOR_IMAGE = 1;
 /**
- * Everyone, every day. The free tier bills nothing, so the worst case here is
- * a used-up quota rather than a bill — but a stranger hammering the endpoint
- * would spend the whole app's quota by lunchtime, and this is what stops that.
+ * Everyone, every day — in pages, the same unit as everything else here.
+ *
+ * It used to count requests, on the reasoning that one call is one call
+ * however little it turned out to be worth. True of hammering, and wrong
+ * about cost: Gemini is paid by the page, so four hundred one-page pastes
+ * and four hundred fifty-page chapters are the same number and fifty times
+ * apart in what they actually spend. A ceiling that cannot tell those apart
+ * is not measuring the thing it exists to protect.
+ *
+ * Three thousand is roughly four times the busiest day a hundred students
+ * would produce, which leaves a real surge alone and still stops a stranger.
  */
-const DAILY_GLOBAL = 400;
+const DAILY_PAGES_GLOBAL = 3_000;
+
+/**
+ * And a request ceiling underneath it, doing the other job.
+ *
+ * Google's free tier counts requests, not pages: fifteen hundred a day. Pages
+ * cannot see that limit — three thousand pages is a thousand requests if they
+ * arrive as chapters and three thousand if they arrive as pastes. So this one
+ * is not a budget at all, it is the wall that keeps us inside Google's, set
+ * below it so a student meets our sentence rather than Google's error code.
+ */
+const DAILY_REQUESTS_GLOBAL = 1_200;
 
 /**
  * The same counting, by where the request came from.
@@ -92,11 +128,13 @@ const DAILY_GLOBAL = 400;
  * and until it is in place this ceiling is what stands in its way.
  *
  * An address is not chosen by the caller, so it survives all of that. It is
- * still not a person — a school or a house shares one — which is why this
- * ceiling is well above what any single student would ever use, and why it is
- * a backstop rather than the allowance itself.
+ * still not a person — a school or a house shares one, which is the whole
+ * reason this number is what it is. Thirty requests a day meant about fifteen
+ * students at one school got through and the rest were refused for nothing
+ * they had done. Four hundred pages is a classroom: eight students taking a
+ * fifty-page chapter each, or a great many pastes.
  */
-const DAILY_PER_ADDRESS = 30;
+const DAILY_PAGES_PER_ADDRESS = 400;
 
 // --- counting that survives ---------------------------------------------
 //
@@ -494,6 +532,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Keys carry their own period, so nothing has to be compared or swept —
   // yesterday's key is simply never asked for again, and expires by itself.
   const globalKey = `nib:all:${today}`;
+  /** The same day, counted the other way — see DAILY_REQUESTS_GLOBAL. */
+  const globalCallsKey = `nib:calls:${today}`;
   const addressKey = `nib:ip:${address}:${today}`;
 
   /**
@@ -532,13 +572,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const [globalUsed, addressUsed, used] = await Promise.all([
+  const [globalPages, globalCalls, addressPages, used] = await Promise.all([
     spent(globalKey),
+    spent(globalCallsKey),
     spent(addressKey),
     spent(weekly),
   ]);
 
-  if (globalUsed >= DAILY_GLOBAL) {
+  // Two ceilings over everyone, measuring two different things: what the day
+  // has cost, and how many times Google has been asked. Either can be the one
+  // that runs out first, depending entirely on whether the day arrived as
+  // chapters or as pastes.
+  if (globalPages >= DAILY_PAGES_GLOBAL || globalCalls >= DAILY_REQUESTS_GLOBAL) {
     res.status(429).json({ reason: 'unavailable', message: 'Nib is resting. Try tomorrow.' });
     return;
   }
@@ -546,7 +591,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Checked before the device allowance, because this is the one a fresh
   // private window cannot reset. The message stays vague on purpose: a
   // stranger probing the endpoint learns nothing about how it is counted.
-  if (addressUsed >= DAILY_PER_ADDRESS) {
+  if (addressPages >= DAILY_PAGES_PER_ADDRESS) {
     res.status(429).json({ reason: 'unavailable', message: 'Nib is resting. Try later.' });
     return;
   }
@@ -570,7 +615,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ? mime === 'application/pdf'
       ? await pdfPages(file as string)
       : PAGES_FOR_IMAGE
-    : PAGES_FOR_TEXT;
+    : pagesForText(notes as string);
 
   const request = {
     method: 'POST',
@@ -740,11 +785,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   await Promise.all([
     charge(weekly, DAY * 8, cost),
-    // The daily ceilings count requests rather than pages: they are there to
-    // stop a stranger hammering the endpoint, and one call is one call
-    // however little it turned out to be worth.
-    charge(addressKey, DAY * 2),
-    charge(globalKey, DAY * 2),
+    // The page ceilings are charged what the reading was worth, exactly as
+    // the student's own week is — a reading that gave nothing back costs
+    // everybody nothing.
+    charge(addressKey, DAY * 2, cost),
+    charge(globalKey, DAY * 2, cost),
+    // The request ceiling is charged the call itself, worth or no worth:
+    // Google counted it either way, and that is the whole thing it tracks.
+    charge(globalCallsKey, DAY * 2),
   ]);
 
   res.status(200).json(answer);

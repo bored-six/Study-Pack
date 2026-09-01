@@ -12,7 +12,7 @@
  * two ever drift, the last test in this file is the one that fails.
  */
 
-import { PAGES_FOR_IMAGE, PAGES_FOR_TEXT, percentOfWeek } from '../aiNotes';
+import { PAGES_FOR_IMAGE, TEXT_CHARS_PER_PAGE, pagesForText, percentOfWeek } from '../aiNotes';
 
 /** Mirrors `cost` in api/nib.ts. */
 function cost(pages: number, questions: number, allowance: number, used: number): number {
@@ -46,9 +46,28 @@ describe('what a reading costs', () => {
     expect(cost(30, 30, WEEK, WEEK)).toBe(0);
   });
 
-  it('prices a photo and a paste at one page', () => {
+  it('prices a photo at one page', () => {
     expect(cost(PAGES_FOR_IMAGE, 9, WEEK, 0)).toBe(1);
-    expect(cost(PAGES_FOR_TEXT, 9, WEEK, 0)).toBe(1);
+  });
+
+  /**
+   * Measured, not assumed: Gemini charges a PDF page about 525 tokens
+   * whatever is on it, a thousand characters of text 180, and ten thousand
+   * 1,772. A full box of pasted notes is therefore worth roughly three and a
+   * half pages, and used to be charged one.
+   */
+  it('prices a paste by how much of it there is', () => {
+    expect(pagesForText('')).toBe(1);
+    expect(pagesForText('a short line')).toBe(1);
+    expect(pagesForText('x'.repeat(TEXT_CHARS_PER_PAGE))).toBe(1);
+    expect(pagesForText('x'.repeat(TEXT_CHARS_PER_PAGE + 1))).toBe(2);
+    // The biggest paste the box will take, against the measurement above.
+    expect(pagesForText('x'.repeat(10_000))).toBe(4);
+  });
+
+  it('still never charges a paste more than the questions it gave', () => {
+    // Four pages of notes that yielded two questions costs two.
+    expect(cost(pagesForText('x'.repeat(10_000)), 2, WEEK, 0)).toBe(2);
   });
 
   it('is never negative, whatever it is given', () => {

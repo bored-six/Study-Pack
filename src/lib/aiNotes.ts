@@ -172,7 +172,24 @@ export const WEEKLY_PAGES = onAndroid ? 150 : 20;
 
 /** A photo is one page. So is a page of pasted notes. */
 export const PAGES_FOR_IMAGE = 1;
-export const PAGES_FOR_TEXT = 1;
+/**
+ * How much pasted text makes a page.
+ *
+ * Measured rather than guessed. Gemini charges a PDF page about 525 tokens
+ * however little is on it, and pasted text by what it says: a thousand
+ * characters is 180 tokens, ten thousand is 1,772. So a full box of pasted
+ * notes costs about three and a half pages and used to be charged one.
+ *
+ * Three thousand characters lands within a rounding of the measurement at
+ * every size, and it is a number a student can feel: about a page of writing
+ * is about a page of reading.
+ */
+export const TEXT_CHARS_PER_PAGE = 3_000;
+
+/** A page at minimum, because nothing sent is still something read. */
+export function pagesForText(body: string): number {
+  return Math.max(1, Math.ceil(body.trim().length / TEXT_CHARS_PER_PAGE));
+}
 
 /**
  * How many pages a PDF really has, read on the phone before anything is sent.
@@ -230,7 +247,7 @@ function base64ToBytes(base64: string): Uint8Array {
 
 /** What a picked file will cost, at most. Null when it cannot be worked out. */
 export async function pagesFor(source: AiSource): Promise<number | null> {
-  if (source.kind === 'text') return PAGES_FOR_TEXT;
+  if (source.kind === 'text') return pagesForText(source.body);
   if (source.mime !== 'application/pdf') return PAGES_FOR_IMAGE;
   return pdfPageCount(source.base64);
 }
