@@ -114,6 +114,15 @@ const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_
 const persistent = Boolean(REDIS_URL && REDIS_TOKEN);
 const fallback = new Map<string, number>();
 
+/**
+ * The memory counter, reachable by name.
+ *
+ * Only ever the fallback — with a store connected nothing reads this. It is
+ * exported so a test can act as the operator does, writing a block straight
+ * into the ledger and then asking the handler what it makes of it.
+ */
+export const __fallbackForTests = fallback;
+
 const DAY = 60 * 60 * 24;
 
 async function redis(command: (string | number)[]): Promise<unknown> {
