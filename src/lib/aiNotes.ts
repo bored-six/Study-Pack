@@ -14,6 +14,9 @@
  * where anyone holding the app can take it out and spend it.
  */
 
+import * as Application from 'expo-application';
+import { Platform } from 'react-native';
+
 import { readSetting, writeSetting } from './db';
 import type { ParsedQuestion } from './noteParser';
 
@@ -114,21 +117,61 @@ const TIMEOUT_MS = 25_000;
 const FILE_TIMEOUT_MS = 90_000;
 
 /**
- * This phone, to the server — a random id, not an identity.
+ * This phone, to the server — a counter's name, not an identity.
  *
- * It exists only so one student's ten readings a week are their own. It is
- * generated here, never derived from anything about the device or the person,
- * and it is on the privacy card because it is the one thing besides the notes
- * that leaves the phone.
+ * It exists for one reason: so that one student's readings are their own, and
+ * so that running out is something a person can do to themselves rather than
+ * to everybody else.
+ *
+ * On Android it is the id the platform already keeps for this app — the same
+ * one after an uninstall and a reinstall, different on every other phone, and
+ * gone only if the device is factory reset. That last part is the whole
+ * point. The id Flipp used to invent for itself lived in the app's own
+ * storage, so deleting the app deleted the count, and the week began again
+ * for anyone who could be bothered to tap twice.
+ *
+ * It never leaves as it is. The server keeps only a keyed hash of it, so what
+ * is stored identifies a counter and cannot be turned back into a device.
+ *
+ * In a browser there is no such id, and nothing kept in a private window
+ * outlives the window. So the browser sends none, the server counts it by
+ * address instead, and the allowance there is one reading rather than ten —
+ * which is the honest shape of the difference, not a punishment.
  */
 const DEVICE_KEY = 'nib_device_id';
 
-async function deviceId(): Promise<string> {
+/** Which of the two allowances this build is asking against. */
+export const onAndroid = Platform.OS === 'android';
+
+/** What a full week looks like here. The copy reads this so it cannot drift. */
+export const WEEKLY_READINGS = onAndroid ? 10 : 1;
+
+/**
+ * The invented id, kept only as a fallback.
+ *
+ * `getAndroidId` has been known to come back empty on an emulator or a
+ * half-provisioned device. A student on one of those should still get their
+ * ten readings, so there is something to fall back to — weaker, because it
+ * dies with the app, but never worse than having no reading at all.
+ */
+async function inventedId(): Promise<string> {
   const saved = await readSetting(DEVICE_KEY);
   if (saved != null && saved.length >= 8) return saved;
   const made = `d${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   await writeSetting(DEVICE_KEY, made);
   return made;
+}
+
+async function deviceId(): Promise<string | null> {
+  if (!onAndroid) return null;
+  try {
+    const android = Application.getAndroidId();
+    if (android != null && android.length >= 8) return android;
+  } catch {
+    // Unavailable on this device. The fallback below still gives the student
+    // a week of their own; it just does not survive a reinstall.
+  }
+  return inventedId();
 }
 
 /**
@@ -144,10 +187,11 @@ async function deviceId(): Promise<string> {
  */
 export async function readWithAI(source: AiSource): Promise<AiReading> {
   const id = await deviceId();
+  const platform = onAndroid ? 'android' : 'web';
   const payload =
     source.kind === 'text'
-      ? { notes: source.body, deviceId: id }
-      : { file: source.base64, mime: source.mime, deviceId: id };
+      ? { notes: source.body, deviceId: id, platform }
+      : { file: source.base64, mime: source.mime, deviceId: id, platform };
 
   const stop = new AbortController();
   // A file takes longer than a paste: it has to be uploaded and then read.

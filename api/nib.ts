@@ -18,6 +18,8 @@
  * of the notes the student actually sent.
  */
 
+import { createHmac } from 'node:crypto';
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
@@ -35,7 +37,22 @@ const MAX_INPUT_CHARS = 10_000;
 const ACCEPTED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 /** 3MB of file, which is about 4MB once base64 has had its way with it. */
 const MAX_FILE_B64 = Math.ceil((3 * 1024 * 1024 * 4) / 3);
+/**
+ * The allowance, and why there are two of them.
+ *
+ * On Android the week is counted against the phone itself, which cannot be
+ * thrown away and remade — so the number can be generous, because the person
+ * holding it is the same person next week.
+ *
+ * In a browser there is nothing of the sort to hold on to. A private window
+ * starts life with no memory and ends it with none, so anything we leave
+ * there is gone by choice at any moment. All that survives is the address the
+ * request came from, and that is shared by a whole school. So the browser
+ * gets one reading: enough to see what Nib does, not enough to be worth
+ * farming, and the honest answer to someone who wants more is the app.
+ */
 const WEEKLY_PER_DEVICE = 10;
+const WEEKLY_PER_WEB = 1;
 /**
  * Everyone, every day. The free tier bills nothing, so the worst case here is
  * a used-up quota rather than a bill — but a stranger hammering the endpoint
@@ -46,10 +63,16 @@ const DAILY_GLOBAL = 400;
 /**
  * The same counting, by where the request came from.
  *
- * The device id is a courtesy, not a lock: it lives in the app's own storage,
- * so a private browsing window or a reinstall invents a fresh one and the
- * weekly allowance starts over. Nothing stored on a machine can stop the
- * person holding that machine.
+ * The device id used to be a courtesy rather than a lock — the app invented
+ * one and kept it in its own storage, so an uninstall threw it away and the
+ * allowance began again. Android hands out an id of its own instead, the same
+ * one every time the app is installed on that phone, and that is what the
+ * week is counted against now. Reinstalling gains nothing; only a factory
+ * reset does, which nobody performs for ten questions.
+ *
+ * What that id still cannot do is prove there is a phone at the other end. A
+ * script can put any string in the field. Play Integrity is what closes that,
+ * and until it is in place this ceiling is what stands in its way.
  *
  * An address is not chosen by the caller, so it survives all of that. It is
  * still not a person — a school or a house shares one — which is why this
@@ -117,6 +140,38 @@ async function charge(key: string, ttl: number): Promise<void> {
     // A reading already happened; failing to write it down is not worth
     // taking away from the student.
   }
+}
+
+/**
+ * Turns whoever is asking into a name for a counter, and nothing else.
+ *
+ * An Android id belongs to a phone, and a phone belongs to a student, so it
+ * is the kind of thing that should never be written down as it arrived. This
+ * runs it through a keyed hash first: the counters still tell one student
+ * from another, but what is stored cannot be turned back into the id, and a
+ * copy of the database is not a list of anybody's devices.
+ *
+ * The salt is a server secret. Changing it forgets every count at once, which
+ * is worth knowing before rotating it mid-week.
+ */
+const ID_SALT = process.env.NIB_ID_SALT ?? 'nib-unsalted';
+
+function fingerprint(value: string): string {
+  return createHmac('sha256', ID_SALT).update(value).digest('hex').slice(0, 32);
+}
+
+/**
+ * One person, turned off, without touching anybody else.
+ *
+ * `SET nib:blocked:<fingerprint> 1` in Redis and that phone stops being
+ * served. There is no TTL on purpose — a block ends when it is deleted.
+ *
+ * A store that cannot be reached reports nothing rather than refusing, for
+ * the same reason the counters do: a broken database must not become a
+ * broken app for everyone who is not blocked.
+ */
+async function blocked(holder: string): Promise<boolean> {
+  return (await spent(`nib:blocked:${holder}`)) > 0;
 }
 
 /** Vercel puts the caller first in x-forwarded-for; everything after is proxies. */
@@ -301,8 +356,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const file: unknown = body.file;
   const mime: unknown = body.mime;
   const deviceId: unknown = body.deviceId;
+  // Anything that is not the app is treated as the browser, which is the
+  // smaller allowance — so a caller lying about this only cheats itself.
+  const onAndroid = body.platform === 'android';
 
-  if (typeof deviceId !== 'string' || deviceId.length < 8) {
+  // The browser has no id worth asking for; Android always has one.
+  if (onAndroid && (typeof deviceId !== 'string' || deviceId.length < 8)) {
     res.status(400).json({ reason: 'unavailable', message: 'Missing device id.' });
     return;
   }
@@ -341,12 +400,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // yesterday's key is simply never asked for again, and expires by itself.
   const globalKey = `nib:all:${today}`;
   const addressKey = `nib:ip:${address}:${today}`;
-  const deviceKey = `nib:dev:${deviceId}:${week}`;
+
+  // Who the week belongs to. On Android that is the phone, which an uninstall
+  // does not change; in a browser there is only the address, which is why the
+  // browser's allowance is one and not ten.
+  const holder = onAndroid
+    ? fingerprint(`dev:${deviceId as string}`)
+    : fingerprint(`ip:${address}`);
+  const allowance = onAndroid ? WEEKLY_PER_DEVICE : WEEKLY_PER_WEB;
+  const weekly = `nib:${onAndroid ? 'dev' : 'web'}:${holder}:${week}`;
+
+  // Asked first, and before any counting: someone who has been turned off
+  // should not be told how many readings they have left.
+  if (await blocked(holder)) {
+    res.status(403).json({ reason: 'unavailable', message: 'Nib is not available on this device.' });
+    return;
+  }
 
   const [globalUsed, addressUsed, used] = await Promise.all([
     spent(globalKey),
     spent(addressKey),
-    spent(deviceKey),
+    spent(weekly),
   ]);
 
   if (globalUsed >= DAILY_GLOBAL) {
@@ -362,11 +436,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  if (used >= WEEKLY_PER_DEVICE) {
+  if (used >= allowance) {
     res.status(429).json({
       reason: 'spent',
       message: 'No readings left this week. They come back Monday.',
-      credits: { left: 0, of: WEEKLY_PER_DEVICE },
+      credits: { left: 0, of: allowance },
     });
     return;
   }
@@ -513,13 +587,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Eight days and two, so a key outlives the period it counts and cannot
   // expire early on somebody mid-week.
   await Promise.all([
-    charge(deviceKey, DAY * 8),
+    charge(weekly, DAY * 8),
     charge(addressKey, DAY * 2),
     charge(globalKey, DAY * 2),
   ]);
 
   res.status(200).json({
     questions: kept,
-    credits: { left: Math.max(0, WEEKLY_PER_DEVICE - (used + 1)), of: WEEKLY_PER_DEVICE },
+    credits: { left: Math.max(0, allowance - (used + 1)), of: allowance },
   });
 }

@@ -19,7 +19,7 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
-import { ACCEPTED_FILE_TYPES, MAX_FILE_BYTES } from '@/lib/aiNotes';
+import { ACCEPTED_FILE_TYPES, MAX_FILE_BYTES, WEEKLY_READINGS } from '@/lib/aiNotes';
 import { LIMITS } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
 import {
@@ -130,7 +130,7 @@ export default function NibScreen() {
   const spent = credits != null && credits.left <= 0;
   const countLine =
     credits == null
-      ? '10 readings a week'
+      ? `${WEEKLY_READINGS} ${WEEKLY_READINGS === 1 ? 'reading' : 'readings'} a week`
       : `${credits.left} of ${credits.of} readings left this week`;
 
   return (

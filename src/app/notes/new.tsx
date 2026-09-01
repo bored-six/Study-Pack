@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { WEEKLY_READINGS } from '@/lib/aiNotes';
 import { readSetting, writeSetting } from '@/lib/db';
 import { NotesHowTo } from '@/components/NotesHowTo';
 import { Icon, type IconName } from '@/components/Icon';
@@ -276,7 +277,7 @@ export default function NewNotesScreen() {
                 </View>
                 <Text style={styles.recipeAltBody}>
                   Paste them anyway and ask Nib — the AI reader. It takes plain paragraphs as
-                  they are. Needs internet, 10 a week; the scan is always free.
+                  they are. Needs internet, {WEEKLY_READINGS} a week; the scan is always free.
                 </Text>
                 <Text style={styles.recipeAltAdd}>paste yours to see it +</Text>
               </Pressable>
@@ -372,7 +373,7 @@ export default function NewNotesScreen() {
                     ? 'Keeping everything the scan already found.'
                     : credits != null
                       ? `${credits.left} of ${credits.of} readings left this week.`
-                      : '10 readings a week. The scan below is always free.'}
+                      : `${WEEKLY_READINGS} ${WEEKLY_READINGS === 1 ? 'reading' : 'readings'} a week. The scan below is always free.`}
                 </Text>
                 {rescueError != null ? (
                   <Text style={styles.readerWarn}>{rescueError}</Text>
