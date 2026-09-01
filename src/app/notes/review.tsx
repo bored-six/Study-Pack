@@ -14,7 +14,6 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
-import type { Credits } from '@/lib/aiNotes';
 import { SKIP_LABEL, type ParsedQuestion, type SkippedLine } from '@/lib/noteParser';
 import { useNotesStore } from '@/store/notes';
 import { candy, font, getColors, outlineOn, radius, shadow, subjectInkFor, useThemeStore } from '@/theme/tokens';
@@ -134,123 +133,48 @@ function QuestionCard({
 }
 
 /**
- * The lines that produced nothing, and the one offer to go back over them.
+ * The lines the scan produced nothing from, and why.
  *
- * The offer lives here rather than on a tab or a screen of its own because
- * this is where the shortfall is already reported — a student meets it at the
- * moment they are looking at what they did not get, and nowhere else.
- *
- * Dumb on purpose: everything it needs arrives as props, so the panel can be
- * driven through all of its states in a test without a store behind it.
+ * It used to carry an offer to read them with Nib. That offer now lives in
+ * two better places — the banner on Add notes, which fires before a scan is
+ * even run, and Nib's own screen. Three doors to one room was two too many,
+ * and this was the wrong one: a student reviewing questions is finishing a
+ * job, not starting another.
  */
-function SkippedPanel({
-  skipped,
-  credits,
-  busy,
-  added,
-  error,
-  canRescue,
-  onRescue,
-}: {
-  skipped: SkippedLine[];
-  credits: Credits | null;
-  busy: boolean;
-  /** Questions the last reading added, or null if none has run. */
-  added: number | null;
-  error: string | null;
-  canRescue: boolean;
-  onRescue: () => void;
-}) {
+function SkippedPanel({ skipped }: { skipped: SkippedLine[] }) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
   const styles = getStyles(colors);
 
   const [open, setOpen] = useState(false);
-
-  // A reading that cleared every skipped line still has something to say, so
-  // the card stays for its own outcome rather than vanishing with the list.
-  if (skipped.length === 0 && added == null && error == null) return null;
-
-  const spent = credits != null && credits.left <= 0;
-  const done = added != null;
-
-  const label = busy
-    ? 'Reading your notes…'
-    : spent
-      ? 'Readings come back Monday'
-      : 'Read these with Nib';
-
-  const countLine =
-    credits == null
-      ? '10 readings a week'
-      : `${credits.left} of ${credits.of} left this week`;
+  if (skipped.length === 0) return null;
 
   return (
     <View style={styles.skipCard}>
-      {skipped.length > 0 ? (
-        <>
-          <Pressable
-            onPress={() => setOpen((v) => !v)}
-            style={({ pressed }) => [styles.skipHead, pressed && styles.pressed]}>
-            <Text style={styles.skipTitle}>
-              Skipped {skipped.length} line{skipped.length === 1 ? '' : 's'}
-            </Text>
-            <Text style={styles.skipToggle}>{open ? 'Hide' : 'Show'}</Text>
-          </Pressable>
-          {open ? (
-            <View style={styles.skipList}>
-              {skipped.map((line, i) => (
-                <View key={`${i}-${line.text}`} style={styles.skipRow}>
-                  <Text style={styles.skipText} numberOfLines={2}>
-                    "{line.text}"
-                  </Text>
-                  <Text style={styles.skipReason}>{SKIP_LABEL[line.reason]}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.skipHint}>
-              These didn't have a clear fact to test — tap Show to see them.
-            </Text>
-          )}
-        </>
-      ) : null}
-
-      {canRescue ? (
-        <View style={[styles.rescue, skipped.length === 0 && styles.rescueAlone]}>
-          {done ? (
-            // Read once per draft: asking again reads the same notes and
-            // spends a second reading to hand back what is already on screen.
-            <View style={styles.rescueNote}>
-              <Icon name="check" size={17} color={colors.leaf} strokeWidth={2.6} />
-              <Text style={styles.rescueNoteText}>
-                {added === 0
-                  ? 'Nothing more to pull out of these notes.'
-                  : `Added ${added} question${added === 1 ? '' : 's'}.`}
-                {credits != null ? ` ${credits.left} of ${credits.of} left this week.` : ''}
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        style={({ pressed }) => [styles.skipHead, pressed && styles.pressed]}>
+        <Text style={styles.skipTitle}>
+          Skipped {skipped.length} line{skipped.length === 1 ? '' : 's'}
+        </Text>
+        <Text style={styles.skipToggle}>{open ? 'Hide' : 'Show'}</Text>
+      </Pressable>
+      {open ? (
+        <View style={styles.skipList}>
+          {skipped.map((line, i) => (
+            <View key={`${i}-${line.text}`} style={styles.skipRow}>
+              <Text style={styles.skipText} numberOfLines={2}>
+                "{line.text}"
               </Text>
+              <Text style={styles.skipReason}>{SKIP_LABEL[line.reason]}</Text>
             </View>
-          ) : (
-            <>
-              <ChunkyButton
-                label={label}
-                icon={busy ? 'pencil' : spent ? 'clock' : 'nib'}
-                variant="soft"
-                size="sm"
-                disabled={busy || spent}
-                onPress={onRescue}
-              />
-              <Text style={styles.rescueCount}>{countLine}</Text>
-              {error != null ? (
-                <View style={[styles.rescueNote, styles.rescueNoteWarn]}>
-                  <Icon name="alert" size={17} color={colors.coral} strokeWidth={2.6} />
-                  <Text style={[styles.rescueNoteText, styles.rescueNoteTextWarn]}>{error}</Text>
-                </View>
-              ) : null}
-            </>
-          )}
+          ))}
         </View>
-      ) : null}
+      ) : (
+        <Text style={styles.skipHint}>
+          These didn't have a clear fact to test — tap Show to see them.
+        </Text>
+      )}
     </View>
   );
 }
@@ -272,12 +196,6 @@ export default function ReviewNotesScreen() {
     removeDraftQuestion,
     saveDraft,
     clearDraft,
-    source,
-    rescue,
-    rescuing,
-    rescueAdded,
-    rescueError,
-    credits,
   } = useNotesStore();
   const [saving, setSaving] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -419,19 +337,7 @@ export default function ReviewNotesScreen() {
             </View>
           </View>
         }
-        ListFooterComponent={
-          <SkippedPanel
-            skipped={stats.skipped}
-            credits={credits}
-            busy={rescuing}
-            added={rescueAdded}
-            error={rescueError}
-            canRescue={source != null}
-            onRescue={() => {
-              void rescue();
-            }}
-          />
-        }
+        ListFooterComponent={<SkippedPanel skipped={stats.skipped} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={styles.emptyBadge}>
