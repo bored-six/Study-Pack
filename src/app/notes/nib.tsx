@@ -1,7 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -19,7 +19,7 @@ import { ChunkyButton } from '@/components/ChunkyButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { Icon } from '@/components/Icon';
 import { RuledPaper, Squiggle, Tape } from '@/components/notebook';
-import { ACCEPTED_FILE_TYPES, MAX_FILE_BYTES, WEEKLY_READINGS } from '@/lib/aiNotes';
+import { ACCEPTED_FILE_TYPES, MAX_FILE_BYTES, WEEKLY_READINGS, newAttempt } from '@/lib/aiNotes';
 import { LIMITS } from '@/lib/noteParser';
 import { playSfx } from '@/lib/sfx';
 import { useNotesStore } from '@/store/notes';
@@ -122,7 +122,25 @@ export default function NibScreen() {
   const [writing, setWriting] = useState(false);
   const [body, setBody] = useState('');
   const [finished, setFinished] = useState<Finished | null>(null);
+  /**
+   * A reading that started and did not come back.
+   *
+   * Kept apart from `problem`, which is a modal, because a modal on top of an
+   * interruption is a second interruption. This one stays on the page with
+   * the file still taped to it, so the way back is one press rather than
+   * finding the document again.
+   */
+  const [cutOff, setCutOff] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  /**
+   * The name this try goes by.
+   *
+   * Kept across a retry on purpose: the server hands back a reading already
+   * made under the same name instead of making — and charging for — a second
+   * one. Minted fresh whenever the notes change, because different notes are
+   * a different reading and should cost what a reading costs.
+   */
+  const attempt = useRef(newAttempt());
 
   const over = body.length > LIMITS.maxInputChars;
   const counter = useMemo(
@@ -162,6 +180,7 @@ export default function NibScreen() {
       }
 
       playSfx('derp_pop');
+      attempt.current = newAttempt();
       setPicked({
         base64: await file.base64(),
         mime: asset.mimeType ?? 'application/pdf',
@@ -176,16 +195,27 @@ export default function NibScreen() {
   }, []);
 
   const send = useCallback(() => {
+    setCutOff(null);
     const run = async () => {
       const staged = picked
-        ? await readFile({ base64: picked.base64, mime: picked.mime, name: picked.name })
-        : await scanWithReader(body);
+        ? await readFile(
+            { base64: picked.base64, mime: picked.mime, name: picked.name },
+            attempt.current
+          )
+        : await scanWithReader(body, attempt.current);
 
       if (staged === 0) {
-        setProblem(
-          useNotesStore.getState().rescueError ??
+        // Two very different failures wearing the same zero. A reading that
+        // never arrived says nothing about the notes, and must not be
+        // reported as though it did.
+        const failed = useNotesStore.getState().rescueError;
+        if (failed != null) {
+          setCutOff(failed);
+        } else {
+          setProblem(
             "I couldn't find anything in there worth testing. Try a page with more facts on it?"
-        );
+          );
+        }
         return;
       }
       // Held, not navigated. He has something to say first.
@@ -195,7 +225,19 @@ export default function NibScreen() {
     void run();
   }, [body, picked, readFile, scanWithReader]);
 
+  /**
+   * Typing makes it a different reading, so it stops being the same attempt.
+   * Without this, editing the notes after a failure and asking again would
+   * hand back the reading of what was there before.
+   */
+  const changeBody = useCallback((next: string) => {
+    attempt.current = newAttempt();
+    setBody(next);
+  }, []);
+
   const takeBack = useCallback(() => {
+    attempt.current = newAttempt();
+    setCutOff(null);
     setPicked(null);
     setWriting(false);
     setBody('');
@@ -203,6 +245,8 @@ export default function NibScreen() {
 
   const idle = finished == null && !rescuing;
   const empty = picked == null && !writing;
+  /** While the interruption is on screen it owns the reply and the button. */
+  const interrupted = idle && cutOff != null;
 
   return (
     <KeyboardAvoidingView
@@ -294,7 +338,7 @@ export default function NibScreen() {
               </Animated.View>
             ) : null}
 
-            {idle && !spent && !empty ? (
+            {idle && !spent && !empty && !interrupted ? (
               <Wrote>
                 {picked
                   ? 'Right, let me have a look.\nI’ll mix it up: some choices, some\nfill-the-blanks, and lists where\nyou’ve written lists.'
@@ -310,6 +354,52 @@ export default function NibScreen() {
                 long one. Stay here if you like,{'\n'}
                 I don&apos;t mind an audience.
               </Wrote>
+            ) : null}
+
+            {/* --- cut off mid-sentence ---------------------------------- */}
+            {interrupted ? (
+              <Animated.View entering={FadeInDown.duration(200)} style={styles.content}>
+                <View style={styles.wrote}>
+                  <View style={styles.who}>
+                    <Icon name="nib" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={2.1} />
+                  </View>
+                  <View style={styles.flex}>
+                    {/*
+                      He stops mid-word. A sentence that runs out is the one
+                      thing on a page of handwriting that unmistakably means
+                      "interrupted" — no icon has to say it.
+                    */}
+                    <Text style={styles.hand}>
+                      Reading it now… I was about{'\n'}
+                      half way through when the li
+                      <Text style={styles.trail}>—</Text>
+                    </Text>
+                    <Squiggle width={62} style={styles.scrawl} />
+                  </View>
+                </View>
+
+                <View style={styles.torn}>
+                  <Icon name="alert" size={17} color={onWash.ink} strokeWidth={2.5} />
+                  <View style={styles.tornText}>
+                    <Text style={styles.tornTitle}>The line went.</Text>
+                    <Text style={styles.tornBody}>
+                      {cutOff}
+                      {picked != null
+                        ? ' Your file is still here — nothing to find again.'
+                        : ' Everything you wrote is still below.'}
+                    </Text>
+                  </View>
+                </View>
+
+                <ChunkyButton
+                  label="Ask him again"
+                  icon="nib"
+                  size="lg"
+                  disabled={!ready}
+                  onPress={send}
+                  style={styles.cta}
+                />
+              </Animated.View>
             ) : null}
 
             {/* --- finished: he says so, and waits ----------------------- */}
@@ -398,7 +488,7 @@ export default function NibScreen() {
                 <View style={styles.padWrap}>
                   <TextInput
                     value={body}
-                    onChangeText={setBody}
+                    onChangeText={changeBody}
                     placeholder={'Paste a paragraph, a page of\nlecture notes, a list of terms…'}
                     placeholderTextColor={colors.textFaint}
                     style={styles.pad}
@@ -411,7 +501,7 @@ export default function NibScreen() {
             ) : null}
 
             {/* --- the one button ---------------------------------------- */}
-            {(idle && !empty) || rescuing ? (
+            {((idle && !empty && !interrupted) || rescuing) ? (
               <ChunkyButton
                 label={rescuing ? 'Nib is reading…' : spent ? 'Back Monday' : 'Read it'}
                 icon={rescuing ? 'pencil' : spent ? 'clock' : 'nib'}
@@ -420,10 +510,6 @@ export default function NibScreen() {
                 onPress={send}
                 style={styles.cta}
               />
-            ) : null}
-
-            {rescueError != null && idle ? (
-              <Text style={styles.warn}>{rescueError}</Text>
             ) : null}
 
             <Text style={styles.footnote}>
@@ -514,6 +600,32 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
     },
     whoSleep: { backgroundColor: colors.disabledBg },
     hand: { flex: 1, fontFamily: font.hero, fontSize: 17, lineHeight: RULE, color: colors.text },
+
+    /** The dash his pen left when the sentence stopped. */
+    trail: { color: colors.coral },
+    /** And the scrawl the nib made on its way off the line. */
+    scrawl: { marginTop: -6, marginLeft: 2, opacity: 0.55 },
+
+    torn: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      backgroundColor: colors.coralWash,
+      ...outlineOn(colors),
+      ...derpRadius,
+      paddingVertical: 11,
+      paddingHorizontal: 12,
+      transform: [{ rotate: '0.4deg' }],
+      ...shadow.card,
+    },
+    tornText: { flex: 1, gap: 2 },
+    tornTitle: { fontFamily: font.heading, fontSize: 14.5, color: onWash.ink },
+    tornBody: {
+      fontFamily: font.body,
+      fontSize: 12.5,
+      lineHeight: 17.5,
+      color: onWash.dim,
+    },
 
     mine: { alignItems: 'flex-end' },
     taped: {

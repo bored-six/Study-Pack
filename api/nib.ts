@@ -127,6 +127,43 @@ async function spent(key: string): Promise<number> {
   }
 }
 
+/**
+ * What a finished reading was, kept under the attempt that produced it.
+ *
+ * The charge happens here and the answer travels back over the network, so
+ * there is a moment where a student has paid and has nothing: the reading
+ * worked, the reply was lost. Asking again would ordinarily cost a second.
+ *
+ * So an attempt carries an id, a retry reuses it, and a reading already done
+ * under that id is handed back from here — free, and identical. It is the
+ * only thing that makes "nothing was used up" true rather than hopeful.
+ */
+const HOUR = 60 * 60;
+
+async function recall(key: string): Promise<unknown | null> {
+  if (!persistent) return fallbackResults.get(key) ?? null;
+  try {
+    const value = await redis(['GET', key]);
+    return typeof value === 'string' ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function remember(key: string, value: unknown): Promise<void> {
+  if (!persistent) {
+    fallbackResults.set(key, value);
+    return;
+  }
+  try {
+    await redis(['SET', key, JSON.stringify(value), 'EX', HOUR]);
+  } catch {
+    // Worst case the retry costs a reading, which is where we were before.
+  }
+}
+
+const fallbackResults = new Map<string, unknown>();
+
 /** Adds one, and gives the key a life just past the period it counts. */
 async function charge(key: string, ttl: number): Promise<void> {
   if (!persistent) {
@@ -401,6 +438,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const globalKey = `nib:all:${today}`;
   const addressKey = `nib:ip:${address}:${today}`;
 
+  /**
+   * The same attempt asked twice.
+   *
+   * Handed back before any limit is looked at, let alone charged: a student
+   * whose connection died holding the answer is not over their allowance,
+   * they are owed the thing they already paid for. Scoped to the address so
+   * one caller cannot replay another's id.
+   */
+  const attempt = typeof body.attempt === 'string' ? body.attempt.slice(0, 64) : null;
+  const attemptKey =
+    attempt && attempt.length >= 8 ? `nib:try:${fingerprint(`${address}:${attempt}`)}` : null;
+
+  if (attemptKey) {
+    const already = await recall(attemptKey);
+    if (already != null) {
+      res.status(200).json(already);
+      return;
+    }
+  }
+
   // Who the week belongs to. On Android that is the phone, which an uninstall
   // does not change; in a browser there is only the address, which is why the
   // browser's allowance is one and not ten.
@@ -586,14 +643,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // reading that failed on the way here has cost the student nothing.
   // Eight days and two, so a key outlives the period it counts and cannot
   // expire early on somebody mid-week.
+  const answer = {
+    questions: kept,
+    credits: { left: Math.max(0, allowance - (used + 1)), of: allowance },
+  };
+
+  // Remembered before it is charged, never after. Getting this order wrong
+  // the other way round means a write that fails leaves a charge with no
+  // record of what it bought, and the retry pays for the same reading twice.
+  if (attemptKey) await remember(attemptKey, answer);
+
   await Promise.all([
     charge(weekly, DAY * 8),
     charge(addressKey, DAY * 2),
     charge(globalKey, DAY * 2),
   ]);
 
-  res.status(200).json({
-    questions: kept,
-    credits: { left: Math.max(0, allowance - (used + 1)), of: allowance },
-  });
+  res.status(200).json(answer);
 }

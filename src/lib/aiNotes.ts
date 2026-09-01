@@ -34,6 +34,21 @@ export type AiSource =
   | { kind: 'text'; body: string }
   | { kind: 'file'; base64: string; mime: string; name: string };
 
+/**
+ * One try at one thing, named.
+ *
+ * The server charges when the reading is made and the answer then travels
+ * back, so a connection that dies in between leaves a student paid up with
+ * nothing to show. Asking again under the same name gets that reading handed
+ * back for free instead of buying it twice — which is the only reason the
+ * app is allowed to say nothing was used up.
+ *
+ * A new one is minted for new notes; a retry keeps the old one.
+ */
+export function newAttempt(): string {
+  return `a${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+
 /** What Nib can open. Anything else is refused before the upload starts. */
 export const ACCEPTED_FILE_TYPES = [
   'application/pdf',
@@ -185,13 +200,13 @@ async function deviceId(): Promise<string | null> {
  *      app never counts a reading itself, so a request that dies on the way
  *      home cannot cost a student anything.
  */
-export async function readWithAI(source: AiSource): Promise<AiReading> {
+export async function readWithAI(source: AiSource, attempt?: string): Promise<AiReading> {
   const id = await deviceId();
   const platform = onAndroid ? 'android' : 'web';
   const payload =
     source.kind === 'text'
-      ? { notes: source.body, deviceId: id, platform }
-      : { file: source.base64, mime: source.mime, deviceId: id, platform };
+      ? { notes: source.body, deviceId: id, platform, attempt }
+      : { file: source.base64, mime: source.mime, deviceId: id, platform, attempt };
 
   const stop = new AbortController();
   // A file takes longer than a paste: it has to be uploaded and then read.

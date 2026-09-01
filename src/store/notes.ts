@@ -63,7 +63,7 @@ interface NotesState {
    * The parse still runs first and its questions are still kept: a reading
    * that fails leaves the student exactly where pressing Scan would have.
    */
-  scanWithReader: (raw: string) => Promise<number>;
+  scanWithReader: (raw: string, attempt?: string) => Promise<number>;
   /**
    * Reads a PDF or a photo and stages what comes back.
    *
@@ -72,7 +72,10 @@ interface NotesState {
    * one has no offline half. It returns how many questions are staged, and
    * zero means the failure is in `rescueError`.
    */
-  readFile: (file: { base64: string; mime: string; name: string }) => Promise<number>;
+  readFile: (
+    file: { base64: string; mime: string; name: string },
+    attempt?: string
+  ) => Promise<number>;
   /**
    * Asks the reader to make questions from the lines the parser skipped, and
    * merges what comes back into the draft under review.
@@ -80,7 +83,7 @@ interface NotesState {
    * Never replaces the parse. On any failure the draft is exactly as it was —
    * the parser's work is not something a dropped connection can take away.
    */
-  rescue: () => Promise<void>;
+  rescue: (attempt?: string) => Promise<void>;
   /** Options already saved in a subject, to borrow wrong answers from. */
   poolFor: (deckId: string) => Promise<string[]>;
   /**
@@ -142,10 +145,10 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     return result;
   },
 
-  readFile: async (file) => {
+  readFile: async (file, attempt) => {
     set({ rescuing: true, rescueError: null, rescueAdded: null });
     try {
-      const reading = await readWithAI({ kind: 'file', ...file });
+      const reading = await readWithAI({ kind: 'file', ...file }, attempt);
       const questions = reading.questions.slice(0, LIMITS.maxQuestions);
       set({
         draft: questions,
@@ -171,22 +174,22 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     }
   },
 
-  scanWithReader: async (raw) => {
+  scanWithReader: async (raw, attempt) => {
     get().parse(raw);
     // rescue() reports failure through state rather than throwing, so the
     // parser's questions survive a reading that never arrives.
-    await get().rescue();
+    await get().rescue(attempt);
     return get().draft.length;
   },
 
-  rescue: async () => {
+  rescue: async (attempt) => {
     const { source, draft, stats, rescuing } = get();
     // Nothing to send, nowhere to put it, or one already in flight.
     if (rescuing || source == null || stats == null) return;
 
     set({ rescuing: true, rescueError: null });
     try {
-      const reading = await readWithAI({ kind: 'text', body: source });
+      const reading = await readWithAI({ kind: 'text', body: source }, attempt);
 
       // Keep every question the parser built. Only genuinely new answers are
       // appended — deduped against the draft *and* within the reading itself,
