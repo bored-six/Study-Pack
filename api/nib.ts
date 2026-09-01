@@ -146,7 +146,9 @@ interface Question {
   correctAnswer: string;
   wrongAnswers: string[];
   sourceLine: string;
-  kind: 'definition' | 'cloze';
+  kind: 'definition' | 'cloze' | 'enumeration';
+  items?: string[];
+  ordered?: boolean;
 }
 
 const QUESTION_SHAPE = {
@@ -156,7 +158,11 @@ const QUESTION_SHAPE = {
     correctAnswer: { type: 'string' },
     wrongAnswers: { type: 'array', items: { type: 'string' } },
     sourceLine: { type: 'string' },
-    kind: { type: 'string', enum: ['definition', 'cloze'] },
+    kind: { type: 'string', enum: ['definition', 'cloze', 'enumeration'] },
+    /** Enumeration only: every item in the list. */
+    items: { type: 'array', items: { type: 'string' } },
+    /** Enumeration only: true when the order is part of the answer. */
+    ordered: { type: 'boolean' },
   },
   required: ['prompt', 'correctAnswer', 'wrongAnswers', 'sourceLine', 'kind'],
 } as const;
@@ -207,7 +213,39 @@ Rules, in order of importance:
    result. Do not ask about the wording of the sentence itself.
 6. One question per fact. Do not ask the same thing twice.
 7. If a line has no testable fact in it, skip it. Returning fewer good
-   questions is always better than padding with weak ones.`;
+   questions is always better than padding with weak ones.
+
+THE THREE KINDS, AND WHY THEY MATTER
+
+A question is sat in one of seven exam formats, and which ones it can be
+depends entirely on the "kind" you give it. Write a mixture — a paper made
+of nothing but one kind is a duller paper.
+
+"definition" — a question you have written, with a short answer.
+  "prompt" is a real question ending in "?".
+  Becomes: multiple choice, identification, true/false, matching.
+  Use for: a term and its meaning, a cause, a name, a number.
+
+"cloze" — the sentence from the notes with one word taken out.
+  "prompt" MUST be the sentence with the missing word replaced by exactly
+  six underscores: ______
+  "correctAnswer" is the word that was taken out. Prefer ONE word — a
+  one-word answer unlocks a format a two-word answer cannot.
+  Becomes: multiple choice, fill in the blank, true/false, and — only with a
+  one-word answer — modified true/false.
+  Example prompt: "Osmosis is the movement of ______ across a membrane."
+
+"enumeration" — a list the notes give as a list.
+  "prompt" asks for the list ("Name the three states of matter.").
+  "items" holds every item, between three and six of them.
+  "ordered" is true only when the order is part of the answer (a sequence,
+  a ranking); false for a set.
+  "correctAnswer" is the first item, "wrongAnswers" can be empty.
+  Becomes: enumeration.
+  Only use this where the notes actually list things. Never invent a list.
+
+Aim for roughly half definitions, a third cloze, and enumerations wherever
+the notes genuinely list something.`;
 
 /** Added when the notes arrive as a file rather than as typed text. */
 const FILE_INSTRUCTIONS = `
@@ -406,7 +444,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   );
 
   const answers = new Set<string>();
-  const kept = [];
+  const kept: Record<string, unknown>[] = [];
 
   for (const q of payload.questions ?? []) {
     if (kept.length >= MAX_QUESTIONS) break;
@@ -425,6 +463,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const key = correct.toLowerCase();
     if (answers.has(key)) continue;
 
+    const prompt = q.prompt.trim();
+
+    // An enumeration carries its whole list in `answers` instead of decoys.
+    // Three to six is what the app's grid is built for.
+    if (q.kind === 'enumeration') {
+      const items = (Array.isArray(q.items) ? q.items : [])
+        .map((a) => String(a).trim())
+        .filter((a) => a.length > 0);
+      if (items.length < 3 || items.length > 6) continue;
+      answers.add(key);
+      kept.push({
+        prompt,
+        correctAnswer: items[0],
+        answers: items,
+        kind: 'enumeration',
+        ordered: q.ordered === true,
+        sourceLine:
+          corpus.split('\n').find((line) => normalize(line) === quoted)?.trim() ?? null,
+      });
+      continue;
+    }
+
+    // A cloze without a blank in it is just a sentence, and loses the two
+    // formats it exists for. Six underscores is what the app looks for.
+    if (q.kind === 'cloze' && !/_{6,}/.test(prompt)) continue;
+
     const wrong = (Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [])
       .map((a) => String(a).trim())
       .filter((a) => a.length > 0 && a.toLowerCase() !== key);
@@ -433,7 +497,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     answers.add(key);
     kept.push({
-      prompt: q.prompt.trim(),
+      prompt,
       correctAnswer: correct,
       answers: shuffle([correct, ...wrong.slice(0, 3)]),
       kind: q.kind === 'cloze' ? 'cloze' : 'definition',
