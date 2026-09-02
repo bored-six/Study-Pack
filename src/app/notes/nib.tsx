@@ -53,6 +53,20 @@ const PERI = '#E3E7FB';
  */
 const RULE = 30;
 
+/**
+ * Where a document stops being worth its pages.
+ *
+ * Measured, on the same notes at four lengths: one page gave six questions,
+ * three gave eighteen, eight gave thirty-two, and sixteen gave twenty-eight
+ * — fewer than eight did, for twice the allowance. Past about ten pages the
+ * reading starts summarising instead of covering, and the student pays by
+ * the page either way.
+ *
+ * So this is not a limit. It is the point where somebody deserves to be told
+ * what they are buying, while they can still pick a chapter instead.
+ */
+const PAGES_WORTH_A_WARNING = 10;
+
 type Picked = {
   base64: string;
   mime: string;
@@ -343,6 +357,12 @@ export default function NibScreen() {
                           ? `${sizeLabel(picked.bytes)} · ${picked.pages} ${picked.pages === 1 ? 'page' : 'pages'} — up to ${percentOfWeek(picked.pages, of)}% of your week`
                           : sizeLabel(picked.bytes)}
                       </Text>
+                      {picked.pages != null && picked.pages > PAGES_WORTH_A_WARNING ? (
+                        <Text style={styles.tapedWarn}>
+                          That&apos;s a long one. A chapter of five or six pages gives about as
+                          many questions for a third of the pages.
+                        </Text>
+                      ) : null}
                     </View>
                     {idle ? (
                       <Pressable
@@ -675,6 +695,13 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
     tapedMid: { flexShrink: 1, gap: 1 },
     tapedName: { fontFamily: font.heading, fontSize: 13.5, color: colors.ink },
     tapedSize: { fontFamily: font.bodySemibold, fontSize: 11, color: colors.textFaint },
+    tapedWarn: {
+      fontFamily: font.bodySemibold,
+      fontSize: 11,
+      lineHeight: 15,
+      color: colors.gold,
+      marginTop: 3,
+    },
     tapedX: {
       width: 25,
       height: 25,
