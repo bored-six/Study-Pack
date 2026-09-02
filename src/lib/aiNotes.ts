@@ -168,7 +168,11 @@ export const onAndroid = Platform.OS === 'android';
  * a student spend their week how they like — sixty short pastes, or one long
  * chapter — instead of being handed ten of somebody else's idea of a reading.
  */
-export const WEEKLY_PAGES = onAndroid ? 150 : 20;
+export const WEEKLY_PAGES_DEVICE = 150;
+export const WEEKLY_PAGES_WEB = 20;
+
+/** Whichever of the two this build is actually asking against. */
+export const WEEKLY_PAGES = onAndroid ? WEEKLY_PAGES_DEVICE : WEEKLY_PAGES_WEB;
 
 /** A photo is one page. So is a page of pasted notes. */
 export const PAGES_FOR_IMAGE = 1;
@@ -243,6 +247,68 @@ function base64ToBytes(base64: string): Uint8Array {
     }
   }
   return out.subarray(0, at);
+}
+
+/** The name a file goes by, when the picker will not say what it is. */
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  pdf: 'application/pdf',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heic',
+};
+
+/**
+ * What a file really is, read from its first bytes.
+ *
+ * The last resort, and the only one that cannot be lied to: a name can be
+ * anything and a picker can say nothing, but a PDF still opens with %PDF and
+ * a PNG still opens with its own eight bytes.
+ */
+function sniffType(base64: string): string | null {
+  // Sixty-four base64 characters is forty-eight bytes, which is far more than
+  // any of these signatures needs and still costs nothing to decode.
+  const head = base64ToBytes(base64.slice(0, 64));
+  const at = (offset: number, ...bytes: number[]): boolean =>
+    bytes.every((b, i) => head[offset + i] === b);
+
+  if (at(0, 0x25, 0x50, 0x44, 0x46)) return 'application/pdf';
+  if (at(0, 0x89, 0x50, 0x4e, 0x47)) return 'image/png';
+  if (at(0, 0xff, 0xd8, 0xff)) return 'image/jpeg';
+  if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return 'image/webp';
+
+  // An ISO container: `ftyp` at four, then the brand that says which kind.
+  // Checked rather than assumed, because a video file has the same box there
+  // and must not be sent to the reader as though it were a photo.
+  if (at(4, 0x66, 0x74, 0x79, 0x70)) {
+    const brand = String.fromCharCode(head[8], head[9], head[10], head[11]);
+    if (['heic', 'heix', 'heim', 'heis', 'hevc', 'mif1', 'msf1'].includes(brand)) {
+      return 'image/heic';
+    }
+  }
+  return null;
+}
+
+/**
+ * What kind of file this is, asked three ways.
+ *
+ * The picker is asked first and is usually right. But some Android providers
+ * hand back a file with no type at all, and the old code answered that by
+ * assuming PDF — so a photo went to the reader labelled as a document, Google
+ * refused it, and the student was told only that the reader could not be
+ * reached. Guessing wrong is worse than not guessing, which is why this ends
+ * at null and the caller says so plainly.
+ */
+export function fileType(
+  name: string,
+  reported: string | null | undefined,
+  base64: string
+): string | null {
+  if (reported != null && ACCEPTED_FILE_TYPES.includes(reported)) return reported;
+  const extension = name.toLowerCase().split('.').pop() ?? '';
+  return TYPE_BY_EXTENSION[extension] ?? sniffType(base64);
 }
 
 /** What a picked file will cost, at most. Null when it cannot be worked out. */

@@ -23,6 +23,7 @@ import {
   ACCEPTED_FILE_TYPES,
   MAX_FILE_BYTES,
   WEEKLY_PAGES,
+  fileType,
   newAttempt,
   pdfPageCount,
   percentOfWeek,
@@ -208,10 +209,19 @@ export default function NibScreen() {
         return;
       }
 
+      const base64 = await file.base64();
+      // Asked of the picker, then of the name, then of the bytes themselves.
+      // It used to assume PDF when the picker said nothing, which sent photos
+      // to the reader labelled as documents and got them refused — and all
+      // the student was told was that the reader could not be reached.
+      const mime = fileType(asset.name, asset.mimeType, base64);
+      if (mime == null) {
+        setProblem("I can't tell what kind of file that is. A PDF or a photo?");
+        return;
+      }
+
       playSfx('derp_pop');
       attempt.current = newAttempt();
-      const base64 = await file.base64();
-      const mime = asset.mimeType ?? 'application/pdf';
       // Counted here so the cost can be said while the student can still
       // change their mind. The server counts it again, and that one is what
       // is charged — a wrong number here is a wrong sentence, never a bill.

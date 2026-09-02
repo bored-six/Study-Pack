@@ -19,14 +19,20 @@ function cost(pages: number, questions: number, allowance: number, used: number)
   return questions === 0 ? 0 : Math.min(pages, questions, Math.max(0, allowance - used));
 }
 
-const WEEK = 60;
+/**
+ * A week to do the arithmetic against. The size is not the point here — these
+ * are checks on the shape of the rule, and they hold at any budget. That the
+ * number matches the real one is guarded in api/__tests__/nibCharging, where
+ * the client and server constants are compared directly.
+ */
+const WEEK = 150;
 
 describe('what a reading costs', () => {
   it('charges nothing at all when nothing came back', () => {
     expect(cost(30, 0, WEEK, 0)).toBe(0);
     expect(cost(1, 0, WEEK, 0)).toBe(0);
     // The bug this file exists for: a full page taken for an empty answer.
-    expect(cost(1, 0, WEEK, 59)).toBe(0);
+    expect(cost(1, 0, WEEK, WEEK - 1)).toBe(0);
   });
 
   it('never charges more pages than questions it gave back', () => {
@@ -42,7 +48,7 @@ describe('what a reading costs', () => {
   });
 
   it('cannot push a week below zero', () => {
-    expect(cost(30, 30, WEEK, 58)).toBe(2);
+    expect(cost(30, 30, WEEK, WEEK - 2)).toBe(2);
     expect(cost(30, 30, WEEK, WEEK)).toBe(0);
   });
 
@@ -73,7 +79,7 @@ describe('what a reading costs', () => {
   it('is never negative, whatever it is given', () => {
     for (const pages of [0, 1, 7, 60, 500]) {
       for (const questions of [0, 1, 50]) {
-        for (const used of [0, 30, 60, 99]) {
+        for (const used of [0, 30, WEEK, WEEK + 39]) {
           expect(cost(pages, questions, WEEK, used)).toBeGreaterThanOrEqual(0);
         }
       }
@@ -83,8 +89,8 @@ describe('what a reading costs', () => {
 
 describe('the week as a percentage', () => {
   it('reads full at full and empty at empty', () => {
-    expect(percentOfWeek(60, 60)).toBe(100);
-    expect(percentOfWeek(0, 60)).toBe(0);
+    expect(percentOfWeek(WEEK, WEEK)).toBe(100);
+    expect(percentOfWeek(0, WEEK)).toBe(0);
   });
 
   it('rounds a real slice to something a student can act on', () => {

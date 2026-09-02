@@ -11,9 +11,12 @@
 
 import { PDFDocument } from 'pdf-lib';
 
-import { WEEKLY_PAGES_DEVICE, WEEKLY_PAGES_WEB } from '../nib';
+import {
+  WEEKLY_PAGES_DEVICE as CLIENT_DEVICE,
+  WEEKLY_PAGES_WEB as CLIENT_WEB,
+} from '../../src/lib/aiNotes';
 
-import handler, { __fallbackForTests } from '../nib';
+import handler, { WEEKLY_PAGES_DEVICE, WEEKLY_PAGES_WEB, __fallbackForTests } from '../nib';
 
 type Body = Record<string, unknown>;
 
@@ -180,6 +183,21 @@ describe('what the week costs', () => {
     await ask({ notes: NOTES, deviceId: mine, platform: 'android' });
     const yours = await ask({ notes: NOTES, deviceId: nextPhone(), platform: 'android' });
     expect(yours.credits?.left).toBe(WEEKLY_PAGES_DEVICE - 1);
+  });
+});
+
+describe('the two budgets agree', () => {
+  it('offers the app what the app says it offers', () => {
+    // The screen shows this number before the server has said anything, so a
+    // client that disagrees with the server tells a student a figure their
+    // first reading then contradicts.
+    expect(CLIENT_DEVICE).toBe(WEEKLY_PAGES_DEVICE);
+    expect(CLIENT_WEB).toBe(WEEKLY_PAGES_WEB);
+  });
+
+  it('keeps the browser well under the app', () => {
+    expect(WEEKLY_PAGES_WEB).toBeLessThan(WEEKLY_PAGES_DEVICE);
+    expect(WEEKLY_PAGES_WEB).toBeGreaterThan(0);
   });
 });
 
