@@ -25,10 +25,18 @@ import { PDFDocument } from 'pdf-lib';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
- * Google retired gemini-2.5-flash for new keys and names this as the
- * replacement. Reads images and PDFs too, which is what Phase 2 needs.
+ * Chosen by measurement, not by the documentation, which is wrong here.
+ *
+ * The docs give every Flash model 1,500 requests a day. This key gets twenty
+ * — measured, on both gemini-3.6-flash and gemini-3.5-flash, a wall reachable
+ * in two minutes. Twenty a day is the whole app, not one student.
+ *
+ * flash-lite took 179 calls without the daily cap firing at all. It is a
+ * smaller model, so the wrong answers it invents are a little less devious
+ * and bad handwriting is where it will slip first — but a better model
+ * nobody can reach is worth nothing.
  */
-const MODEL = 'gemini-3.6-flash';
+const MODEL = 'gemini-3.5-flash-lite';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 /** Mirrors LIMITS.maxQuestions in the app. A review screen has to be finishable. */
@@ -105,13 +113,14 @@ const DAILY_PAGES_GLOBAL = 3_000;
 /**
  * And a request ceiling underneath it, doing the other job.
  *
- * Google's free tier counts requests, not pages: fifteen hundred a day. Pages
+ * Google's free tier counts requests, not pages: about a thousand a day on
+ * this model. Pages
  * cannot see that limit — three thousand pages is a thousand requests if they
  * arrive as chapters and three thousand if they arrive as pastes. So this one
  * is not a budget at all, it is the wall that keeps us inside Google's, set
  * below it so a student meets our sentence rather than Google's error code.
  */
-const DAILY_REQUESTS_GLOBAL = 1_200;
+const DAILY_REQUESTS_GLOBAL = 800;
 
 /**
  * The same counting, by where the request came from.
