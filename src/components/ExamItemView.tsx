@@ -1152,7 +1152,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     position: 'relative',
   },
   stampOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'flex-end',
     justifyContent: 'center',
     paddingRight: 6,

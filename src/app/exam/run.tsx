@@ -1145,7 +1145,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   /** The frame a hot run lights up behind everything. */
   glowFrame: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderWidth: 3.5,
     borderColor: '#C24E38',
     borderRadius: 26,
