@@ -646,21 +646,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let payload: { questions?: Question[]; sourceText?: string };
   try {
     /**
-     * The free tier goes unavailable under ordinary load, and not briefly.
+     * One retry, and only for a server fault.
      *
-     * "This model is currently experiencing high demand" is a 503, and one
-     * retry after 1.2 seconds was measured failing three files in a row that
-     * had read perfectly an hour earlier. A file is the worst thing to lose
-     * to it: the student waited, uploaded, and got an apology.
+     * Four tries with widening gaps looked right against "high demand" 503s
+     * and was measured making things worse: the quota this runs on is small,
+     * so every retry spends a share of the day's readings on a call that has
+     * already failed, and the waiting pushed one production reading past two
+     * minutes before it gave up anyway.
      *
-     * Four tries with widening gaps instead. 429 is included because Google
-     * rate-limits by the minute and backing off is exactly the right answer
-     * to it — retrying at once is what makes that worse.
+     * 429 is deliberately NOT retried. It means the allowance is gone, and
+     * asking again cannot conjure more of it — it only spends the student's
+     * wait on a refusal that was already final.
      */
     let upstream = await fetch(ENDPOINT, request);
-    for (const wait of [1_000, 3_000, 8_000]) {
-      if (upstream.status < 500 && upstream.status !== 429) break;
-      await new Promise((wake) => setTimeout(wake, wait));
+    if (upstream.status >= 500) {
+      await new Promise((wake) => setTimeout(wake, 1_500));
       upstream = await fetch(ENDPOINT, request);
     }
 
