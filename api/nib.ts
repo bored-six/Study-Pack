@@ -403,9 +403,24 @@ Rules, in order of importance:
    against the original and the question is discarded if it does not match.
 3. "correctAnswer" must be short: at most five words, ideally one or two. It
    has to fit on a button.
-4. "wrongAnswers" must be exactly three, plausible, the same kind of thing as
-   the correct answer, and clearly wrong to somebody who studied the notes.
-   Take them from other terms in the same notes wherever you can.
+4. "wrongAnswers" must be exactly three, and every one of them has to be a
+   thing the student could believe for a moment. Two rules make that so:
+
+   Same kind as the right answer. A temperature is wrong against another
+   temperature, never against a year. A place against another place. A
+   process against another process. If the right answer is a number, all
+   three wrong ones are numbers of the same sort.
+
+   Same part of the document. Take them from the nearby lines — the same
+   page, the same topic — not from wherever in the file a word happens to
+   sit. A document often holds several subjects, and a chemistry term
+   offered against a geography question is not a wrong answer, it is a
+   giveaway: the student rules it out without knowing anything.
+
+   Where the nearby lines cannot supply three of the same kind, write
+   plausible ones of your own that fit the subject. That is the one place
+   invention is allowed, because a decoy is not a claim about the world —
+   but it must still be clearly wrong to anyone who studied the page.
 5. Ask about things worth knowing — a term, a number, a name, a cause, a
    result. Do not ask about the wording of the sentence itself.
 6. One question per fact. Do not ask the same thing twice.
