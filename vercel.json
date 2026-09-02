@@ -3,6 +3,9 @@
   "framework": null,
   "buildCommand": "npx expo export -p web && node scripts/postexport.mjs",
   "outputDirectory": "dist",
+  "functions": {
+    "api/nib.ts": { "maxDuration": 120 }
+  },
   "cleanUrls": true,
   "rewrites": [
     { "source": "/exam/(.*)", "destination": "/exam/[deckId]" }

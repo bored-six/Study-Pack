@@ -645,13 +645,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let payload: { questions?: Question[]; sourceText?: string };
   try {
+    /**
+     * The free tier goes unavailable under ordinary load, and not briefly.
+     *
+     * "This model is currently experiencing high demand" is a 503, and one
+     * retry after 1.2 seconds was measured failing three files in a row that
+     * had read perfectly an hour earlier. A file is the worst thing to lose
+     * to it: the student waited, uploaded, and got an apology.
+     *
+     * Four tries with widening gaps instead. 429 is included because Google
+     * rate-limits by the minute and backing off is exactly the right answer
+     * to it — retrying at once is what makes that worse.
+     */
     let upstream = await fetch(ENDPOINT, request);
-
-    // The free tier goes briefly unavailable under ordinary use — "this model
-    // is currently experiencing high demand" is a 503 that clears in seconds.
-    // One retry turns most of those into a reading instead of an apology.
-    if (upstream.status >= 500) {
-      await new Promise((wake) => setTimeout(wake, 1200));
+    for (const wait of [1_000, 3_000, 8_000]) {
+      if (upstream.status < 500 && upstream.status !== 429) break;
+      await new Promise((wake) => setTimeout(wake, wait));
       upstream = await fetch(ENDPOINT, request);
     }
 
