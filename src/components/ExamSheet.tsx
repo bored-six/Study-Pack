@@ -160,7 +160,7 @@ export function StockLines({ kind, accent }: { kind: PaperStock; accent: string 
 }
 
 const stockStyles = StyleSheet.create({
-  fill: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  fill: { ...StyleSheet.absoluteFill, overflow: 'hidden' },
   rule: {
     position: 'absolute',
     left: 0,

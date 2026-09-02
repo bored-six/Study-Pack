@@ -248,7 +248,7 @@ const SMUDGE_SPOTS: ViewStyle[] = [
 
 const getStockStyles = (colors: any) =>
   StyleSheet.create({
-    fill: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+    fill: { ...StyleSheet.absoluteFill, overflow: 'hidden' },
     rule: {
       position: 'absolute',
       left: 0,

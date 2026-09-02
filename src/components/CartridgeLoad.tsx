@@ -174,13 +174,13 @@ export function CartridgeLoad({ spec, onCovered, onDone }: Props) {
 const getStyles = (colors: any) =>
   StyleSheet.create({
     fill: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       zIndex: 90,
       alignItems: 'center',
       justifyContent: 'center',
     },
     dim: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: 'rgba(39, 54, 43, 0.45)',
     },
     centre: {

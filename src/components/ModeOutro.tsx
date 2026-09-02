@@ -248,13 +248,13 @@ function Figure({
 const getStyles = (colors: any) =>
   StyleSheet.create({
     fill: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       zIndex: 80,
       alignItems: 'center',
       justifyContent: 'center',
     },
     cover: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
     },
     centre: {
       alignItems: 'center',

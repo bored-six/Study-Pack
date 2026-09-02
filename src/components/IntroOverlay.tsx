@@ -157,7 +157,7 @@ export function IntroOverlay({ onDone }: Props) {
 
 const getStyles = (colors: any) => StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.bg,
   },
   fill: {
