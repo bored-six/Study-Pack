@@ -35,6 +35,11 @@ const SOURCES = {
   album_open: require('../../assets/sfx/album_open.wav'),
   day_tap: require('../../assets/sfx/day_tap.wav'),
   tab_flip: require('../../assets/sfx/tab_flip.wav'),
+  // Nib's own three, written for him rather than borrowed from the exam.
+  nib_taped: require('../../assets/sfx/nib_taped.wav'),
+  nib_send: require('../../assets/sfx/nib_send.wav'),
+  nib_reply: require('../../assets/sfx/nib_reply.wav'),
+  nib_cutoff: require('../../assets/sfx/nib_cutoff.wav'),
 } as const;
 
 export type SfxName = keyof typeof SOURCES;
