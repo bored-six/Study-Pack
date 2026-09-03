@@ -558,7 +558,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const globalKey = `nib:all:${today}`;
   /** The same day, counted the other way — see DAILY_REQUESTS_GLOBAL. */
   const globalCallsKey = `nib:calls:${today}`;
-  const addressKey = `nib:ip:${address}:${today}`;
+  /**
+   * The daily ceiling, counted against a hash of the address rather than the
+   * address.
+   *
+   * It used to hold the address as it arrived, which made this one key a
+   * standing list of every IP that had ever used Nib — the exact thing the
+   * weekly counter hashes to avoid, kept in the clear one line away from it.
+   * An address is a person's, the privacy card says the notes are the only
+   * thing that leaves the phone, and a counter does not need to know who it
+   * is counting in order to count.
+   */
+  const addressKey = `nib:ip:${fingerprint(`ip:${address}`)}:${today}`;
 
   /**
    * The same attempt asked twice.

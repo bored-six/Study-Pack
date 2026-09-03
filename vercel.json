@@ -4,18 +4,41 @@
   "buildCommand": "npx expo export -p web && node scripts/postexport.mjs",
   "outputDirectory": "dist",
   "functions": {
-    "api/nib.ts": { "maxDuration": 120 }
+    "api/nib.ts": {
+      "maxDuration": 120
+    }
   },
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/exam/(.*)", "destination": "/exam/[deckId]" }
+    {
+      "source": "/exam/(.*)",
+      "destination": "/exam/[deckId]"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
-        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     }
   ]

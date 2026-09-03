@@ -201,6 +201,41 @@ describe('the two budgets agree', () => {
   });
 });
 
+describe('what the ledger is allowed to remember', () => {
+  it('writes no address into any key, in any form', async () => {
+    // The daily ceiling used to be keyed on the address as it arrived, which
+    // made one key a standing list of every IP that had ever used Nib — the
+    // exact thing the weekly counter hashes to avoid, in the clear one line
+    // away from it. A counter does not need to know who it is counting.
+    gemini = { questions: questionsFrom(NOTES.split('\n').slice(0, 2)) };
+    const address = '203.0.113.77';
+
+    const was = new Set(__fallbackForTests.keys());
+    const out = await ask({ notes: NOTES, deviceId: nextPhone(), platform: 'android' }, address);
+    expect(out.status).toBe(200);
+
+    const written = [...__fallbackForTests.keys()].filter((k) => !was.has(k));
+    expect(written.length).toBeGreaterThan(0);
+    for (const key of written) {
+      expect(key).not.toContain(address);
+      // Nor an octet of it, which would leak the address a piece at a time.
+      for (const octet of address.split('.')) expect(key).not.toContain(`:${octet}.`);
+    }
+  });
+
+  it('writes no device id into any key either', async () => {
+    gemini = { questions: questionsFrom(NOTES.split('\n').slice(0, 2)) };
+    const id = nextPhone();
+
+    const was = new Set(__fallbackForTests.keys());
+    await ask({ notes: NOTES, deviceId: id, platform: 'android' }, '203.0.113.78');
+
+    for (const key of [...__fallbackForTests.keys()].filter((k) => !was.has(k))) {
+      expect(key).not.toContain(id);
+    }
+  });
+});
+
 describe('the blocklist', () => {
   it('refuses a blocked phone without telling it anything', async () => {
     gemini = { questions: questionsFrom(NOTES.split('\n').slice(0, 2)) };
