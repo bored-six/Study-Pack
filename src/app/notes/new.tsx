@@ -34,7 +34,7 @@ import { LIMITS } from '@/lib/noteParser';
 import { readShape, shapeAdvice, shapeNeedsReader } from '@/lib/noteShape';
 import { playSfx } from '@/lib/sfx';
 import { useNotesStore } from '@/store/notes';
-import { derpRadius, font, getColors, onWash, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
+import { derpRadius, font, getColors, outlineOn, radius, shadow, useThemeStore } from '@/theme/tokens';
 
 const PLACEHOLDER = `Chlorophyll: the green pigment that absorbs light
 ATP stands for adenosine triphosphate
@@ -269,7 +269,7 @@ export default function NewNotesScreen() {
                   <Icon
                     name="nib"
                     size={15}
-                    color={onWash.ink}
+                    color={colors.text}
                     fill={colors.surface}
                     strokeWidth={2}
                   />
@@ -351,7 +351,7 @@ export default function NewNotesScreen() {
               <Animated.View entering={FadeInDown.duration(220)} style={styles.reader}>
                 <View style={styles.readerHead}>
                   <View style={styles.readerBadge}>
-                    <Icon name="nib" size={19} color={onWash.ink} fill={colors.surface} strokeWidth={2.2} />
+                    <Icon name="nib" size={19} color={colors.text} fill={colors.surface} strokeWidth={2.2} />
                   </View>
                   <Text style={styles.readerTitle}>Nib can read these as they are</Text>
                 </View>
@@ -700,19 +700,19 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     fontFamily: font.heading,
     fontSize: 13.5,
-    color: onWash.ink,
+    color: colors.text,
   },
   recipeAltBody: {
     fontFamily: font.body,
     fontSize: 12.5,
     lineHeight: 17,
-    color: onWash.dim,
+    color: colors.textDim,
   },
   recipeAltAdd: {
     fontFamily: font.bodyHeavy,
     fontSize: 10,
     letterSpacing: 0.6,
-    color: onWash.ink,
+    color: colors.text,
   },
   recipeHead: {
     flexDirection: 'row',
@@ -904,13 +904,13 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontFamily: font.heading,
     fontSize: 15,
     lineHeight: 19,
-    color: onWash.ink,
+    color: colors.text,
   },
   readerBody: {
     fontFamily: font.body,
     fontSize: 12.5,
     lineHeight: 17.5,
-    color: onWash.dim,
+    color: colors.textDim,
   },
   readerBtn: {
     marginTop: 1,
@@ -919,7 +919,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontFamily: font.bodySemibold,
     fontSize: 11.5,
     lineHeight: 16,
-    color: onWash.faint,
+    color: colors.textDim,
     textAlign: 'center',
   },
   readerWarn: {
