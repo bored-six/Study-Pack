@@ -1,6 +1,8 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { Text } from 'react-native';
 
+import * as DocumentPicker from 'expo-document-picker';
+
 import NibScreen from '../notes/nib';
 
 /** The store the screen reads, swapped per test. */
@@ -11,6 +13,12 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn() }));
+// Only the page count is faked; fileType, percentOfWeek and the limits are
+// the real ones, because the cost sentence is what these tests are about.
+jest.mock('@/lib/aiNotes', () => ({
+  ...jest.requireActual('@/lib/aiNotes'),
+  pdfPageCount: jest.fn(async () => 14),
+}));
 jest.mock('expo-file-system', () => ({ File: class {} }));
 jest.mock('@/lib/sfx', () => ({ playSfx: jest.fn() }));
 jest.mock('@/store/notes', () => {
@@ -48,6 +56,25 @@ function allText(tree: ReactTestRenderer): string {
     .join(' | ');
 }
 
+/** Hands the picker a 14-page PDF and waits for it to be taped on. */
+async function pickAPdf(tree: ReactTestRenderer) {
+  (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValue({
+    canceled: false,
+    assets: [
+      {
+        name: 'Ch4 Transport.pdf',
+        mimeType: 'application/pdf',
+        uri: 'file:///ch4.pdf',
+        size: 1_200_000,
+        base64: 'JVBERi0xLjQK',
+      },
+    ],
+  });
+  await act(async () => {
+    press(tree, 'a file');
+  });
+}
+
 function render(): ReactTestRenderer {
   let tree!: ReactTestRenderer;
   act(() => {
@@ -82,7 +109,7 @@ describe('what Nib says first', () => {
   it('asks, and offers the two ways to answer', () => {
     setStore();
     const said = allText(render());
-    expect(said).toContain('What have you got for me?');
+    expect(said).toContain('Are they for me?');
     expect(said).toContain('a file');
     expect(said).toContain('write it');
   });
@@ -179,5 +206,76 @@ describe('when the reading lands', () => {
     expect(said).toContain('QUESTIONS');
     expect(said).toContain('KINDS');
     expect(said).toContain('See what he made');
+  });
+});
+
+describe('before it costs anything', () => {
+  it('asks what a file will spend instead of just spending it', async () => {
+    const readFile = jest.fn(async () => 3);
+    setStore({ readFile, credits: { left: 150, of: 150 } });
+    const tree = render();
+    await pickAPdf(tree);
+
+    await act(async () => {
+      press(tree, 'Read it');
+    });
+
+    // Nothing has been read yet — the press only asked.
+    expect(readFile).not.toHaveBeenCalled();
+    const said = allText(tree);
+    expect(said).toContain('Read all 14 pages?');
+    // Pages to decide on, percent to feel by.
+    expect(said).toContain('14 of your 150 this week');
+    expect(said).toContain('9%');
+  });
+
+  it('reads it once you say go on', async () => {
+    const readFile = jest.fn(async () => 3);
+    setStore({ readFile, draft: [], credits: { left: 150, of: 150 } });
+    const tree = render();
+    await pickAPdf(tree);
+
+    await act(async () => {
+      press(tree, 'Read it');
+    });
+    await act(async () => {
+      press(tree, 'Go on then');
+    });
+
+    expect(readFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('spends nothing if you back out', async () => {
+    const readFile = jest.fn(async () => 3);
+    setStore({ readFile, credits: { left: 150, of: 150 } });
+    const tree = render();
+    await pickAPdf(tree);
+
+    await act(async () => {
+      press(tree, 'Read it');
+    });
+    await act(async () => {
+      press(tree, 'Wait');
+    });
+
+    expect(readFile).not.toHaveBeenCalled();
+    // The card is gone, and the file is still taped on.
+    const said = allText(tree);
+    expect(said).not.toContain('Read all 14 pages?');
+    expect(said).toContain('Ch4 Transport.pdf');
+  });
+
+  it('does not ask for typed notes — the length is already on screen', async () => {
+    const scanWithReader = jest.fn(async () => 2);
+    setStore({ scanWithReader, draft: [] });
+    const tree = render();
+    press(tree, 'write it');
+    type(tree, 'Osmosis is the movement of water across a membrane.');
+
+    await act(async () => {
+      press(tree, 'Read it');
+    });
+
+    expect(scanWithReader).toHaveBeenCalledTimes(1);
   });
 });

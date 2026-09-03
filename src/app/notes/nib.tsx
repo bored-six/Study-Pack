@@ -122,6 +122,45 @@ function Allowance({ left, of }: { left: number; of: number }) {
   );
 }
 
+/**
+ * How many ruled lines a bubble carries. Five covers his longest message;
+ * the clip hides any that fall past the text.
+ */
+const BUBBLE_RULES = 6;
+
+/**
+ * The scrap of ruled paper Nib writes on.
+ *
+ * The page's own ruling runs behind the whole screen, so his words used to
+ * sit straight on it. That read as a page he had written on — but not as
+ * someone talking to you. Giving each line its own torn-off scrap, with its
+ * own ruling inside, keeps the handwriting on lines and makes each one a
+ * message: something handed over, not merely written down.
+ *
+ * The corner nearest his face is squared off. That is the tail.
+ */
+function Bubble({ children, asleep = false }: { children: React.ReactNode; asleep?: boolean }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+  // A touch stronger than the page ruling behind it, since it has a lit
+  // surface under it rather than the cream of the page.
+  const rule = isDark ? 'rgba(226, 229, 224, 0.10)' : 'rgba(46, 111, 163, 0.13)';
+  return (
+    <View style={[styles.bubble, asleep && styles.bubbleSleep]}>
+      <View pointerEvents="none" style={styles.bubbleClip}>
+        {Array.from({ length: BUBBLE_RULES }, (_, i) => (
+          <View
+            key={i}
+            style={[styles.bubbleRule, { top: 9 + (i + 1) * RULE, backgroundColor: rule }]}
+          />
+        ))}
+      </View>
+      {children}
+    </View>
+  );
+}
+
 /** One thing Nib wrote, in his own hand, on the lines. */
 function Wrote({
   children,
@@ -142,7 +181,9 @@ function Wrote({
         <View style={[styles.who, asleep && styles.whoSleep]}>
           <Icon name="nib" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={2.1} />
         </View>
-        <Text style={styles.hand}>{children}</Text>
+        <Bubble asleep={asleep}>
+          <Text style={styles.hand}>{children}</Text>
+        </Bubble>
       </View>
       {time != null ? <Text style={styles.timeNib}>{time}</Text> : null}
     </View>
@@ -182,15 +223,63 @@ function TypingDot({ delay }: { delay: number }) {
   return <Animated.View style={[styles.typingDot, style]} />;
 }
 
+/**
+ * Nib, visibly working.
+ *
+ * The dots say someone is at the other end; this says it is *him*. He leans
+ * into the page and back out of it, and rocks while he does — the reading
+ * takes up to ninety seconds, and ninety seconds of a still mascot beside
+ * three bouncing dots reads as a screen that has stopped rather than one
+ * that is busy.
+ */
+function NibAtWork() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const styles = getStyles(getColors(isDark));
+  const rock = useSharedValue(0);
+  const lean = useSharedValue(0);
+
+  useEffect(() => {
+    // Slightly different periods, so the two never settle into one motion.
+    rock.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 620, easing: Easing.inOut(Easing.quad) }),
+        withTiming(-1, { duration: 620, easing: Easing.inOut(Easing.quad) })
+      ),
+      -1,
+      true
+    );
+    lean.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 900, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1
+    );
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      // -4deg is where he sits at rest, so the rock is around his own tilt.
+      { rotate: `${-4 + rock.value * 5}deg` },
+      { translateY: lean.value * 2.5 },
+      { scale: 1 + lean.value * 0.04 },
+    ],
+  }));
+
+  return (
+    <Animated.View style={[styles.who, styles.whoAtWork, style]}>
+      <Icon name="nib" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={2.1} />
+    </Animated.View>
+  );
+}
+
 function TypingDots() {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
   const styles = getStyles(colors);
   return (
     <View style={styles.typingRow}>
-      <View style={styles.who}>
-        <Icon name="nib" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={2.1} />
-      </View>
+      <NibAtWork />
       <View style={styles.typingBubble}>
         <TypingDot delay={0} />
         <TypingDot delay={130} />
@@ -235,6 +324,16 @@ export default function NibScreen() {
    */
   const [cutOff, setCutOff] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  /**
+   * Whether the "this will cost you N pages" card is up.
+   *
+   * A file is the one input whose cost the student cannot feel. Fourteen
+   * pages is nine percent of a week gone on one press, and the reading is
+   * charged whether or not they wanted that chapter — so the press asks
+   * first. Typed notes go straight through: they are one page, and the
+   * length is already on screen as you type it.
+   */
+  const [confirming, setConfirming] = useState(false);
   /**
    * The name this try goes by.
    *
@@ -301,7 +400,7 @@ export default function NibScreen() {
       const bytes = asset.size ?? Math.ceil((base64.length * 3) / 4);
       if (bytes > MAX_FILE_BYTES) {
         setProblem(
-          `That one is ${sizeLabel(bytes)}. I can take 3 MB — try a single chapter rather than the whole book?`
+          `That one's ${sizeLabel(bytes)} and I cap out at 3 MB. One chapter, not the whole textbook — I'm small.`
         );
         return;
       }
@@ -312,11 +411,11 @@ export default function NibScreen() {
       // the student was told was that the reader could not be reached.
       const mime = fileType(asset.name, asset.mimeType, base64);
       if (mime == null) {
-        setProblem("I can't tell what kind of file that is. A PDF or a photo?");
+        setProblem("I have no idea what that file even is. A PDF or a photo, please?");
         return;
       }
 
-      playSfx('derp_pop');
+      playSfx('nib_taped');
       attempt.current = newAttempt();
       // Counted here so the cost can be said while the student can still
       // change their mind. The server counts it again, and that one is what
@@ -328,11 +427,16 @@ export default function NibScreen() {
       setWriting(false);
       setBody('');
     };
-    run().catch(() => setProblem("I couldn't open that one. Try another?"));
+    run().catch(() => setProblem("That one won't open for me. Try another?"));
   }, []);
 
   const send = useCallback(() => {
+    setConfirming(false);
     setCutOff(null);
+    // The sound of it leaving your hands: a lift, then a short sweep away.
+    // Fires on the press rather than on the upload finishing, because it is
+    // confirming the press.
+    playSfx('nib_send');
     readingAt.current = nowLabel();
     const run = async () => {
       const staged = picked
@@ -348,20 +452,34 @@ export default function NibScreen() {
         // reported as though it did.
         const failed = useNotesStore.getState().rescueError;
         if (failed != null) {
+          playSfx('nib_cutoff');
           setCutOff(failed);
         } else {
           setProblem(
-            "I couldn't find anything in there worth testing. Try a page with more facts on it?"
+            'I read the whole thing and found nothing worth testing you on. Embarrassing for us both. Try a page with more actual facts?'
           );
         }
         return;
       }
       // Held, not navigated. He has something to say first.
       const kinds = new Set(useNotesStore.getState().draft.map((q) => q.kind)).size;
+      playSfx('nib_reply');
       setFinished({ questions: staged, kinds, at: nowLabel() });
     };
     void run();
   }, [body, picked, readFile, scanWithReader]);
+
+  /**
+   * What the "Read it" button does. A file asks; typed notes just go.
+   */
+  const askThenSend = useCallback(() => {
+    if (picked != null) {
+      playSfx('tap');
+      setConfirming(true);
+      return;
+    }
+    send();
+  }, [picked, send]);
 
   /**
    * Typing makes it a different reading, so it stops being the same attempt.
@@ -425,19 +543,20 @@ export default function NibScreen() {
             {/* --- what he says ------------------------------------------- */}
             {idle && spent ? (
               <Wrote asleep time={askedAt}>
-                That&apos;s my {of === 1 ? 'one' : of} for the week.{'\n'}
-                Back on Monday. Add notes still{'\n'}
-                scans for nothing, and it never{'\n'}
-                needs a signal.
+                That&apos;s my {of === 1 ? 'one' : of} for the week. Every{'\n'}
+                last one. My brain is a damp{'\n'}
+                sponge now. Back on Monday!{'\n'}
+                Add notes still works though —{'\n'}
+                no signal, no me, no bother.
               </Wrote>
             ) : null}
 
             {idle && !spent && empty ? (
               <Wrote time={askedAt}>
-                What have you got for me?{'\n'}
-                A chapter, a handout, a photo{'\n'}
-                of the board — or write it out{'\n'}
-                and I&apos;ll read that.
+                Ooh. Notes. Are they for me?{'\n'}
+                A PDF, a photo of the board, or{'\n'}
+                scribble something below. I&apos;m{'\n'}
+                not a picky reader. Barely a reader.
               </Wrote>
             ) : null}
 
@@ -467,8 +586,8 @@ export default function NibScreen() {
                       </Text>
                       {picked.pages != null && picked.pages > PAGES_WORTH_A_WARNING ? (
                         <Text style={styles.tapedWarn}>
-                          That&apos;s a long one. A chapter of five or six pages gives about as
-                          many questions for a third of the pages.
+                          That&apos;s a big one. Five or six pages gets you about the same number
+                          of questions for a third of the cost. Just saying.
                         </Text>
                       ) : null}
                     </View>
@@ -494,8 +613,8 @@ export default function NibScreen() {
             {idle && !spent && !empty && !interrupted ? (
               <Wrote time={handedOverAt.current ?? undefined}>
                 {picked
-                  ? 'Right, let me have a look.\nI’ll mix it up: some choices, some\nfill-the-blanks, and lists where\nyou’ve written lists.'
-                  : 'Write it out below.\nIt doesn’t need to be tidy —\nthat is rather the point of me.'}
+                  ? 'Ooh, this one looks HARD.\nGood. I’ll do you some multiple\nchoice, some fill-the-blanks, and\nlists where you wrote lists. Posh.'
+                  : 'Go on then. Type at me.\nIt doesn’t need to be tidy.\nTidy isn’t really my whole thing.'}
               </Wrote>
             ) : null}
 
@@ -503,10 +622,10 @@ export default function NibScreen() {
             {rescuing ? (
               <>
                 <Wrote time={readingAt.current ?? undefined}>
-                  Reading it now…{'\n'}
-                  Up to a minute and a half on a{'\n'}
-                  long one. Stay here if you like,{'\n'}
-                  I don&apos;t mind an audience.
+                  Reading! Reading. Don&apos;t look{'\n'}
+                  at me. Up to a minute and a half{'\n'}
+                  if it&apos;s a big one — I move my{'\n'}
+                  lips when I read. It&apos;s a whole thing.
                 </Wrote>
                 <TypingDots />
               </>
@@ -519,19 +638,19 @@ export default function NibScreen() {
                   <View style={styles.who}>
                     <Icon name="nib" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={2.1} />
                   </View>
-                  <View style={styles.flex}>
+                  <Bubble>
                     {/*
                       He stops mid-word. A sentence that runs out is the one
                       thing on a page of handwriting that unmistakably means
                       "interrupted" — no icon has to say it.
                     */}
                     <Text style={styles.hand}>
-                      Reading it now… I was about{'\n'}
+                      I was doing SO well. I was{'\n'}
                       half way through when the li
                       <Text style={styles.trail}>—</Text>
                     </Text>
                     <Squiggle width={62} style={styles.scrawl} />
-                  </View>
+                  </Bubble>
                 </View>
                 {/*
                   The one message where the time actually matters — a student
@@ -543,7 +662,7 @@ export default function NibScreen() {
                 ) : null}
 
                 <View style={styles.torn}>
-                  <Icon name="alert" size={17} color={onWash.ink} strokeWidth={2.5} />
+                  <Icon name="alert" size={17} color={colors.coral} strokeWidth={2.5} />
                   <View style={styles.tornText}>
                     <Text style={styles.tornTitle}>The line went.</Text>
                     <Text style={styles.tornBody}>
@@ -560,7 +679,7 @@ export default function NibScreen() {
                   icon="nib"
                   size="lg"
                   disabled={!ready}
-                  onPress={send}
+                  onPress={askThenSend}
                   style={styles.cta}
                 />
               </Animated.View>
@@ -570,9 +689,10 @@ export default function NibScreen() {
             {finished != null ? (
               <>
                 <Wrote time={finished.at}>
-                  Finished! I read it all and{'\n'}
-                  wrote you {finished.questions}. Have a look{'\n'}
-                  before you keep any of them.
+                  Finished! {finished.questions} questions. I made{'\n'}
+                  them myself, with my own two{'\n'}
+                  hands, which I do not have.{'\n'}
+                  Check them though — I get things wrong.
                 </Wrote>
                 <Animated.View entering={FadeInDown.duration(280)} style={styles.slip}>
                   <View style={styles.slipCell}>
@@ -614,7 +734,7 @@ export default function NibScreen() {
                     spent && styles.faded,
                     pressed && styles.pressed,
                   ]}>
-                  <Icon name="book" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={1.9} />
+                  <Icon name="book" size={19} color={colors.text} fill={colors.surface} strokeWidth={1.9} />
                   <Text style={styles.stickLabel}>a file</Text>
                   <Text style={styles.stickHint}>PDF or photo{'\n'}up to 3 MB</Text>
                 </Pressable>
@@ -632,7 +752,7 @@ export default function NibScreen() {
                     spent && styles.faded,
                     pressed && styles.pressed,
                   ]}>
-                  <Icon name="pencil" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={1.9} />
+                  <Icon name="pencil" size={19} color={colors.text} fill={colors.surface} strokeWidth={1.9} />
                   <Text style={styles.stickLabel}>write it</Text>
                   <Text style={styles.stickHint}>
                     paste or type{'\n'}up to {(LIMITS.maxInputChars / 1000).toFixed(0)},000
@@ -674,7 +794,7 @@ export default function NibScreen() {
                 icon={rescuing ? 'pencil' : spent ? 'clock' : 'nib'}
                 size="lg"
                 disabled={rescuing || !ready}
-                onPress={send}
+                onPress={askThenSend}
                 style={styles.cta}
               />
             ) : null}
@@ -684,6 +804,29 @@ export default function NibScreen() {
             </Text>
           </ScrollView>
         </View>
+
+        {/*
+          Named in pages rather than percent, because pages are the thing
+          being spent and the percent is only how it feels. Both are here:
+          the number to decide on, and the number to feel.
+        */}
+        <ConfirmModal
+          visible={confirming}
+          title={
+            picked?.pages != null
+              ? `Read all ${picked.pages} ${picked.pages === 1 ? 'page' : 'pages'}?`
+              : 'Hand it over?'
+          }
+          message={
+            picked?.pages != null
+              ? `That's ${picked.pages} of your ${of} this week — about ${percentOfWeek(picked.pages, of)}% of it, and I can't un-read it.`
+              : `I can't count the pages in that one, so it will cost what it costs.`
+          }
+          confirmLabel="Go on then"
+          cancelLabel="Wait"
+          onConfirm={send}
+          onCancel={() => setConfirming(false)}
+        />
 
         <ConfirmModal
           visible={problem != null}
@@ -790,6 +933,8 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
       ...shadow.card,
     },
     typingDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: '#8892CE' },
+    /** Reanimated drives the transform, so the static tilt comes off. */
+    whoAtWork: { transform: [] },
     who: {
       width: 32,
       height: 32,
@@ -802,7 +947,32 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
       marginTop: 3,
     },
     whoSleep: { backgroundColor: colors.disabledBg },
-    hand: { flex: 1, fontFamily: font.hero, fontSize: 17, lineHeight: RULE, color: colors.text },
+    hand: { fontFamily: font.hero, fontSize: 17, lineHeight: RULE, color: colors.text },
+    /**
+     * His paper. Sized by its content rather than stretched to the column,
+     * which is what makes a run of them read as messages: each one is as
+     * wide as what he actually said.
+     */
+    bubble: {
+      flexShrink: 1,
+      maxWidth: '100%',
+      backgroundColor: colors.surface,
+      ...outlineOn(colors),
+      ...derpRadius,
+      // Squared toward his face. The tail.
+      borderTopLeftRadius: 5,
+      paddingTop: 9,
+      paddingBottom: 10,
+      paddingHorizontal: 13,
+      overflow: 'hidden',
+      ...shadow.card,
+    },
+    /** Out of pages, out of paper: the scrap goes grey with him. */
+    bubbleSleep: { backgroundColor: colors.disabledBg },
+    /** Holds the ruling, so the clip never touches the bubble's own shadow. */
+    bubbleClip: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+    /** One line of the scrap's own ruling, sat under a line of his hand. */
+    bubbleRule: { position: 'absolute', left: 0, right: 0, height: 1 },
 
     /** The dash his pen left when the sentence stopped. */
     trail: { color: colors.coral },
@@ -822,12 +992,12 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
       ...shadow.card,
     },
     tornText: { flex: 1, gap: 2 },
-    tornTitle: { fontFamily: font.heading, fontSize: 14.5, color: onWash.ink },
+    tornTitle: { fontFamily: font.heading, fontSize: 14.5, color: colors.text },
     tornBody: {
       fontFamily: font.body,
       fontSize: 12.5,
       lineHeight: 17.5,
-      color: onWash.dim,
+      color: colors.textDim,
     },
 
     mine: { alignItems: 'flex-end' },
@@ -890,12 +1060,12 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
     },
     stickGold: { backgroundColor: colors.goldWash, transform: [{ rotate: '-1deg' }] },
     stickMint: { backgroundColor: colors.accentWash, transform: [{ rotate: '1deg' }] },
-    stickLabel: { fontFamily: font.hero, fontSize: 19, lineHeight: 22, color: onWash.ink },
+    stickLabel: { fontFamily: font.hero, fontSize: 19, lineHeight: 22, color: colors.text },
     stickHint: {
       fontFamily: font.bodySemibold,
       fontSize: 10.5,
       lineHeight: 14,
-      color: onWash.faint,
+      color: colors.textDim,
       textAlign: 'center',
     },
 
@@ -932,12 +1102,12 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
       ...shadow.card,
     },
     slipCell: { flex: 1, alignItems: 'center' },
-    slipNum: { fontFamily: font.hero, fontSize: 30, lineHeight: 32, color: onWash.ink },
+    slipNum: { fontFamily: font.hero, fontSize: 30, lineHeight: 32, color: colors.text },
     slipLab: {
       fontFamily: font.bodyHeavy,
       fontSize: 9,
       letterSpacing: 0.9,
-      color: onWash.dim,
+      color: colors.textDim,
       marginTop: 2,
     },
     slipDiv: { width: 1.5, alignSelf: 'stretch', backgroundColor: colors.edge, opacity: 0.5 },
