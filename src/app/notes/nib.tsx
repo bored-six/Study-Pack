@@ -197,11 +197,26 @@ export default function NibScreen() {
       const asset = result.assets[0];
       if (!asset) return;
 
-      const file = new File(asset.uri);
+      /**
+       * Two different ways to get the bytes, because expo-file-system's
+       * File class is real on a phone and an empty stub in a browser — its
+       * own web build declares the class with no methods at all. Calling
+       * .base64() there does not fail loudly, it just is not a function,
+       * and the picker throws before the student ever hears why.
+       *
+       * The picker itself already solves this on web: asset.base64 is
+       * populated by default, a plain data URL with the bytes already
+       * inside it, and this is the one field that is always safe to read.
+       * Native never sets it, so the phone still goes through File.
+       */
+      const base64 = asset.base64
+        ? asset.base64.replace(/^data:[^;]*;base64,/, '')
+        : await new File(asset.uri).base64();
+
       // Checked here rather than after the upload: telling a student their
       // file was too big once they have already waited for it to send is the
       // rudest possible order to do this in.
-      const bytes = asset.size ?? file.size ?? 0;
+      const bytes = asset.size ?? Math.ceil((base64.length * 3) / 4);
       if (bytes > MAX_FILE_BYTES) {
         setProblem(
           `That one is ${sizeLabel(bytes)}. I can take 3 MB — try a single chapter rather than the whole book?`
@@ -209,7 +224,6 @@ export default function NibScreen() {
         return;
       }
 
-      const base64 = await file.base64();
       // Asked of the picker, then of the name, then of the bytes themselves.
       // It used to assume PDF when the picker said nothing, which sent photos
       // to the reader labelled as documents and got them refused — and all
