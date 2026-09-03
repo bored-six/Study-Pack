@@ -1,7 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,7 +12,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChunkyButton } from '@/components/ChunkyButton';
@@ -75,9 +84,16 @@ type Picked = {
   bytes: number;
   /** Pages, once they have been counted. Null when the file would not open. */
   pages: number | null;
+  /** When it was handed over — shown under the card, chat-style. */
+  at: string;
 };
 /** What he hands over when he is done. */
-type Finished = { questions: number; kinds: number };
+type Finished = { questions: number; kinds: number; at: string };
+
+/** A plain clock reading, the way a messaging app timestamps a line. */
+function nowLabel(): string {
+  return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
 
 function sizeLabel(bytes: number): string {
   return bytes < 1024 * 1024
@@ -110,19 +126,76 @@ function Allowance({ left, of }: { left: number; of: number }) {
 function Wrote({
   children,
   asleep = false,
+  time,
 }: {
   children: React.ReactNode;
   asleep?: boolean;
+  /** When this line was written — a small chat-style timestamp underneath. */
+  time?: string;
 }) {
   const isDark = useThemeStore((s) => s.isDark);
   const colors = getColors(isDark);
   const styles = getStyles(colors);
   return (
-    <View style={styles.wrote}>
-      <View style={[styles.who, asleep && styles.whoSleep]}>
+    <View>
+      <View style={styles.wrote}>
+        <View style={[styles.who, asleep && styles.whoSleep]}>
+          <Icon name="nib" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={2.1} />
+        </View>
+        <Text style={styles.hand}>{children}</Text>
+      </View>
+      {time != null ? <Text style={styles.timeNib}>{time}</Text> : null}
+    </View>
+  );
+}
+
+/**
+ * Three dots, bouncing, while a reading is in flight.
+ *
+ * Additive rather than a replacement for the "Reading it now…" line above
+ * it — that sentence says what is happening and how long it might take,
+ * which the dots alone cannot. This is just the small chat-app tell that
+ * someone is on the other end doing something right now.
+ */
+/** One bouncing dot. Its own component so the loop lives in JSX, not in hooks. */
+function TypingDot({ delay }: { delay: number }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const styles = getStyles(getColors(isDark));
+  const bounce = useSharedValue(0);
+
+  useEffect(() => {
+    bounce.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(-5, { duration: 260, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: 260, easing: Easing.in(Easing.quad) })
+        ),
+        -1
+      )
+    );
+    // Fires once to start an animation that then runs on its own.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: bounce.value }] }));
+  return <Animated.View style={[styles.typingDot, style]} />;
+}
+
+function TypingDots() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const colors = getColors(isDark);
+  const styles = getStyles(colors);
+  return (
+    <View style={styles.typingRow}>
+      <View style={styles.who}>
         <Icon name="nib" size={19} color={onWash.ink} fill="#FFFFFF" strokeWidth={2.1} />
       </View>
-      <Text style={styles.hand}>{children}</Text>
+      <View style={styles.typingBubble}>
+        <TypingDot delay={0} />
+        <TypingDot delay={130} />
+        <TypingDot delay={260} />
+      </View>
     </View>
   );
 }
@@ -171,6 +244,15 @@ export default function NibScreen() {
    * a different reading and should cost what a reading costs.
    */
   const attempt = useRef(newAttempt());
+  /** When Nib's opening line was written — captured once, not on every render. */
+  const [askedAt] = useState(() => nowLabel());
+  /**
+   * When you answered him — picked a file or chose to write. Stable across
+   * re-renders while you keep typing, which nowLabel() inline would not be.
+   */
+  const handedOverAt = useRef<string | null>(null);
+  /** When the current reading started. */
+  const readingAt = useRef<string | null>(null);
 
   const over = body.length > LIMITS.maxInputChars;
   const counter = useMemo(
@@ -240,7 +322,8 @@ export default function NibScreen() {
       // change their mind. The server counts it again, and that one is what
       // is charged — a wrong number here is a wrong sentence, never a bill.
       const pages = mime === 'application/pdf' ? await pdfPageCount(base64) : 1;
-      setPicked({ base64, mime, name: asset.name, bytes, pages });
+      handedOverAt.current = nowLabel();
+      setPicked({ base64, mime, name: asset.name, bytes, pages, at: handedOverAt.current });
       // A file and a written page are two answers to one question.
       setWriting(false);
       setBody('');
@@ -250,6 +333,7 @@ export default function NibScreen() {
 
   const send = useCallback(() => {
     setCutOff(null);
+    readingAt.current = nowLabel();
     const run = async () => {
       const staged = picked
         ? await readFile(
@@ -274,7 +358,7 @@ export default function NibScreen() {
       }
       // Held, not navigated. He has something to say first.
       const kinds = new Set(useNotesStore.getState().draft.map((q) => q.kind)).size;
-      setFinished({ questions: staged, kinds });
+      setFinished({ questions: staged, kinds, at: nowLabel() });
     };
     void run();
   }, [body, picked, readFile, scanWithReader]);
@@ -340,7 +424,7 @@ export default function NibScreen() {
 
             {/* --- what he says ------------------------------------------- */}
             {idle && spent ? (
-              <Wrote asleep>
+              <Wrote asleep time={askedAt}>
                 That&apos;s my {of === 1 ? 'one' : of} for the week.{'\n'}
                 Back on Monday. Add notes still{'\n'}
                 scans for nothing, and it never{'\n'}
@@ -349,7 +433,7 @@ export default function NibScreen() {
             ) : null}
 
             {idle && !spent && empty ? (
-              <Wrote>
+              <Wrote time={askedAt}>
                 What have you got for me?{'\n'}
                 A chapter, a handout, a photo{'\n'}
                 of the board — or write it out{'\n'}
@@ -399,11 +483,16 @@ export default function NibScreen() {
                     ) : null}
                   </View>
                 </View>
+                {/* The small chat-app tell that this was actually sent. */}
+                <View style={styles.seenRow}>
+                  <Text style={styles.timeYou}>{picked.at}</Text>
+                  <Icon name="check" size={11} color={colors.leaf} strokeWidth={3} />
+                </View>
               </Animated.View>
             ) : null}
 
             {idle && !spent && !empty && !interrupted ? (
-              <Wrote>
+              <Wrote time={handedOverAt.current ?? undefined}>
                 {picked
                   ? 'Right, let me have a look.\nI’ll mix it up: some choices, some\nfill-the-blanks, and lists where\nyou’ve written lists.'
                   : 'Write it out below.\nIt doesn’t need to be tidy —\nthat is rather the point of me.'}
@@ -412,12 +501,15 @@ export default function NibScreen() {
 
             {/* --- reading ----------------------------------------------- */}
             {rescuing ? (
-              <Wrote>
-                Reading it now…{'\n'}
-                Up to a minute and a half on a{'\n'}
-                long one. Stay here if you like,{'\n'}
-                I don&apos;t mind an audience.
-              </Wrote>
+              <>
+                <Wrote time={readingAt.current ?? undefined}>
+                  Reading it now…{'\n'}
+                  Up to a minute and a half on a{'\n'}
+                  long one. Stay here if you like,{'\n'}
+                  I don&apos;t mind an audience.
+                </Wrote>
+                <TypingDots />
+              </>
             ) : null}
 
             {/* --- cut off mid-sentence ---------------------------------- */}
@@ -469,7 +561,7 @@ export default function NibScreen() {
             {/* --- finished: he says so, and waits ----------------------- */}
             {finished != null ? (
               <>
-                <Wrote>
+                <Wrote time={finished.at}>
                   Finished! I read it all and{'\n'}
                   wrote you {finished.questions}. Have a look{'\n'}
                   before you keep any of them.
@@ -519,7 +611,10 @@ export default function NibScreen() {
                   <Text style={styles.stickHint}>PDF or photo{'\n'}up to 3 MB</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => setWriting(true)}
+                  onPress={() => {
+                    handedOverAt.current = nowLabel();
+                    setWriting(true);
+                  }}
                   disabled={spent}
                   accessibilityRole="button"
                   accessibilityLabel="Write it out for Nib"
@@ -653,6 +748,40 @@ const getStyles = (colors: ReturnType<typeof getColors>) =>
 
     // His hand, on the ruling — the line height is the gap between lines.
     wrote: { flexDirection: 'row', gap: 9, alignItems: 'flex-start' },
+    /** Under his line, indented past the avatar so it sits under the text. */
+    timeNib: {
+      fontFamily: font.bodySemibold,
+      fontSize: 10,
+      color: colors.textFaint,
+      marginTop: 3,
+      marginLeft: 41,
+    },
+    /** Under yours, aligned the same way the taped card sits — flush right. */
+    timeYou: { fontFamily: font.bodySemibold, fontSize: 10, color: colors.textFaint },
+    seenRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 4,
+      justifyContent: 'flex-end',
+    },
+    typingRow: { flexDirection: 'row', gap: 9, alignItems: 'center', marginTop: 6 },
+    typingBubble: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: colors.surface,
+      borderWidth: 1.8,
+      borderColor: colors.edge,
+      borderTopLeftRadius: 4,
+      borderTopRightRadius: 16,
+      borderBottomRightRadius: 16,
+      borderBottomLeftRadius: 16,
+      paddingHorizontal: 13,
+      paddingVertical: 10,
+      ...shadow.card,
+    },
+    typingDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: '#8892CE' },
     who: {
       width: 32,
       height: 32,
