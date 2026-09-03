@@ -12,6 +12,7 @@ import {
 } from '@expo-google-fonts/nunito';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import Head from 'expo-router/head';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -76,25 +77,49 @@ export default function RootLayout() {
     }
   }, [settled]);
 
+  /**
+   * The name in the browser tab, on a bookmark, and on a shared link.
+   *
+   * Rendered in every branch below, including the one that returns while
+   * fonts and the database are still opening. The static web export
+   * snapshots this component before either of those settles, so a title
+   * placed only in the happy path never reaches the exported HTML — which
+   * is exactly how the site came to ship an empty <title> and show its URL
+   * where its name should be.
+   *
+   * Expo Router emits the document's first <title>, and a browser honours
+   * the first one, so this is the only place that can fill it. No-ops on a
+   * phone.
+   */
+  const documentTitle = (
+    <Head>
+      <title>Flipp</title>
+    </Head>
+  );
+
   if (!settled) {
-    return null;
+    return documentTitle;
   }
 
   if (dbState === 'error') {
     return (
-      <View style={styles.errorScreen}>
-        <Text style={styles.errorTitle}>Storage failed to start</Text>
-        <Text style={styles.errorBody}>
-          Flipp couldn't open its local database. Restart the app; if it keeps
-          happening, reinstall.
-        </Text>
-        {dbError ? <Text style={styles.errorDetail}>{dbError}</Text> : null}
-      </View>
+      <>
+        {documentTitle}
+        <View style={styles.errorScreen}>
+          <Text style={styles.errorTitle}>Storage failed to start</Text>
+          <Text style={styles.errorBody}>
+            Flipp couldn&apos;t open its local database. Restart the app; if it keeps
+            happening, reinstall.
+          </Text>
+          {dbError ? <Text style={styles.errorDetail}>{dbError}</Text> : null}
+        </View>
+      </>
     );
   }
 
   return (
     <>
+      {documentTitle}
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
