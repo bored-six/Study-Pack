@@ -533,6 +533,14 @@ export default function NibScreen() {
                     <Squiggle width={62} style={styles.scrawl} />
                   </View>
                 </View>
+                {/*
+                  The one message where the time actually matters — a student
+                  coming back to a failed reading wants to know when it went,
+                  and this was the only line on the screen without a clock.
+                */}
+                {readingAt.current != null ? (
+                  <Text style={styles.timeNib}>{readingAt.current}</Text>
+                ) : null}
 
                 <View style={styles.torn}>
                   <Icon name="alert" size={17} color={onWash.ink} strokeWidth={2.5} />
