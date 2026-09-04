@@ -121,11 +121,22 @@ export function failureReason(error: unknown): AiFailure {
 }
 
 /**
- * Where Nib lives. Overridable for a local proxy while developing; the
- * default is the deployed one, because a phone has no localhost to talk to.
+ * Where Nib lives. Overridable for a local proxy while developing.
+ *
+ * In a browser this is a path, not a URL, so the call is always made to
+ * whatever host the page is already being served from. That is not tidiness:
+ * the API is on the same deployment as the site and sends no CORS headers,
+ * so naming an absolute host here means any *other* address the app is
+ * reachable at makes a cross-origin request and gets blocked before it
+ * leaves the browser. The app reports that as a lost connection, which is
+ * how adding a second domain silently broke Nib on the new one while the
+ * old one kept working.
+ *
+ * A phone has no page to be relative to, so it keeps the absolute address.
  */
 const NIB_URL =
-  process.env.EXPO_PUBLIC_NIB_URL ?? 'https://flipp-theta-gilt.vercel.app/api/nib';
+  process.env.EXPO_PUBLIC_NIB_URL ??
+  (Platform.OS === 'web' ? '/api/nib' : 'https://flipp-theta-gilt.vercel.app/api/nib');
 
 /** Long enough for a full page, short enough to give up rather than hang. */
 const TIMEOUT_MS = 25_000;
