@@ -455,8 +455,12 @@ export default function NibScreen() {
           playSfx('nib_cutoff');
           setCutOff(failed);
         } else {
+          // Distinct from "the line went" on purpose: nothing failed here.
+          // He read it, and could not quote anything back out of it.
           setProblem(
-            'I read the whole thing and found nothing worth testing you on. Embarrassing for us both. Try a page with more actual facts?'
+            picked != null
+              ? 'I read all of that and could not find a single fact to test you on. Embarrassing for us both. Is it mostly pictures or headings?'
+              : 'I read all of that and could not find a single fact to test you on. Embarrassing for us both. Try a page with more actual statements on it?'
           );
         }
         return;

@@ -485,6 +485,57 @@ function shuffle<T>(items: T[]): T[] {
   return out;
 }
 
+/**
+ * The shortest run of words that can stand as a quote.
+ *
+ * Only applied to sentences pulled out of a longer line. A line grounds at
+ * any length, as it always did — a heading or a one-line fact is the
+ * student's own writing and there is nothing to be suspicious of.
+ */
+const SHORTEST_QUOTE = 5;
+
+/**
+ * Everything the model is allowed to quote, mapped to how it was written.
+ *
+ * Whole lines, and the sentences inside them.
+ *
+ * It used to be whole lines only, which quietly broke the commonest way
+ * notes arrive. A chapter pasted out of a PDF is one unbroken block, so
+ * every sentence the model quoted was *part of* a line rather than a line;
+ * nothing matched, every question was dropped, and the student got a
+ * reading that returned nothing and charged nothing, with no way to tell
+ * why. Measured on three good definitions: 0 questions as a paragraph, 4
+ * with line breaks, same notes and the same minute.
+ *
+ * Grounding is no weaker for it. A sentence is still the student's own text
+ * word for word, and still has to be handed back exactly; what this will
+ * not take is a fragment, which is what "has it shown its working" is
+ * actually asking.
+ */
+function groundable(corpus: string): Map<string, string> {
+  const units = new Map<string, string>();
+
+  const add = (text: string, minWords: number) => {
+    const trimmed = text.trim();
+    const key = normalize(trimmed);
+    if (key.length === 0 || wordCount(trimmed) < minWords) return;
+    // First writing wins, so a repeated sentence keeps its original casing.
+    if (!units.has(key)) units.set(key, trimmed);
+  };
+
+  for (const line of corpus.split('\n')) {
+    add(line, 1);
+    // Split on sentence enders followed by space. Only worth doing when it
+    // actually finds more than one — otherwise it is the line again.
+    const sentences = line.split(/(?<=[.!?])\s+/);
+    if (sentences.length > 1) {
+      for (const sentence of sentences) add(sentence, SHORTEST_QUOTE);
+    }
+  }
+
+  return units;
+}
+
 /** Collapses whitespace and case, so a quote is compared on its words. */
 function normalize(text: string): string {
   return text.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -726,12 +777,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // typing, but it still forces an invention to be written down where the
   // student can see it, rather than appearing only as an answer.
   const corpus = isFile ? (payload.sourceText ?? '') : (notes as string);
-  const lines = new Set(
-    corpus
-      .split('\n')
-      .map((line) => normalize(line))
-      .filter((line) => line.length > 0)
-  );
+  const sources = groundable(corpus);
 
   const answers = new Set<string>();
   const kept: Record<string, unknown>[] = [];
@@ -741,10 +787,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!q || typeof q.prompt !== 'string' || typeof q.correctAnswer !== 'string') continue;
 
     const quoted = normalize(String(q.sourceLine ?? ''));
-    // The quote has to be a whole line the student wrote. `has` rather than a
-    // substring search on purpose: a model that returns three words found
-    // somewhere in the notes has not shown its working.
-    if (quoted.length === 0 || !lines.has(quoted)) continue;
+    // The quote has to be a whole line, or a whole sentence inside one, as
+    // the student wrote it. An exact lookup rather than a substring search
+    // on purpose: a model returning three words found somewhere in the
+    // notes has not shown its working.
+    const written = sources.get(quoted);
+    if (written == null) continue;
 
     const correct = q.correctAnswer.trim();
     if (correct.length === 0 || wordCount(correct) > 5) continue;
@@ -769,8 +817,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         answers: items,
         kind: 'enumeration',
         ordered: q.ordered === true,
-        sourceLine:
-          corpus.split('\n').find((line) => normalize(line) === quoted)?.trim() ?? null,
+        sourceLine: written,
       });
       continue;
     }
@@ -791,10 +838,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       correctAnswer: correct,
       answers: shuffle([correct, ...wrong.slice(0, 3)]),
       kind: q.kind === 'cloze' ? 'cloze' : 'definition',
-      // The line as the student wrote it, not the normalized form — the app
-      // matches this against its own skipped list.
-      sourceLine:
-        corpus.split('\n').find((line) => normalize(line) === quoted)?.trim() ?? null,
+      // As the student wrote it, not the normalized form — the app matches
+      // this against its own skipped list.
+      sourceLine: written,
     });
   }
 
